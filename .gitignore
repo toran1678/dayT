@@ -1,0 +1,48 @@
+# Environment variables (never commit real secrets)
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Backend (Spring Boot / Gradle / Java)
+backend/.gradle/
+backend/build/
+backend/out/
+backend/bin/
+*.log
+
+# AI Service (FastAPI / Python)
+ai-service/.venv/
+ai-service/venv/
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Mobile (Expo / React Native) & Web (Next.js)
+**/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+web/.next/
+web/out/
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.tsbuildinfo
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
