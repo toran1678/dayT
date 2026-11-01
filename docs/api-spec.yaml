@@ -1,0 +1,1445 @@
+openapi: 3.0.3
+info:
+  title: DayT API Specification
+  version: 1.0.0
+  description: |
+    DayT(하루 전체를 책임지는 올인원 데이트 코스 서비스)의 단일 기준(Source of Truth) API 명세서.
+    - Client (`mobile`, `web`) ↔ Main Backend (`backend`, Spring Boot): `/api/v1/...`
+    - Main Backend (`backend`) ↔ AI & Data Service (`ai-service`, FastAPI): `/internal/ai/v1/...`
+    - 실시간 공동 코스 편집 WebSocket 엔드포인트(별도 STOMP 프로토콜): `ws://{host}/ws/collab` (구독: `/topic/courses/{shareToken}`, 발행: `/app/courses/{shareToken}/edit`)
+
+servers:
+  - url: http://localhost:8080
+    description: Local Spring Boot Main API Server
+  - url: http://localhost:8000
+    description: Local FastAPI AI & Data Service (Internal)
+
+tags:
+  - name: Auth
+    description: 소셜 로그인 및 토큰 인증 (P0)
+  - name: Users & Couples
+    description: 내 프로필 및 커플 연결 관리 (P0 / P2)
+  - name: Places
+    description: 지역·카테고리 장소 탐색 및 음식 추천 (P0 / P1)
+  - name: Courses
+    description: 커스텀 코스 CRUD, AI 추천, 공유 및 구글맵 연동 (P0 ~ P2)
+  - name: Pets & Missions
+    description: Grow Together 커플 펫 성장 및 일일 미션 (P2)
+  - name: Diaries
+    description: 커플 데이트 일기장 (P2)
+  - name: Internal AI
+    description: Spring Boot ↔ FastAPI 내부 전용 AI/수집 통신 API (P1)
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ==========================================
+  # 1. Auth (인증)
+  # ==========================================
+  /api/v1/auth/oauth/{provider}:
+    post:
+      tags: [Auth]
+      summary: 소셜 로그인 (카카오 / 구글)
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/OAuthProvider'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthLoginRequest'
+      responses:
+        '200':
+          description: 로그인 성공 및 JWT 발급
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Access Token 재발급
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+      responses:
+        '200':
+          description: 토큰 재발급 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: 로그아웃 (Refresh Token 만료 처리)
+      responses:
+        '204':
+          description: 로그아웃 완료
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================
+  # 2. Users & Couples (사용자 및 커플 연결)
+  # ==========================================
+  /api/v1/users/me:
+    get:
+      tags: [Users & Couples]
+      summary: 내 프로필 및 커플 상태 조회
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Users & Couples]
+      summary: 내 프로필 수정
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: 수정된 사용자 프로필 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/couples/invite:
+    post:
+      tags: [Users & Couples]
+      summary: 커플 연결용 초대 코드 생성
+      responses:
+        '200':
+          description: 초대 코드 발급 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoupleInviteResponse'
+
+  /api/v1/couples/connect:
+    post:
+      tags: [Users & Couples]
+      summary: 초대 코드로 커플 연결 확정
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoupleConnectRequest'
+      responses:
+        '200':
+          description: 커플 연결 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoupleSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # 3. Places (장소 탐색 및 음식 추천)
+  # ==========================================
+  /api/v1/places/search:
+    get:
+      tags: [Places]
+      summary: 지역·카테고리·예산 기반 장소 탐색
+      parameters:
+        - name: keyword
+          in: query
+          required: false
+          description: "역/동네 또는 장소 검색어 (예: 성수동, 홍대입구역)"
+          schema:
+            type: string
+        - name: latitude
+          in: query
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: longitude
+          in: query
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: radiusMeters
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1500
+            minimum: 100
+            maximum: 10000
+        - name: categoryGroup
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/PlaceCategoryGroup'
+        - name: foodCategory
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/FoodCategory'
+        - name: maxPricePerPerson
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: isIndoor
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 장소 탐색 결과 목록 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceSearchListResponse'
+
+  /api/v1/places/foods/recommend:
+    get:
+      tags: [Places]
+      summary: 취향·예산 기반 음식 메뉴 및 주변 식당 추천
+      parameters:
+        - name: foodCategory
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/FoodCategory'
+        - name: latitude
+          in: query
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: longitude
+          in: query
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: budgetPerPerson
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 추천 음식 메뉴 및 매칭 장소 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodRecommendationResponse'
+
+  /api/v1/places/{placeId}:
+    get:
+      tags: [Places]
+      summary: 장소 상세 정보 및 AI 해시태그 요약 조회
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 장소 상세 정보 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # 4. Courses (데이트 코스 · AI 추천 · 공유 · 구글맵)
+  # ==========================================
+  /api/v1/courses:
+    get:
+      tags: [Courses]
+      summary: 내 저장 코스(및 커플 공유 코스) 목록 조회
+      responses:
+        '200':
+          description: 코스 요약 목록 반환
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CourseListItem'
+    post:
+      tags: [Courses]
+      summary: 새 데이트 코스 저장 (직접 제작 또는 AI 추천본 확정 저장)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseUpsertRequest'
+      responses:
+        '201':
+          description: 코스 생성 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/courses/recommend:
+    post:
+      tags: [Courses]
+      summary: Gemini 기반 맞춤형 데이트 코스 자동 추천 생성
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseRecommendRequest'
+      responses:
+        '200':
+          description: AI 추천 코스 프리뷰 반환 (저장 전 미리보기 상태)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRecommendationPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/courses/shared/{shareToken}:
+    get:
+      tags: [Courses]
+      summary: 공유 토큰으로 코스 상세 조회 (카톡 OG 프리뷰 및 공동 편집 입장용)
+      security: []
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 공유된 코스 상세 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/courses/{courseId}:
+    get:
+      tags: [Courses]
+      summary: 데이트 코스 상세 조회 (지도 마커·폴리라인 동선 데이터 포함)
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 코스 상세 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Courses]
+      summary: 데이트 코스 전체 수정 (제목, 테마, 방문 장소 및 순서 변경)
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseUpsertRequest'
+      responses:
+        '200':
+          description: 수정된 코스 상세 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDetail'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Courses]
+      summary: 데이트 코스 삭제
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: 삭제 성공
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/courses/{courseId}/collaboration:
+    patch:
+      tags: [Courses]
+      summary: 실시간 공동 코스 편집 허용 여부 변경
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isCollabOpen]
+              properties:
+                isCollabOpen:
+                  type: boolean
+      responses:
+        '200':
+          description: 상태 변경 후 코스 상세 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDetail'
+
+  /api/v1/courses/{courseId}/google-maps-link:
+    get:
+      tags: [Courses]
+      summary: 스마트폰 구글맵 원클릭 경유지 길안내 Deep Link 생성
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Google Maps URL Scheme 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoogleMapsLinkResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/courses/{courseId}/export.kml:
+    get:
+      tags: [Courses]
+      summary: 구글 내 지도(My Maps) 임포트용 KML 파일 다운로드
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: KML XML 파일 스트림 반환
+          content:
+            application/vnd.google-earth.kml+xml:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # 5. Pets & Missions (Grow Together)
+  # ==========================================
+  /api/v1/pets/me:
+    get:
+      tags: [Pets & Missions]
+      summary: 연결된 커플 펫 성장 상태 조회
+      responses:
+        '200':
+          description: 커플 펫 정보 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CouplePetResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/pets/check-in:
+    post:
+      tags: [Pets & Missions]
+      summary: 오늘의 만남 인증 (하루 1회 경험치 성장 반영)
+      responses:
+        '200':
+          description: 만남 인증 처리 및 갱신된 펫 상태 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CouplePetResponse'
+        '409':
+          description: 오늘 이미 만남 인증을 완료한 경우
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/missions/today:
+    get:
+      tags: [Pets & Missions]
+      summary: 오늘의 커플 성장 미션 목록 조회
+      responses:
+        '200':
+          description: 일일 미션 배열 반환
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DailyMissionItem'
+
+  /api/v1/missions/{missionLogId}/complete:
+    post:
+      tags: [Pets & Missions]
+      summary: 오늘의 성장 미션 완료 처리 및 펫 경험치 적립
+      parameters:
+        - name: missionLogId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 미션 완료 후 갱신된 미션 상태 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyMissionItem'
+
+  # ==========================================
+  # 6. Diaries (데이트 일기장)
+  # ==========================================
+  /api/v1/diaries:
+    get:
+      tags: [Diaries]
+      summary: 데이트 일기 목록 조회
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 일기 목록 반환
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DiaryDetail'
+    post:
+      tags: [Diaries]
+      summary: 데이트 일기 작성
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiaryUpsertRequest'
+      responses:
+        '201':
+          description: 일기 생성 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiaryDetail'
+
+  /api/v1/diaries/{diaryId}:
+    get:
+      tags: [Diaries]
+      summary: 데이트 일기 상세 조회
+      parameters:
+        - name: diaryId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 일기 상세 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiaryDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Diaries]
+      summary: 데이트 일기 수정
+      parameters:
+        - name: diaryId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiaryUpsertRequest'
+      responses:
+        '200':
+          description: 수정된 일기 상세 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiaryDetail'
+    delete:
+      tags: [Diaries]
+      summary: 데이트 일기 삭제
+      parameters:
+        - name: diaryId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: 삭제 완료
+
+  # ==========================================
+  # 7. Internal AI Service (Spring Boot -> FastAPI)
+  # ==========================================
+  /internal/ai/v1/courses/generate:
+    post:
+      tags: [Internal AI]
+      summary: "[내부 전용] 후보 장소 풀 기반 Gemini 최적 데이트 코스 조합 생성"
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InternalAiCourseGenerateRequest'
+      responses:
+        '200':
+          description: Gemini가 선택한 최적 동선 코스 응답
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRecommendationPreview'
+
+  /internal/ai/v1/places/enrich:
+    post:
+      tags: [Internal AI]
+      summary: "[내부 전용] 단일 장소 리뷰 수집 및 Gemini 해시태그·예상비용 정형 추출"
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InternalPlaceEnrichRequest'
+      responses:
+        '200':
+          description: 정형 추출된 해시태그 및 요약 결과 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalPlaceEnrichResponse'
+
+# ==========================================
+# Components (공통 스키마 및 응답 계약)
+# ==========================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: 잘못된 요청 파라미터 또는 유효성 검증 실패
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: 인증 토큰 누락 또는 만료
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: 접근/수정 권한 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: 요청한 리소스를 찾을 수 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    # --- Common Error ---
+    ErrorResponse:
+      type: object
+      required: [code, message, timestamp]
+      properties:
+        code:
+          type: string
+          example: INVALID_INPUT
+        message:
+          type: string
+          example: 요청 파라미터가 올바르지 않습니다.
+        timestamp:
+          type: string
+          format: date-time
+
+    # --- Enums ---
+    OAuthProvider:
+      type: string
+      enum: [KAKAO, GOOGLE]
+
+    PlaceCategoryGroup:
+      type: string
+      enum: [RESTAURANT, CAFE, ACTIVITY, EXHIBITION, PARK, ETC]
+
+    FoodCategory:
+      type: string
+      enum: [한식, 중식, 일식, 양식, 치킨, 고기, 분식, 기타]
+
+    DateTheme:
+      type: string
+      enum: [감성 카페, 맛집 투어, 액티비티, 전시·문화, 산책·야외, 어디든]
+
+    DateTimeSlot:
+      type: string
+      enum: [HALF_DAY, ALL_DAY, EVENING]
+
+    CourseSourceType:
+      type: string
+      enum: [CUSTOM, AI_RECOMMENDED]
+
+    CoupleStatus:
+      type: string
+      enum: [PENDING, CONNECTED, DISCONNECTED]
+
+    # --- Auth & Users & Couples ---
+    OAuthLoginRequest:
+      type: object
+      required: [authorizationCode]
+      properties:
+        authorizationCode:
+          type: string
+          description: 소셜 OAuth 인가 코드 또는 SDK 액세스 토큰
+        redirectUri:
+          type: string
+          nullable: true
+
+    TokenRefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    AuthTokenResponse:
+      type: object
+      required: [accessToken, refreshToken, user]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: '#/components/schemas/UserSummary'
+
+    UserSummary:
+      type: object
+      required: [id, nickname, oauthProvider, coupleId, profileImageUrl, email]
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+          nullable: true
+        nickname:
+          type: string
+        profileImageUrl:
+          type: string
+          nullable: true
+        oauthProvider:
+          $ref: '#/components/schemas/OAuthProvider'
+        coupleId:
+          type: integer
+          format: int64
+          nullable: true
+
+    UserUpdateRequest:
+      type: object
+      required: [nickname]
+      properties:
+        nickname:
+          type: string
+          maxLength: 50
+        profileImageUrl:
+          type: string
+          nullable: true
+
+    CoupleInviteResponse:
+      type: object
+      required: [coupleId, inviteCode, status]
+      properties:
+        coupleId:
+          type: integer
+          format: int64
+        inviteCode:
+          type: string
+        status:
+          $ref: '#/components/schemas/CoupleStatus'
+
+    CoupleConnectRequest:
+      type: object
+      required: [inviteCode]
+      properties:
+        inviteCode:
+          type: string
+        startedDate:
+          type: string
+          format: date
+          nullable: true
+
+    CoupleSummary:
+      type: object
+      required: [id, status, startedDate, partnerNickname]
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/CoupleStatus'
+        startedDate:
+          type: string
+          format: date
+          nullable: true
+        partnerNickname:
+          type: string
+          nullable: true
+
+    # --- Places ---
+    PlaceDetail:
+      type: object
+      required:
+        - id
+        - externalProvider
+        - externalPlaceId
+        - name
+        - categoryGroup
+        - foodCategory
+        - subCategory
+        - address
+        - latitude
+        - longitude
+        - phone
+        - placeUrl
+        - thumbnailUrl
+        - avgPricePerPerson
+        - isIndoor
+        - hashtags
+        - recommendedMenus
+        - aiSummary
+        - eventStartDate
+        - eventEndDate
+      properties:
+        id:
+          type: integer
+          format: int64
+        externalProvider:
+          type: string
+          enum: [KAKAO, NAVER, TOUR_API]
+        externalPlaceId:
+          type: string
+        name:
+          type: string
+        categoryGroup:
+          $ref: '#/components/schemas/PlaceCategoryGroup'
+        foodCategory:
+          allOf:
+            - $ref: '#/components/schemas/FoodCategory'
+          nullable: true
+        subCategory:
+          type: string
+          nullable: true
+        address:
+          type: string
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        phone:
+          type: string
+          nullable: true
+        placeUrl:
+          type: string
+          nullable: true
+        thumbnailUrl:
+          type: string
+          nullable: true
+        avgPricePerPerson:
+          type: integer
+          nullable: true
+          example: 18000
+        isIndoor:
+          type: boolean
+          nullable: true
+        hashtags:
+          type: array
+          items:
+            type: string
+          example: ["#주차가_편해요", "#디저트_맛집"]
+        recommendedMenus:
+          type: array
+          items:
+            type: string
+        aiSummary:
+          type: string
+          nullable: true
+        eventStartDate:
+          type: string
+          format: date
+          nullable: true
+        eventEndDate:
+          type: string
+          format: date
+          nullable: true
+
+    PlaceSearchListResponse:
+      type: object
+      required: [items, page, size, hasNext]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlaceDetail'
+        page:
+          type: integer
+        size:
+          type: integer
+        hasNext:
+          type: boolean
+
+    FoodRecommendationResponse:
+      type: object
+      required: [recommendedFoodCategory, recommendedSubMenu, reason, places]
+      properties:
+        recommendedFoodCategory:
+          $ref: '#/components/schemas/FoodCategory'
+        recommendedSubMenu:
+          type: string
+          example: 텐동
+        reason:
+          type: string
+          example: 예산 2만 원 내외로 바삭하고 든든하게 즐기기 좋은 일식 메뉴예요.
+        places:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlaceDetail'
+
+    # --- Courses ---
+    CoursePlaceRequestItem:
+      type: object
+      required: [placeId, visitOrder, estimatedCost, stayMinutes, travelMinutesToNext]
+      properties:
+        placeId:
+          type: integer
+          format: int64
+        visitOrder:
+          type: integer
+          minimum: 1
+        estimatedCost:
+          type: integer
+          minimum: 0
+        stayMinutes:
+          type: integer
+          minimum: 0
+        travelMinutesToNext:
+          type: integer
+          minimum: 0
+        memo:
+          type: string
+          nullable: true
+
+    CourseUpsertRequest:
+      type: object
+      required: [title, themeTags, sourceType, places]
+      properties:
+        title:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+        themeTags:
+          type: array
+          items:
+            $ref: '#/components/schemas/DateTheme'
+        timeSlot:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeSlot'
+          nullable: true
+        sourceType:
+          $ref: '#/components/schemas/CourseSourceType'
+        shareWithCouple:
+          type: boolean
+          default: false
+        places:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CoursePlaceRequestItem'
+
+    CoursePlaceDetailItem:
+      type: object
+      required: [visitOrder, estimatedCost, stayMinutes, travelMinutesToNext, memo, place]
+      properties:
+        visitOrder:
+          type: integer
+        estimatedCost:
+          type: integer
+        stayMinutes:
+          type: integer
+        travelMinutesToNext:
+          type: integer
+        memo:
+          type: string
+          nullable: true
+        place:
+          $ref: '#/components/schemas/PlaceDetail'
+
+    CourseListItem:
+      type: object
+      required:
+        - id
+        - title
+        - themeTags
+        - timeSlot
+        - totalEstimatedCost
+        - totalDurationMinutes
+        - placeCount
+        - thumbnailUrl
+        - createdAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        themeTags:
+          type: array
+          items:
+            $ref: '#/components/schemas/DateTheme'
+        timeSlot:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeSlot'
+          nullable: true
+        totalEstimatedCost:
+          type: integer
+        totalDurationMinutes:
+          type: integer
+        placeCount:
+          type: integer
+        thumbnailUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CourseDetail:
+      type: object
+      required:
+        - id
+        - creatorId
+        - coupleId
+        - title
+        - description
+        - themeTags
+        - timeSlot
+        - totalEstimatedCost
+        - totalDurationMinutes
+        - sourceType
+        - shareToken
+        - isCollabOpen
+        - places
+        - routePolyline
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        creatorId:
+          type: integer
+          format: int64
+        coupleId:
+          type: integer
+          format: int64
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        themeTags:
+          type: array
+          items:
+            $ref: '#/components/schemas/DateTheme'
+        timeSlot:
+          allOf:
+            - $ref: '#/components/schemas/DateTimeSlot'
+          nullable: true
+        totalEstimatedCost:
+          type: integer
+        totalDurationMinutes:
+          type: integer
+        sourceType:
+          $ref: '#/components/schemas/CourseSourceType'
+        shareToken:
+          type: string
+        isCollabOpen:
+          type: boolean
+        places:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoursePlaceDetailItem'
+        routePolyline:
+          type: array
+          description: 지도에 폴리라인을 그리기 위한 순서별 좌표 배열
+          items:
+            $ref: '#/components/schemas/LatLngPoint'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    LatLngPoint:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+
+    CourseRecommendRequest:
+      type: object
+      required: [regionKeyword, themeTags, budgetPerPerson, timeSlot]
+      properties:
+        regionKeyword:
+          type: string
+          example: 성수동
+        latitude:
+          type: number
+          format: double
+          nullable: true
+        longitude:
+          type: number
+          format: double
+          nullable: true
+        themeTags:
+          type: array
+          items:
+            $ref: '#/components/schemas/DateTheme'
+        foodCategories:
+          type: array
+          items:
+            $ref: '#/components/schemas/FoodCategory'
+        budgetPerPerson:
+          type: integer
+          example: 50000
+        timeSlot:
+          $ref: '#/components/schemas/DateTimeSlot'
+        moodKeywords:
+          type: array
+          items:
+            type: string
+          example: ["비 오는 날", "조용한 분위기"]
+
+    CourseRecommendationPreview:
+      type: object
+      required: [suggestedTitle, aiReason, totalEstimatedCost, totalDurationMinutes, places, routePolyline]
+      properties:
+        suggestedTitle:
+          type: string
+          example: 비 오는 날 성수동 아늑한 일식 & 디저트 코스
+        aiReason:
+          type: string
+        totalEstimatedCost:
+          type: integer
+        totalDurationMinutes:
+          type: integer
+        places:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoursePlaceDetailItem'
+        routePolyline:
+          type: array
+          items:
+            $ref: '#/components/schemas/LatLngPoint'
+
+    GoogleMapsLinkResponse:
+      type: object
+      required: [deepLinkUrl, webFallbackUrl]
+      properties:
+        deepLinkUrl:
+          type: string
+          description: 스마트폰 구글맵 앱 실행용 경유지 포함 URL Scheme
+        webFallbackUrl:
+          type: string
+          description: 브라우저 폴백용 Google Maps Directions URL
+
+    # --- Pets & Missions ---
+    CouplePetResponse:
+      type: object
+      required: [id, coupleId, name, characterType, level, exp, nextLevelExp, lastMetDate, totalMeetDays]
+      properties:
+        id:
+          type: integer
+          format: int64
+        coupleId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        characterType:
+          type: string
+        level:
+          type: integer
+        exp:
+          type: integer
+        nextLevelExp:
+          type: integer
+        lastMetDate:
+          type: string
+          format: date
+          nullable: true
+        totalMeetDays:
+          type: integer
+
+    DailyMissionItem:
+      type: object
+      required: [missionLogId, title, description, rewardExp, assignedDate, isCompleted, completedAt]
+      properties:
+        missionLogId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+        rewardExp:
+          type: integer
+        assignedDate:
+          type: string
+          format: date
+        isCompleted:
+          type: boolean
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    # --- Diaries ---
+    DiaryUpsertRequest:
+      type: object
+      required: [dateAt, title, content, imageUrls]
+      properties:
+        dateAt:
+          type: string
+          format: date
+        title:
+          type: string
+          maxLength: 100
+        content:
+          type: string
+        courseId:
+          type: integer
+          format: int64
+          nullable: true
+        imageUrls:
+          type: array
+          items:
+            type: string
+
+    DiaryDetail:
+      type: object
+      required: [id, authorId, coupleId, courseId, dateAt, title, content, imageUrls, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        authorId:
+          type: integer
+          format: int64
+        coupleId:
+          type: integer
+          format: int64
+          nullable: true
+        courseId:
+          type: integer
+          format: int64
+          nullable: true
+        dateAt:
+          type: string
+          format: date
+        title:
+          type: string
+        content:
+          type: string
+        imageUrls:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # --- Internal AI Contracts ---
+    InternalAiCourseGenerateRequest:
+      type: object
+      required: [condition, candidatePlaces]
+      properties:
+        condition:
+          $ref: '#/components/schemas/CourseRecommendRequest'
+        candidatePlaces:
+          type: array
+          description: Spring Boot가 PostGIS 반경 검색으로 1차 추려낸 실제 후보 장소 목록
+          items:
+            $ref: '#/components/schemas/PlaceDetail'
+
+    InternalPlaceEnrichRequest:
+      type: object
+      required: [placeId, name, address, categoryGroup]
+      properties:
+        placeId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        address:
+          type: string
+        categoryGroup:
+          $ref: '#/components/schemas/PlaceCategoryGroup'
+
+    InternalPlaceEnrichResponse:
+      type: object
+      required: [placeId, hashtags, recommendedMenus, avgPricePerPerson, isIndoor, oneLineSummary]
+      properties:
+        placeId:
+          type: integer
+          format: int64
+        hashtags:
+          type: array
+          items:
+            type: string
+        recommendedMenus:
+          type: array
+          items:
+            type: string
+        avgPricePerPerson:
+          type: integer
+          nullable: true
+        isIndoor:
+          type: boolean
+          nullable: true
+        oneLineSummary:
+          type: string
+          nullable: true
