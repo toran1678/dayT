@@ -4,7 +4,7 @@
 
 ## 기술 스택
 - **Framework**: Spring Boot (Java)
-- **ORM / DB**: Spring Data JPA / MySQL (또는 PostgreSQL)
+- **ORM / DB**: Spring Data JPA + Hibernate Spatial / PostgreSQL (`PostGIS`)
 - **Security**: Spring Security + JWT + OAuth2 (카카오 / 구글 로그인)
 - **Cache & Realtime**: Redis (장소 검색 캐싱, 세션/토큰 관리), WebSocket / SSE (실시간 공동 코스 편집)
 

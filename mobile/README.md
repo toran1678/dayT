@@ -3,8 +3,8 @@
 사용자가 데이트 코스를 탐색·제작하고, 커플 활동을 기록하는 **React Native** 모바일 애플리케이션 폴더입니다.
 
 ## 기술 스택
-- **Framework**: React Native
-- **Map API**: Kakao Map / Naver Map API (마커 및 이동 동선 폴리라인 시각화), Google Maps Deep Linking
+- **Framework**: React Native (Expo + TypeScript + Expo Router)
+- **Map API**: Google Maps (`react-native-maps` 커스텀 테마 렌더링 & Deep Linking) + 카카오 로컬/모빌리티 API (장소 POI 및 경로 좌표)
 
 ## 주요 화면 및 기능
 - **탐색 (`Explore`)**: 지역/지하철역, 데이트 테마, 음식 카테고리, 예산, 시간대 기반 맞춤 코스 탐색 및 동선 지도 확인

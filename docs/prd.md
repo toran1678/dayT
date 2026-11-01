@@ -86,7 +86,7 @@
 | **F-02** | 탐색 | 지역·카테고리 기반 장소 탐색 | 역/동네 검색 시 주변 맛집, 카페, 액티비티, 전시·문화 장소 데이터 조회 및 Redis 캐싱 적용 | **P0** |
 | **F-03** | 탐색 | 음식 메뉴 추천 | 대분류(한식·중식·일식 등) 및 세부 메뉴 데이터를 기반으로 사용자 취향·예산에 맞는 음식/식당 추천 | **P0** |
 | **F-04** | 코스 | 커스텀 코스 메이커 (CRUD) | 장소 Pick, 방문 순서(`Order`) 지정/변경, 예상 비용·소요 시간 합산, 코스 생성/조회/수정/삭제 | **P0** |
-| **F-05** | 지도 | 지도 기반 동선 시각화 | Kakao/Naver Map API 연동, 방문 순서별 커스텀 핀(마커) 및 장소 간 이동 경로(폴리라인) 렌더링 | **P0** |
+| **F-05** | 지도 | 지도 기반 동선 시각화 | Google Maps(`react-native-maps`) 커스텀 테마 및 카카오 로컬/경로 데이터 연동, 방문 순서별 마커 및 폴리라인 렌더링 | **P0** |
 | **F-06** | AI 추천 | Gemini 기반 맞춤 코스 자동 추천 | 지역·예산·시간·음식·분위기("비 오는 날", "예산 5만 원" 등) 키워드 조합 시 최적 동선의 코스를 자동 구성해 제안 | **P1** |
 | **F-07** | 데이터/AI | 외부 리뷰 수집 및 해시태그 요약 | 장소 리뷰·블로그 데이터를 Python으로 수집 후 LLM을 통해 정형 JSON 및 해시태그(`#주차가_편해요`, `#디저트_맛집`)로 요약 제공 | **P1** |
 | **F-08** | 데이터 | 공공 문화·축제 데이터 연동 | 공공데이터포털(전국문화축제표준데이터) 및 한국관광공사 TourAPI를 연동해 기간 내 진행 중인 축제·전시 정보 반영 | **P1** |
@@ -163,11 +163,11 @@
 
 | 영역 | 구분 | 기술 스택 | 비고 |
 | :--- | :--- | :--- | :--- |
-| **Mobile** | Framework | React Native | iOS / Android 크로스플랫폼 앱 |
-| | Map API | Kakao / Naver / Google Map SDK & Deep Link | 앱 내 지도·동선(폴리라인) 렌더링 및 구글맵 원클릭 길안내 연결 |
+| **Mobile** | Framework | React Native (Expo + TypeScript) | Expo Router 기반 iOS / Android 크로스플랫폼 앱 |
+| | Map API | Google Maps (`react-native-maps`) + 카카오 로컬/모빌리티 API | 커스텀 테마 지도·마커·폴리라인 렌더링, 국내 POI/동선 데이터 및 원클릭 길안내 연결 |
 | **Web** *(Optional)* | Framework / Map | Next.js + Google Maps JS API | 카톡 OG 프리뷰, 커스텀 테마 맵, 웹 공동편집 |
 | **Backend** | Framework | Spring Boot (Java) | 메인 비즈니스 로직, KML 파싱, API 제공 |
-| | ORM / DB | Spring Data JPA / MySQL (또는 PostgreSQL) | 관계형 데이터 및 장소 좌표 저장 |
+| | ORM / DB | Spring Data JPA + Hibernate Spatial / PostgreSQL (`PostGIS`) | 관계형 데이터, 반경 공간 검색(`GEOGRAPHY`), 해시태그(`JSONB`) 저장 |
 | | Security | Spring Security + JWT + OAuth2 | 카카오·구글 소셜 로그인 및 인가 |
 | | Cache / Realtime | Redis, WebSocket / SSE | 검색 결과 캐싱, 세션 관리, 실시간 공동 편집 |
 | **Data & AI** | Framework | FastAPI (Python) | 데이터 수집 및 AI 추론 마이크로서비스 |
@@ -197,12 +197,16 @@
 
 ---
 
-## 9. 추후 구체화할 주요 포인트 (Open Questions)
+## 9. 확정된 아키텍처 결정 및 추후 구체화 포인트
 
-1. **초기 장소·코스 데이터 확보 전략**: 공식 API(카카오/네이버/TourAPI) 실시간 조회 비중 vs 사전 배치 수집 DB 구축 범위 확정
-2. **모바일 지도 SDK 최종 선택**: 한국 골목 상권·도보 경로가 강한 **Naver/Kakao Map** vs RN 연동과 커스텀 테마가 편한 **Google Maps(`react-native-maps`) + 국내 로컬 API 조합** 중 최종 확정
-3. **메인 RDBMS 최종 선택**: **MySQL** vs **PostgreSQL (PostGIS 공간 인덱스)** 중 확정
-4. **음식 추천 및 커플 미니게임 세부 기획**: 룰렛/토너먼트/취향 매칭 등 구체적인 인터랙션 방식 확정
+### 9.1 확정된 핵심 기술 의사결정
+1. **메인 RDBMS**: **PostgreSQL (`PostGIS` + `JSONB`)** — 반경 기반 장소 공간 탐색 및 AI 요약 해시태그 유연 저장
+2. **모바일 개발 환경**: **React Native (Expo + TypeScript + Expo Router)** — 지도·소셜 로그인·실기기 빌드 생산성 극대화
+3. **모바일 메인 지도**: **Google Maps (`react-native-maps`) + 카카오 로컬/모빌리티 API** — 앱 내 커스텀 테마 맵 스타일 통일 및 국내 상권 POI/동선 정확도 확보
+
+### 9.2 추후 구체화할 기획 포인트
+1. **초기 시드(Seed) 상권 범위**: MVP 출시 시 사전 수집해 둘 초기 핵심 데이트 상권(예: 성수, 홍대, 연남, 강남, 잠실, 혜화 등) 목록 확정
+2. **음식 추천 및 커플 미니게임 세부 기획**: 룰렛/토너먼트/취향 매칭 등 구체적인 인터랙션 방식 확정
 
 ---
 
