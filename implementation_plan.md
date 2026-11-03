@@ -29,13 +29,13 @@
 
 > *새로운 기능이나 단계(Phase) 구현에 착수할 때 에이전트가 아래 섹션을 현재 작업의 세부 설계(대상 파일, 구현 순서, 검증 방법)로 갱신합니다.*
 
-- **현재 목표**: **Phase 1 (2/4) — `backend/` Spring Boot 4.1 (Java 21) 초기 아키텍처 및 DB 스키마 세팅**
+- **현재 목표**: **Phase 1 (3/4) — `ai-service/` FastAPI 초기 구조 및 Gemini (`google-genai`) · `camelCase` 계약 세팅**
 - **세부 작업 순서**:
-  1. 루트 `.gitignore`에 `backend/.gitignore` 규칙 통합 및 중복 파일(`backend/.gitignore`, `application.properties`) 정리
-  2. `backend/build.gradle`: JDK `21` 툴체인 설정 및 `hibernate-spatial`(PostGIS), `flyway`(`flyway-database-postgresql`), `oauth2-resource-server`(JWT) 의존성 추가
-  3. `backend/src/main/resources/application.yml` 작성 (`dayt-postgres`, `dayt-redis`, Flyway, JPA `validate`, JWT 환경 변수 연동)
-  4. `backend/src/main/resources/db/migration/V1__init_schema.sql` 작성 (`docs/erd.md` 10개 테이블 및 `GIST`·`GIN` 인덱스 1:1 반영)
-  5. `com.dayt.global` 공통 기반 구성 (`JpaConfig`, `BaseTimeEntity`, `SecurityConfig`, `ErrorCode`, `BusinessException`, `ErrorResponse`, `GlobalExceptionHandler`)
+  1. `ai-service/requirements.txt` 작성 (`fastapi`, `uvicorn`, `pydantic-settings`, `google-genai>=2.30.1`, `httpx`, `pytest`)
+  2. `app/core/config.py`: 루트 `../.env` 자동 로드(`AI_SERVER_PORT`, `GEMINI_API_KEY` 등) 구성
+  3. `app/schemas/base.py` & `app/schemas/internal_ai.py`: `CamelModel`(`alias_generator=to_camel`, `populate_by_name=True`, `serialize_by_alias=True`) 및 `docs/api-spec.yaml`의 `Internal AI` 스키마·`ErrorResponse` 1:1 구현
+  4. `app/core/gemini.py`: 최신 공식 `google-genai` SDK(`gemini-3.8-flash`, Interactions API + Structured Output) 클라이언트 래퍼 작성
+  5. `app/api/v1/internal_ai.py` & `app/main.py` & `tests/test_app.py`: 내부 라우터 골격(`/internal/ai/v1/...`), `/health`, 전역 에러 핸들러 및 자동 검증 테스트 구성
 - **검증 기준**:
-  - `.\gradlew.bat test` 실행 시 Flyway 마이그레이션 자동 적용 + JPA 스키마 검증 + Spring Context 로드 통과
-  - `.\gradlew.bat bootRun` 시 `/actuator/health` 정상(`UP`) 응답 및 미존재 경로 호출 시 명세 규격 `ErrorResponse` 반환 확인
+  - `.venv` 생성 및 `pip install -r requirements.txt` 후 `pytest` 통과
+  - 서버 실행 시 `/health` 및 `/docs`에서 `camelCase` 스키마 정상 노출 확인
