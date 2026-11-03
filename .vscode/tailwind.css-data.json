@@ -1,0 +1,42 @@
+{
+  "version": 1.1,
+  "atDirectives": [
+    {
+      "name": "@theme",
+      "description": "Tailwind CSS v4 theme configuration block for custom design tokens."
+    },
+    {
+      "name": "@utility",
+      "description": "Tailwind CSS v4 custom utility definition."
+    },
+    {
+      "name": "@custom-variant",
+      "description": "Tailwind CSS v4 custom variant definition."
+    },
+    {
+      "name": "@variant",
+      "description": "Tailwind CSS v4 variant application block."
+    },
+    {
+      "name": "@apply",
+      "description": "Inline existing Tailwind utility classes into custom CSS."
+    },
+    {
+      "name": "@source",
+      "description": "Explicitly specify source files for Tailwind CSS v4 class detection."
+    },
+    {
+      "name": "@reference",
+      "description": "Import a Tailwind theme/stylesheet reference without emitting CSS."
+    },
+    {
+      "name": "@plugin",
+      "description": "Load a JavaScript plugin in Tailwind CSS v4."
+    },
+    {
+      "name": "@config",
+      "description": "Load a legacy JavaScript config file in Tailwind CSS v4."
+    }
+  ]
+}
+
