@@ -1,0 +1,63 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: dayt-backend
+
+  config:
+    import:
+      - optional:file:../.env[.properties]
+      - optional:file:.env[.properties]
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/dayt}
+    username: ${SPRING_DATASOURCE_USERNAME:dayt}
+    password: ${SPRING_DATASOURCE_PASSWORD:dayt1234}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  show-actuator: true
+  swagger-ui:
+    path: /docs
+    urls-primary-name: Live Backend API (현재 구현)
+    urls:
+      - name: Live Backend API (현재 구현)
+        url: /v3/api-docs
+      - name: DayT Full Spec (docs/api-spec.yaml)
+        url: /v3/api-spec.yaml
+
+dayt:
+  jwt:
+    secret: ${JWT_SECRET:dayt-local-dev-jwt-secret-key-change-in-production-2026}
+    access-token-ttl-seconds: 3600
+    refresh-token-ttl-seconds: 1209600
+  ai-service:
+    base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
+

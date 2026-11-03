@@ -6,8 +6,8 @@
 ---
 
 ## 1. 현재 포커스 (Current Focus)
-- **현재 단계**: **`Phase 1 (로컬 인프라 & 프로젝트 스캐폴딩)` 진행 중**
-- **다음 우선 작업**: `backend/` Spring Boot 프로젝트 초기화 (`JPA + Hibernate Spatial`, `Security/JWT`, 공통 `ErrorResponse`)
+- **현재 단계**: **`Phase 1 (로컬 인프라 & 프로젝트 스캐폴딩)` 진행 중 (2/4 완료)**
+- **다음 우선 작업**: `mobile/` Expo (React Native + TS + Expo Router) 초기화 또는 `ai-service/` FastAPI 초기화
 
 ---
 
@@ -22,7 +22,7 @@
 
 ### Phase 1: 로컬 인프라 & 프로젝트 스캐폴딩
 - [x] 루트 `docker-compose.yml` (PostgreSQL 16 + `PostGIS`, `Redis`) 및 `.env.example` 구성
-- [ ] `backend/` Spring Boot 초기화 (JPA + Hibernate Spatial, Security/JWT, 공통 `ErrorResponse`)
+- [x] `backend/` Spring Boot 초기화 (JPA + Hibernate Spatial, Security/JWT, 공통 `ErrorResponse`)
 - [ ] `ai-service/` FastAPI 초기화 (Gemini 연동 구조, Pydantic `camelCase` 직렬화 기반)
 - [ ] `mobile/` Expo (React Native + TS + Expo Router) 초기화 및 `openapi-typescript` 타입 생성 연결
 
@@ -53,3 +53,6 @@
 - **기획·설계 문서 확립**: `docs/prd.md`, `docs/erd.md`(PostGIS/JSONB), `docs/api-spec.yaml`(OpenAPI 3.0.3) 작성 완료.
 - **에이전트 하네스 구성**: `.agents/hooks.json` + `guard_spec_edit.py`로 기준 문서 임의 수정 방지(`force_ask`) 적용, `api-rules.md`·`workflow-rules.md` 경량 규칙 세팅 완료.
 - **로컬 인프라 구축 완료**: `docker-compose.yml`(`postgis/postgis:16-3.4`, `redis:7-alpine`), `.env.example`, `.gitignore`, `infra-setup.md` 구성 및 컨테이너 헬스체크·`PostGIS 3.4`·`Redis PONG` 검증 완료.
+
+### 2026-11-03
+- **`backend/` Spring Boot 4.1 (Java 21) 초기 세팅 완료**: `hibernate-spatial`, `Flyway`(`V1__init_schema.sql` 10개 테이블 마이그레이션), `Security/JWT`, 공통 `ErrorResponse` 구성 및 `gradlew test` 검증 통과.

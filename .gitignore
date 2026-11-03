@@ -4,20 +4,38 @@
 !.env.example
 !**/.env.example
 
-# OS & Editor
+# OS & Editor (IntelliJ / VS Code / Eclipse / STS)
 .DS_Store
 Thumbs.db
 .idea/
+*.iws
+*.iml
+*.ipr
 .vscode/*
 !.vscode/extensions.json
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
 *.swp
 *.swo
 
 # Backend (Spring Boot / Gradle / Java)
+backend/HELP.md
 backend/.gradle/
 backend/build/
 backend/out/
 backend/bin/
+!backend/gradle/wrapper/gradle-wrapper.jar
+!backend/src/main/**/build/
+!backend/src/test/**/build/
+!backend/src/main/**/bin/
+!backend/src/test/**/bin/
+!backend/src/main/**/out/
+!backend/src/test/**/out/
 *.log
 
 # AI Service (FastAPI / Python)
@@ -45,4 +63,3 @@ yarn-error.*
 *.p12
 *.key
 *.mobileprovision
-
