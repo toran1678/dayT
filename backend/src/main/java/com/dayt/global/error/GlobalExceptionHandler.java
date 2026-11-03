@@ -2,6 +2,7 @@ package com.dayt.global.error;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -32,7 +33,11 @@ public class GlobalExceptionHandler {
 				.body(ErrorResponse.of(ErrorCode.INVALID_INPUT, detail));
 	}
 
-	@ExceptionHandler({IllegalArgumentException.class, MethodArgumentTypeMismatchException.class})
+	@ExceptionHandler({
+			IllegalArgumentException.class,
+			MethodArgumentTypeMismatchException.class,
+			HttpMessageNotReadableException.class
+	})
 	public ResponseEntity<ErrorResponse> handleBadRequest(Exception ex) {
 		return ResponseEntity
 				.status(ErrorCode.INVALID_INPUT.getStatus())

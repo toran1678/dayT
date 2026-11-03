@@ -20,9 +20,15 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -70,9 +76,22 @@ public class SecurityConfig {
 	@Bean
 	public JwtDecoder jwtDecoder(@Value("${dayt.jwt.secret}") String jwtSecret) {
 		SecretKey secretKey = new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-		return NimbusJwtDecoder.withSecretKey(secretKey)
+		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey)
 				.macAlgorithm(MacAlgorithm.HS256)
 				.build();
+
+		OAuth2TokenValidator<Jwt> accessTokenTypeValidator = token -> {
+			if ("ACCESS".equals(token.getClaimAsString("type"))) {
+				return OAuth2TokenValidatorResult.success();
+			}
+			return OAuth2TokenValidatorResult.failure(
+					new OAuth2Error("invalid_token", "Access token required", null)
+			);
+		};
+		decoder.setJwtValidator(
+				new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefault(), accessTokenTypeValidator)
+		);
+		return decoder;
 	}
 
 	@Bean

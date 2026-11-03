@@ -31,9 +31,7 @@
 
 > *새로운 기능이나 단계(Phase) 구현에 착수할 때 에이전트가 아래 섹션을 현재 작업의 세부 설계(대상 파일, 구현 순서, 검증 방법)로 갱신합니다.*
 
-- **현재 목표**: **Phase 1 전원 완료 → Phase 2 (`[F-01] 인증/회원` ~ `[F-05] 지도 동선 시각화`) 착수 준비**
-- **다음 착수 예정 ([F-01] 인증/회원)**:
-  1. `backend/`: `User` 엔티티 매핑, 카카오·구글 OAuth 인가 코드 검증 클라이언트, JWT 액세스·리프레시 토큰 발급/갱신(Redis 저장), `/api/v1/auth/*` 및 `/api/v1/users/me` 구현
-  2. `web/`: 로그인 모달/페이지, 토큰 상태 관리 및 `apiFetch` 인증 헤더 자동 주입 연동
-- **검증 기준**:
-  - `backend` 단위/통합 테스트 및 `web` 타입체크(`npm run typecheck`) 통과
+- **현재 목표**: **Phase 2 (1/5 완료) → 다음 단계 `[F-02] 장소 탐색` & `[F-03] 음식 추천` 착수 준비**
+- **방금 완료 ([F-01] 인증/회원)**:
+  - `backend/`: `User` 엔티티, `JwtTokenProvider`(Access/Refresh 분리 검증), `RedisRefreshTokenStore`, `DefaultOAuthUserInfoClient`, `AuthController`·`UserController` 및 통합 테스트 완료
+  - `web/`: `AuthProvider`(자동 토큰 갱신 포함), `AuthModals`(소셜 로그인 & 프로필 수정/로그아웃), `/auth/callback/[provider]` 연동 완료

@@ -13,8 +13,11 @@ export type DateTimeSlot = Schemas["DateTimeSlot"];
 export type CourseSourceType = Schemas["CourseSourceType"];
 export type CoupleStatus = Schemas["CoupleStatus"];
 
+export type OAuthLoginRequest = Schemas["OAuthLoginRequest"];
+export type TokenRefreshRequest = Schemas["TokenRefreshRequest"];
 export type AuthTokenResponse = Schemas["AuthTokenResponse"];
 export type UserSummary = Schemas["UserSummary"];
+export type UserUpdateRequest = Schemas["UserUpdateRequest"];
 export type CoupleSummary = Schemas["CoupleSummary"];
 
 export type PlaceDetail = Schemas["PlaceDetail"];

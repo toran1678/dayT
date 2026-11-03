@@ -14,6 +14,7 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
+import { useAuth } from "@/features/auth/AuthContext";
 
 interface NavItem {
   href: string;
@@ -147,6 +148,8 @@ function MobileFloatingDock() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { user, isInitializing, openLoginModal, openProfileModal } = useAuth();
+
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       {/* Top Floating Editorial Header */}
@@ -197,13 +200,28 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span>AI 코스 설계</span>
             </Link>
 
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-full bg-surface-dark px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              <UserRound className="h-3.5 w-3.5 text-primary" />
-              <span>로그인</span>
-            </button>
+            {user ? (
+              <button
+                type="button"
+                onClick={openProfileModal}
+                className="inline-flex items-center gap-2 rounded-full border border-line bg-surface py-1.5 pr-3.5 pl-2 text-xs font-extrabold text-foreground shadow-2xs transition-colors hover:border-primary/40"
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] font-black text-white">
+                  {user.nickname.slice(0, 1)}
+                </span>
+                <span className="max-w-24 truncate">{user.nickname}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={isInitializing}
+                onClick={openLoginModal}
+                className="inline-flex items-center gap-1.5 rounded-full bg-surface-dark px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                <UserRound className="h-3.5 w-3.5 text-primary" />
+                <span>로그인</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
