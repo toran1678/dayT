@@ -6,8 +6,8 @@
 ---
 
 ## 1. 현재 포커스 (Current Focus)
-- **현재 단계**: **`Phase 1 (로컬 인프라 & 프로젝트 스캐폴딩)` 진행 중 (3/4 완료)**
-- **다음 우선 작업**: `mobile/` Expo (React Native + TS + Expo Router) 초기화 및 `openapi-typescript` 타입 생성 연결
+- **현재 단계**: **`Phase 2 (P0 핵심 MVP 구현: F-01 ~ F-05)` 착수 대기 (Phase 1 4/4 전원 완료)**
+- **다음 우선 작업**: **[F-01] 인증/회원** — 카카오·구글 소셜 OAuth 로그인, JWT 발급/갱신, 내 정보 조회·수정 (`/api/v1/auth/*`, `/api/v1/users/me`)
 
 ---
 
@@ -24,14 +24,14 @@
 - [x] 루트 `docker-compose.yml` (PostgreSQL 16 + `PostGIS`, `Redis`) 및 `.env.example` 구성
 - [x] `backend/` Spring Boot 초기화 (JPA + Hibernate Spatial, Security/JWT, 공통 `ErrorResponse`)
 - [x] `ai-service/` FastAPI 초기화 (Gemini 연동 구조, Pydantic `camelCase` 직렬화 기반)
-- [ ] `mobile/` Expo (React Native + TS + Expo Router) 초기화 및 `openapi-typescript` 타입 생성 연결
+- [x] `web/` Next.js (TypeScript + Tailwind + App Router) 초기화 및 `openapi-typescript` 타입 생성 연결 *(웹 우선)*
 
 ### Phase 2: P0 핵심 MVP 구현 (`F-01` ~ `F-05`)
 - [ ] **[F-01] 인증/회원**: 카카오·구글 OAuth 로그인, JWT 발급/갱신, 내 정보 조회·수정 (`/api/v1/auth/*`, `/api/v1/users/me`)
 - [ ] **[F-02] 장소 탐색**: 역·동네 기반 주변 장소 PostGIS 반경 조회, 카카오 로컬 연동 및 Redis 캐싱 (`/api/v1/places`)
 - [ ] **[F-03] 음식 추천**: 음식 대분류·세부 메뉴·예산 조건 기반 식당 추천 (`/api/v1/places/foods/recommend`)
 - [ ] **[F-04] 코스 메이커**: 장소 순서 배치, 예상 비용·이동/소요 시간 자동 계산, 코스 CRUD (`/api/v1/courses`)
-- [ ] **[F-05] 지도 동선 시각화**: `react-native-maps` 커스텀 테마, 순서 마커 및 이동 경로 폴리라인 렌더링
+- [ ] **[F-05] 지도 동선 시각화**: Google Maps JS API 반응형 지도(데스크톱·모바일 뷰), 순서 마커 및 이동 경로 폴리라인 렌더링
 
 ### Phase 3: P1 AI · 데이터 · 공유 고도화 (`F-06` ~ `F-10`)
 - [ ] **[F-07·08] 데이터 수집 & AI 요약**: TourAPI·공공데이터·블로그 후기 수집 및 Gemini 해시태그 추출 (`/internal/ai/v1/places/enrich`)
@@ -39,11 +39,14 @@
 - [ ] **[F-09] 코스 공유**: 공유 토큰 발급 및 카카오톡 Open Graph 썸네일 링크 공유
 - [ ] **[F-10] 원클릭 길안내**: 완성 코스 경유지 포함 Google Maps Deep Link 연동
 
-### Phase 4: P2 실시간 협업 · 웹 · 커플 리텐션 (`F-11` ~ `F-14`)
+### Phase 4: P2 실시간 협업 · 커플 리텐션 (`F-11` ~ `F-14`)
 - [ ] **[F-11] KML Export**: 구글 '내 지도(My Maps)' 임포트용 KML 다운로드 (`/api/v1/courses/{courseId}/export.kml`)
-- [ ] **[F-12] 웹 공유 뷰어 (`web/`)**: Next.js 기반 공유 페이지 및 Google Maps 커스텀 스타일 렌더링
+- [ ] **[F-12] 커스텀 테마 맵 & 공유 뷰어**: Google Maps JS API 기반 서비스 무드 커스텀 스타일(JSON) 및 카톡 OG 프리뷰 고도화
 - [ ] **[F-13] 실시간 공동 편집**: STOMP WebSocket(`/ws/collab`) 기반 동시 장소 추가·삭제·순서 변경
 - [ ] **[F-14] Grow Together & 일기장**: 커플 연결, 펫 성장·일일 미션, 데이트 일기장 CRUD
+
+### Phase 5: 모바일 네이티브 앱 확장 *(추후 선택)*
+- [ ] `mobile/` Expo (React Native + TS) 초기화 및 `web/`의 API 타입·비즈니스 로직 이식
 
 ---
 
@@ -57,3 +60,4 @@
 ### 2026-11-03
 - **`backend/` Spring Boot 4.1 (Java 21) 초기 세팅 완료**: `hibernate-spatial`, `Flyway`(`V1__init_schema.sql` 10개 테이블 마이그레이션), `Security/JWT`, Swagger UI(`/docs`), 공통 `ErrorResponse` 구성 및 검증 통과.
 - **`ai-service/` FastAPI 초기 세팅 완료**: `google-genai`(`gemini-3.8-flash`) 래퍼, `CamelModel` 기반 내부 AI 스키마 1:1 매핑, 전역 에러 핸들러 및 `pytest` 3종 검증 통과.
+- **`web/` Next.js 16 반응형 웹 & 통합 실행 환경 구축 완료**: `openapi-typescript` API 타입 자동 생성(`api.d.ts`), 데스크톱 좌측 사이드바·모바일 하단 탭바 반응형 `AppShell` 및 5대 라우트 골격 구현, 원클릭 통합 실행기(`start-dev.ps1`, `.vscode/tasks.json`) 구성 완료.

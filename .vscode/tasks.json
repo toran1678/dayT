@@ -1,0 +1,68 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "DayT: 1. Infra Up (Docker)",
+      "type": "shell",
+      "command": "docker compose up -d",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DayT: 2. Backend (Spring Boot)",
+      "type": "shell",
+      "command": ".\\gradlew.bat bootRun",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "isBackground": true,
+      "presentation": {
+        "group": "dayt-services",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DayT: 3. AI Service (FastAPI)",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe -m app.main",
+      "options": {
+        "cwd": "${workspaceFolder}/ai-service"
+      },
+      "isBackground": true,
+      "presentation": {
+        "group": "dayt-services",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DayT: 4. Web (Next.js)",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/web"
+      },
+      "isBackground": true,
+      "presentation": {
+        "group": "dayt-services",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "DayT: Start All Services",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "DayT: 1. Infra Up (Docker)",
+        "DayT: 2. Backend (Spring Boot)",
+        "DayT: 3. AI Service (FastAPI)",
+        "DayT: 4. Web (Next.js)"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
+

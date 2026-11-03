@@ -13,6 +13,7 @@ Thumbs.db
 *.ipr
 .vscode/*
 !.vscode/extensions.json
+!.vscode/tasks.json
 .apt_generated
 .classpath
 .factorypath
@@ -47,17 +48,25 @@ ai-service/venv/
 .mypy_cache/
 .ruff_cache/
 
-# Mobile (Expo / React Native) & Web (Next.js)
+# Web (Next.js) & Mobile (Expo / React Native)
 **/node_modules/
+**/coverage/
+.pnp
+.pnp.*
+.vercel/
+web/.next/
+web/out/
+web/build/
+web/next-env.d.ts
 mobile/.expo/
 mobile/dist/
 mobile/web-build/
-web/.next/
-web/out/
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+.pnpm-debug.*
 *.tsbuildinfo
+*.pem
 *.jks
 *.p8
 *.p12

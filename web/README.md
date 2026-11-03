@@ -1,13 +1,24 @@
 # DayT Web (`web/`)
 
-*[Optional]* 데이트 코스 외부 공유 프리뷰 및 웹 기반 커스텀 지도 뷰어를 제공하는 **Next.js** 웹 프론트엔드 폴더입니다.
+사용자가 데이트 코스를 탐색·제작·공유하고 커플 활동을 기록하는 **DayT 주력 반응형 웹 애플리케이션 (`Next.js`)** 폴더입니다.
 
 ## 기술 스택
-- **Framework**: Next.js
-- **Map API**: Google Maps JavaScript API (커스텀 테마 스타일 렌더링)
+- **Framework**: Next.js 16 (App Router + TypeScript + Tailwind CSS v4)
+- **API Contract**: `openapi-typescript` (`../docs/api-spec.yaml` → `src/shared/types/api.d.ts` 자동 생성)
+- **Map API**: Google Maps JavaScript API + 카카오 로컬/모빌리티 연동
 
-## 주요 역할
-- **카카오톡 공유 프리뷰**: Open Graph(OG) 메타태그를 통한 코스 썸네일·요약 카드 제공
-- **커스텀 테마 맵 뷰어**: 공유받은 코스의 순차적 마커 및 동선 웹 렌더링, 앱 딥링크 연결
-- **웹 공동 코스 편집**: 앱 미설치 사용자도 링크를 통해 코스 확인 및 실시간 편집 참여
+## 반응형 레이아웃 구조
+- **데스크톱 (`lg` 이상)**: 좌측 고정 사이드바 + 상단 헤더 + 넓은 지도/카드 대시보드
+- **모바일 웹 (`lg` 미만)**: 상단 컴팩트 바 + 풀스크린 컨텐츠 + 하단 고정 앱 탭바 (`Bottom Navigation`)
 
+## 주요 명령어
+```powershell
+# API 명세 변경 시 TypeScript 타입 재생성
+npm run gen:api
+
+# 개발 서버 실행 (http://localhost:3000)
+npm run dev
+
+# 타입 검사
+npm run typecheck
+```

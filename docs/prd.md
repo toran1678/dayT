@@ -69,10 +69,12 @@
 - 날짜별 데이트 일기 목록 및 타임라인 조회
 - **일기 작성**: 날짜, 제목, 본문 내용, 사진 첨부 (다녀온 데이트 코스 연동 가능)
 
-### 3.7 웹 공유 뷰어 페이지 (`Web` — Optional, Next.js)
-- 공유 링크 접속 시 Open Graph 메타태그 제공
-- 데이트 무드에 맞춘 Google Maps 커스텀 테마 스타일(JSON) 및 순차적 마커 렌더링
-- 웹 환경에서의 실시간 공동 코스 편집 및 앱 딥링크 유도
+### 3.7 반응형 레이아웃 및 외부 공유 뷰어 (`Web-First Responsive` & `Mobile 확장`)
+- **데스크톱 · 모바일 완벽 반응형 지원 (`web/` — Next.js 주력 클라이언트)**:
+  - **데스크톱 뷰**: 좌측 사이드바 네비게이션 + 상단 검색/상태 바 + 넓은 지도·카드 대시보드 레이아웃
+  - **모바일 웹 뷰**: 스마트폰 브라우저(카카오톡 인앱 브라우저 등) 접속 시 하단 고정 탭바(Bottom Navigation)와 터치 친화적 풀스크린 레이아웃으로 자동 전환되어 네이티브 앱과 동일한 사용성 제공
+- **공유 및 협업**: 공유 링크 접속 시 Open Graph 메타태그 프리뷰 및 별도 설치 없는 실시간 공동 코스 편집 지원
+- **모바일 네이티브 확장 (`mobile/` — 추후 확장)**: 웹 MVP 완성 후 동일한 API 계약·타입·비즈니스 로직을 재사용하여 React Native(Expo) 앱으로 이식 가능
 
 ---
 
@@ -86,7 +88,7 @@
 | **F-02** | 탐색 | 지역·카테고리 기반 장소 탐색 | 역/동네 검색 시 주변 맛집, 카페, 액티비티, 전시·문화 장소 데이터 조회 및 Redis 캐싱 적용 | **P0** |
 | **F-03** | 탐색 | 음식 메뉴 추천 | 대분류(한식·중식·일식 등) 및 세부 메뉴 데이터를 기반으로 사용자 취향·예산에 맞는 음식/식당 추천 | **P0** |
 | **F-04** | 코스 | 커스텀 코스 메이커 (CRUD) | 장소 Pick, 방문 순서(`Order`) 지정/변경, 예상 비용·소요 시간 합산, 코스 생성/조회/수정/삭제 | **P0** |
-| **F-05** | 지도 | 지도 기반 동선 시각화 | Google Maps(`react-native-maps`) 커스텀 테마 및 카카오 로컬/경로 데이터 연동, 방문 순서별 마커 및 폴리라인 렌더링 | **P0** |
+| **F-05** | 지도 | 지도 기반 동선 시각화 | Google Maps JS API(반응형 웹, 앱 확장 시 `react-native-maps`) 및 카카오 로컬/경로 데이터 연동, 방문 순서별 마커·폴리라인 렌더링 | **P0** |
 | **F-06** | AI 추천 | Gemini 기반 맞춤 코스 자동 추천 | 지역·예산·시간·음식·분위기("비 오는 날", "예산 5만 원" 등) 키워드 조합 시 최적 동선의 코스를 자동 구성해 제안 | **P1** |
 | **F-07** | 데이터/AI | 외부 리뷰 수집 및 해시태그 요약 | 장소 리뷰·블로그 데이터를 Python으로 수집 후 LLM을 통해 정형 JSON 및 해시태그(`#주차가_편해요`, `#디저트_맛집`)로 요약 제공 | **P1** |
 | **F-08** | 데이터 | 공공 문화·축제 데이터 연동 | 공공데이터포털(전국문화축제표준데이터) 및 한국관광공사 TourAPI를 연동해 기간 내 진행 중인 축제·전시 정보 반영 | **P1** |
@@ -163,9 +165,9 @@
 
 | 영역 | 구분 | 기술 스택 | 비고 |
 | :--- | :--- | :--- | :--- |
-| **Mobile** | Framework | React Native (Expo + TypeScript) | Expo Router 기반 iOS / Android 크로스플랫폼 앱 |
-| | Map API | Google Maps (`react-native-maps`) + 카카오 로컬/모빌리티 API | 커스텀 테마 지도·마커·폴리라인 렌더링, 국내 POI/동선 데이터 및 원클릭 길안내 연결 |
-| **Web** *(Optional)* | Framework / Map | Next.js + Google Maps JS API | 카톡 OG 프리뷰, 커스텀 테마 맵, 웹 공동편집 |
+| **Web** *(주력 프론트엔드)* | Framework | Next.js (App Router + TypeScript + Tailwind CSS) | 데스크톱 대시보드 + 모바일 반응형 앱 뷰, 카톡 OG 프리뷰, 실시간 공동편집 통합 제공 |
+| | Map API | Google Maps JS API + 카카오 로컬/모빌리티 API | 커스텀 테마 지도·마커·폴리라인 렌더링, 국내 POI/동선 데이터 및 원클릭 길안내 연결 |
+| **Mobile** *(추후 확장)* | Framework / Map | React Native (Expo + TypeScript) + `react-native-maps` | 웹 MVP 완성 후 API 타입·비즈니스 로직을 재사용하여 iOS / Android 네이티브 앱 확장 |
 | **Backend** | Framework | Spring Boot (Java) | 메인 비즈니스 로직, KML 파싱, API 제공 |
 | | ORM / DB | Spring Data JPA + Hibernate Spatial / PostgreSQL (`PostGIS`) | 관계형 데이터, 반경 공간 검색(`GEOGRAPHY`), 해시태그(`JSONB`) 저장 |
 | | Security | Spring Security + JWT + OAuth2 | 카카오·구글 소셜 로그인 및 인가 |
@@ -201,8 +203,8 @@
 
 ### 9.1 확정된 핵심 기술 의사결정
 1. **메인 RDBMS**: **PostgreSQL (`PostGIS` + `JSONB`)** — 반경 기반 장소 공간 탐색 및 AI 요약 해시태그 유연 저장
-2. **모바일 개발 환경**: **React Native (Expo + TypeScript + Expo Router)** — 지도·소셜 로그인·실기기 빌드 생산성 극대화
-3. **모바일 메인 지도**: **Google Maps (`react-native-maps`) + 카카오 로컬/모빌리티 API** — 앱 내 커스텀 테마 맵 스타일 통일 및 국내 상권 POI/동선 정확도 확보
+2. **프론트엔드 개발 전략 (`Web-First` + 모바일 반응형)**: **Next.js (App Router + TypeScript + Tailwind CSS)** 로 데스크톱 대시보드와 모바일 앱형(하단 탭바) 반응형 웹을 먼저 완성하고, 이후 동일한 API 타입·로직을 재사용해 **React Native (Expo)** 네이티브 앱으로 확장
+3. **메인 지도 연동**: **Google Maps JS API (앱 확장 시 `react-native-maps`) + 카카오 로컬/모빌리티 API** — 서비스 무드 커스텀 테마 맵 스타일 통일 및 국내 상권 POI/동선 정확도 확보
 
 ### 9.2 추후 구체화할 기획 포인트
 1. **초기 시드(Seed) 상권 범위**: MVP 출시 시 사전 수집해 둘 초기 핵심 데이트 상권(예: 성수, 홍대, 연남, 강남, 잠실, 혜화 등) 목록 확정
