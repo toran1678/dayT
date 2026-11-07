@@ -7,9 +7,11 @@
 ## 0. 사전 준비 (최초 1회)
 
 1. **루트 `.env` 파일 생성**
+
    ```powershell
    Copy-Item .env.example .env
    ```
+
    > **Windows 포트 참고**: Windows(`WinNAT` 예약 포트 대역)에서 기본 `8080`·`8000` 포트 바인딩 권한 오류가 발생하는 경우, `.env`에서 `SERVER_PORT=18080`, `AI_SERVER_PORT=18000`, `AI_SERVICE_BASE_URL=http://localhost:18000`, `NEXT_PUBLIC_API_BASE_URL=http://localhost:18080`으로 설정해 사용합니다.
 
 2. **기존 `5432` 포트 점유 컨테이너 확인 (필요 시)**
@@ -38,6 +40,7 @@
 ## 2. 서비스별 개별 실행 & 테스트 방법
 
 ### ① DB + Redis (`docker-compose.yml`)
+
 프로젝트 루트에서 실행합니다.
 
 ```powershell
@@ -53,14 +56,15 @@ docker exec dayt-redis redis-cli ping
 docker compose down
 ```
 
-| 구분 | 컨테이너명 | Host:Port | DB / 비고 | 계정 (`User` / `Password`) |
-| :--- | :--- | :---: | :--- | :--- |
-| **PostgreSQL + PostGIS** | `dayt-postgres` | `localhost:5432` | `dayt` (`postgis` 확장) | `dayt` / `dayt1234` |
-| **Redis** | `dayt-redis` | `localhost:6379` | AOF 영속화 활성화 | 비밀번호 없음 (로컬 개발용) |
+| 구분                     | 컨테이너명      |    Host:Port     | DB / 비고               | 계정 (`User` / `Password`)  |
+| :----------------------- | :-------------- | :--------------: | :---------------------- | :-------------------------- |
+| **PostgreSQL + PostGIS** | `dayt-postgres` | `localhost:5432` | `dayt` (`postgis` 확장) | `dayt` / `dayt1234`         |
+| **Redis**                | `dayt-redis`    | `localhost:6379` | AOF 영속화 활성화       | 비밀번호 없음 (로컬 개발용) |
 
 ---
 
 ### ② Spring Boot 백엔드 (`backend/`)
+
 > 실행 전 **① DB + Redis** 컨테이너가 켜져 있어야 Flyway 마이그레이션과 JPA 연결이 정상 동작합니다.
 
 ```powershell
@@ -72,7 +76,8 @@ cd backend
 # 전체 테스트 실행
 .\gradlew.bat test
 ```
-- **Swagger UI 접속**: `http://localhost:8080/docs` *(포트 변경 시 예: `http://localhost:18080/docs`)*
+
+- **Swagger UI 접속**: `http://localhost:8080/docs` _(포트 변경 시 예: `http://localhost:18080/docs`)_
 
 ---
 
@@ -94,7 +99,8 @@ python -m venv .venv
 # 테스트 실행
 .\.venv\Scripts\pytest
 ```
-- **Swagger UI 접속**: `http://localhost:8000/docs` *(포트 변경 시 예: `http://localhost:18000/docs`)*
+
+- **Swagger UI 접속**: `http://localhost:8000/docs` _(포트 변경 시 예: `http://localhost:18000/docs`)_
 
 ---
 
@@ -116,4 +122,5 @@ npm run gen:api
 npm run typecheck
 npm run lint
 ```
+
 - **브라우저 접속**: `http://localhost:3000`

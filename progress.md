@@ -6,8 +6,8 @@
 ---
 
 ## 1. 현재 포커스 (Current Focus)
-- **현재 단계**: **`Phase 4 (P2 실시간 협업 · 커플 리텐션: F-11 ~ F-14)` 완료 (웹 올인원 MVP ~ P2 전 기능 완주)**
-- **현재 진행 작업**: Phase 0 ~ Phase 4(`F-01` ~ `F-14`) 풀스택 구현 및 `pytest` · `gradlew test` · `next build`(`cacheComponents`) 전 서비스 통합 검증 완료 (추후 필요 시 `Phase 5` 모바일 네이티브 앱 확장 대기)
+- **현재 단계**: **`Phase 4 (P2 실시간 협업 · 커플 리텐션: F-11 ~ F-14)` 완료 + 지도·아이콘·SSR 안정성 고도화 반영 완료**
+- **현재 진행 작업**: 전역 SVG 아이콘 일원화(`PetStageIcon` 포함), 지도 패닝 시 역·명소/공원·주차장 상시 자동 로드, 현 지도 조건 유지 재탐색 버튼 및 `useSyncExternalStore` 기반 SSR 하이드레이션 일치 수정 완료 (추후 필요 시 `Phase 5` 모바일 네이티브 앱 확장 대기)
 
 ---
 
@@ -69,3 +69,7 @@
 - **Phase 3 `[F-06]`~`[F-10]` P1 AI · 데이터 · 공유 고도화 풀스택 구현 완료 (Phase 3 완주)**: `ai-service`의 공공/리뷰 수집·`gemini-3.8-flash` 해시태그 요약(`/internal/ai/v1/places/enrich`) 및 환각 차단 코스 조합(`/internal/ai/v1/courses/generate`), `backend`의 온디맨드 AI 보강·`/api/v1/courses/recommend`·구글맵 딥링크(`/api/v1/courses/{courseId}/google-maps-link`), `web`의 `AiCourseRecommendModal`·카톡 동적 OG 썸네일(`/api/og/course/[shareToken]`)·원클릭 길안내 연동 및 전 서비스 빌드·테스트 검증 완료.
 - **전국 지역 검색 · 사용자 반경 슬라이더 · Google Places `priceRange` 실측 가격 연동 고도화**: 카카오 주소/키워드 분리 조회로 전국 모든 행정구역·역·랜드마크 탐색 정상화, 프론트엔드 탐색 반경 슬라이더(`500m`~`10km`) 도입, 임의 업종 추정가 제거 후 Google Places API (New) `priceRange`/`priceLevel` 매칭 및 미확인 매장 `'가격 미확인'` 투명 표기 적용 완료.
 - **Phase 4 `[F-11]`~`[F-14]` P2 실시간 협업 · 커플 리텐션 풀스택 구현 완료 (Phase 4 완주)**: 구글 '내 지도' KML 다운로드(`/export.kml`), 커스텀 무드 맵 3종(`Warm Editorial`·`Romantic Sunset`·`Midnight Noir`) 및 공유 패스 보관함 복제, STOMP 1.2 WebSocket(`/ws/collab`) 실시간 동시 코스 편집, 6자리 코드 커플 연결·펫 진화·만남 인증·일일 미션(`/together`) 및 코스 연동 데이트 일기장(`/diaries`) 구현·통합 테스트 통과 완료.
+
+### 2026-11-08
+- **상세 거리·역세권 인터랙티브 동선 지도(`CourseRouteMap`) 고도화**: 기존 단색 배경 SVG 폴백을 실제 한국어 도로·골목·공원이 표시되는 웹 메르카토르(`EPSG:3857`) 타일 엔진 + 3종 무드 테마 필터로 교체하고, 확대/축소(`+`/`-`·휠·더블클릭)·드래그 패닝·`전체 맞춤`·`크게 보기`·실측 축척 바(`Scale Bar`), 카카오 로컬(`SW8`·`AT4`·`CT1`·`PK6`) 연동 주변 지하철역(호선 컬러·첫 장소까지 도보 동선 가이드)·명소·주차장 레이어 및 밀집 마커 겹침 방지 적용 완료.
+- **전역 SVG 아이콘 일원화 · 지도 이동 실시간 컨텍스트 & 현 지도 재탐색 · Hydration 오류 수정**: 커플 펫 단계별 벡터 SVG(`PetStageIcon`) 및 주차장·명소/공원·지하철역·메뉴 추천기 등 전 화면 이모지를 SVG로 교체하고, 지도 이동 시 `역`·`명소·공원`·`주차장` 전체 레이어 자동 갱신 및 기존 필터 조건 유지 **`이 지역에서 다시 탐색`** 버튼 추가, `useSyncExternalStore` 기반 `useDraftPlaces()` 도입으로 SSR/클라이언트 하이드레이션 불일치 해결 완료.

@@ -29,30 +29,27 @@ import {
   fetchMyPetApi,
   fetchTodayMissionsApi,
 } from "./together-api";
+import { PetStageIcon } from "./PetStageIcon";
 
 function getPetStageMeta(characterType?: string) {
   switch (characterType) {
     case "LOVEBIRD":
       return {
-        emoji: "🐥",
         quote: "“함께 걸은 길만큼 우리도 부쩍 자랐어요!”",
         stageLabel: "설렘 앵무",
       };
     case "SWAN":
       return {
-        emoji: "🦢",
         quote: "“어느 동네를 가도 이제 호흡이 척척 맞네요!”",
         stageLabel: "로맨틱 백조",
       };
     case "PHOENIX":
       return {
-        emoji: "🔥",
         quote: "“전설의 커플! 앞으로의 모든 계절도 함께해요.”",
         stageLabel: "전설의 불사조",
       };
     default:
       return {
-        emoji: "🐣",
         quote: "“이번 주말엔 어디로 데이트 가나요?”",
         stageLabel: "아기 삐약이",
       };
@@ -257,7 +254,7 @@ export function TogetherClientView() {
       setTodayIso(getTodaySeoulIso());
       setFeedbackMessage({
         type: "success",
-        text: "오늘의 만남 인증 완료! 커플 펫이 +20 XP 성장했어요 🎉",
+        text: "오늘의 만남 인증 완료! 커플 펫이 +20 XP 성장했어요.",
       });
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
@@ -342,8 +339,8 @@ export function TogetherClientView() {
         </header>
 
         <div className="rounded-[28px] border border-line bg-surface p-10 text-center shadow-xs">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary-soft text-4xl">
-            🐣
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary-soft">
+            <PetStageIcon className="h-12 w-12" />
           </div>
           <h2 className="mt-4 text-lg font-black text-foreground">
             우리 커플만의 캐릭터를 함께 키워보세요
@@ -422,8 +419,11 @@ export function TogetherClientView() {
             </div>
 
             <div className="my-8 flex flex-col items-center text-center">
-              <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-tr from-primary/30 via-white/10 to-amber-300/30 text-6xl ring-1 ring-white/20">
-                {stageMeta.emoji}
+              <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-tr from-primary/30 via-white/10 to-amber-300/30 ring-1 ring-white/20">
+                <PetStageIcon
+                  characterType={pet?.characterType}
+                  className="h-20 w-20"
+                />
               </div>
               <h2 className="mt-4 text-xl font-black">{stageMeta.quote}</h2>
               <p className="mt-1 max-w-sm text-xs text-white/70">

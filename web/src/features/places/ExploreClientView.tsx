@@ -31,9 +31,10 @@ import type {
 } from "@/shared/api/types";
 import {
   CourseRouteMap,
+  type MapAreaSearchRequest,
   type RouteMapStop,
 } from "@/features/map/CourseRouteMap";
-import { readDraftPlaces, writeDraftPlaces } from "./draft-course-storage";
+import { useDraftPlaces, writeDraftPlaces } from "./draft-course-storage";
 import { PlaceDetailModal } from "./PlaceDetailModal";
 import {
   getPlaceDetailApi,
@@ -103,6 +104,14 @@ const CATEGORY_BADGE_LABELS: Record<PlaceCategoryGroup, string> = {
 export function ExploreClientView() {
   const [keywordInput, setKeywordInput] = useState("성수역");
   const [appliedKeyword, setAppliedKeyword] = useState("성수역");
+  const [appliedCoords, setAppliedCoords] = useState<{
+    latitude: number;
+    longitude: number;
+    label: string;
+  } | null>(null);
+  const [mapPreviewMode, setMapPreviewMode] = useState<"places" | "draft">(
+    "places",
+  );
   const [selectedCategory, setSelectedCategory] = useState<
     PlaceCategoryGroup | "ALL"
   >("ALL");
@@ -132,12 +141,10 @@ export function ExploreClientView() {
     useState<FoodRecommendationResponse | null>(null);
   const [isRecommendingFood, setIsRecommendingFood] = useState(false);
 
-  // Detail Modal & Draft Course Cart
+  // Detail Modal & Hydration-Safe Draft Course Cart
   const [activePlaceDetail, setActivePlaceDetail] =
     useState<PlaceDetail | null>(null);
-  const [draftPlaces, setDraftPlaces] = useState<PlaceDetail[]>(() =>
-    readDraftPlaces(),
-  );
+  const draftPlaces = useDraftPlaces();
 
   const [reloadTick, setReloadTick] = useState(0);
 
@@ -158,7 +165,9 @@ export function ExploreClientView() {
     async function loadPlaces() {
       try {
         const res = await searchPlacesApi({
-          keyword: appliedKeyword,
+          keyword: appliedCoords ? undefined : appliedKeyword,
+          latitude: appliedCoords?.latitude,
+          longitude: appliedCoords?.longitude,
           radiusMeters,
           categoryGroup:
             selectedCategory === "ALL" ? undefined : selectedCategory,
@@ -193,6 +202,7 @@ export function ExploreClientView() {
     };
   }, [
     appliedKeyword,
+    appliedCoords,
     radiusMeters,
     selectedCategory,
     maxPrice,
@@ -211,7 +221,9 @@ export function ExploreClientView() {
     const nextKw = keywordInput.trim() || "성수역";
     setIsLoadingPlaces(true);
     setSearchError(null);
-    if (nextKw === appliedKeyword) {
+    setAppliedCoords(null);
+    setMapPreviewMode("places");
+    if (nextKw === appliedKeyword && appliedCoords === null) {
       setReloadTick((n) => n + 1);
     } else {
       setAppliedKeyword(nextKw);
@@ -220,11 +232,24 @@ export function ExploreClientView() {
 
   function selectRegionPreset(region: string) {
     setKeywordInput(region);
-    if (region !== appliedKeyword) {
+    setMapPreviewMode("places");
+    if (region !== appliedKeyword || appliedCoords !== null) {
       setIsLoadingPlaces(true);
       setSearchError(null);
+      setAppliedCoords(null);
       setAppliedKeyword(region);
     }
+  }
+
+  function handleSearchInMapArea(area: MapAreaSearchRequest) {
+    setIsLoadingPlaces(true);
+    setSearchError(null);
+    setMapPreviewMode("places");
+    setAppliedCoords({
+      latitude: area.latitude,
+      longitude: area.longitude,
+      label: area.areaHint ?? "현재 지도 영역",
+    });
   }
 
   async function handleRunFoodRecommend() {
@@ -233,8 +258,8 @@ export function ExploreClientView() {
       const anchor = places[0];
       const res = await recommendFoodsApi({
         foodCategory: recFoodCategory,
-        latitude: anchor?.latitude,
-        longitude: anchor?.longitude,
+        latitude: appliedCoords?.latitude ?? anchor?.latitude,
+        longitude: appliedCoords?.longitude ?? anchor?.longitude,
         budgetPerPerson: recBudget,
       });
       setFoodRecommendation(res);
@@ -256,14 +281,16 @@ export function ExploreClientView() {
   }
 
   function handleToggleDraft(place: PlaceDetail) {
-    setDraftPlaces((prev) => {
-      const exists = prev.some((p) => p.id === place.id);
-      const next = exists
-        ? prev.filter((p) => p.id !== place.id)
-        : [...prev, place];
-      writeDraftPlaces(next);
-      return next;
-    });
+    const exists = draftPlaces.some((p) => p.id === place.id);
+    const next = exists
+      ? draftPlaces.filter((p) => p.id !== place.id)
+      : [...draftPlaces, place];
+    writeDraftPlaces(next);
+    if (!exists && next.length >= 2) {
+      setMapPreviewMode("draft");
+    } else if (next.length < 2) {
+      setMapPreviewMode("places");
+    }
   }
 
   const draftIdSet = useMemo(
@@ -271,8 +298,12 @@ export function ExploreClientView() {
     [draftPlaces],
   );
 
+  const isShowingDraftRoute =
+    mapPreviewMode === "draft" && draftPlaces.length >= 2;
+  const activeRegionDisplay = appliedCoords ? appliedCoords.label : appliedKeyword;
+
   const mapStops = useMemo<RouteMapStop[]>(() => {
-    const source = draftPlaces.length >= 2 ? draftPlaces : places.slice(0, 6);
+    const source = isShowingDraftRoute ? draftPlaces : places.slice(0, 12);
     return source.map((place, index) => ({
       id: place.id,
       order: index + 1,
@@ -285,7 +316,7 @@ export function ExploreClientView() {
         place.avgPricePerPerson !== null ? place.avgPricePerPerson * 2 : undefined,
       placeUrl: place.placeUrl,
     }));
-  }, [places, draftPlaces]);
+  }, [places, draftPlaces, isShowingDraftRoute]);
 
   const totalDraftCostForTwo = useMemo(
     () =>
@@ -339,18 +370,18 @@ export function ExploreClientView() {
         <div className="relative mt-5 flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold text-muted">인기 데이트 상권:</span>
           {REGION_PRESETS.map((region) => (
-            <button
-              key={region}
-              type="button"
-              onClick={() => selectRegionPreset(region)}
-              className={`rounded-full px-3.5 py-1 text-xs font-bold transition-colors ${
-                appliedKeyword === region
-                  ? "bg-primary text-white"
-                  : "border border-line bg-background text-muted hover:border-primary/40 hover:text-foreground"
-              }`}
-            >
-              {region}
-            </button>
+              <button
+                key={region}
+                type="button"
+                onClick={() => selectRegionPreset(region)}
+                className={`rounded-full px-3.5 py-1 text-xs font-bold transition-colors ${
+                  appliedCoords === null && appliedKeyword === region
+                    ? "bg-primary text-white"
+                    : "border border-line bg-background text-muted hover:border-primary/40 hover:text-foreground"
+                }`}
+              >
+                {region}
+              </button>
           ))}
         </div>
 
@@ -510,8 +541,9 @@ export function ExploreClientView() {
           <div className="mt-5 rounded-3xl border border-primary/25 bg-primary-soft/45 p-5 sm:p-6">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
-                <p className="text-xs font-extrabold text-primary">
-                  🍽️ 취향 · 예산 맞춤 메뉴 추천기
+                <p className="inline-flex items-center gap-1.5 text-xs font-extrabold text-primary">
+                  <UtensilsCrossed className="h-3.5 w-3.5 shrink-0" />
+                  <span>취향 · 예산 맞춤 메뉴 추천기</span>
                 </p>
                 <p className="mt-0.5 text-xs text-muted">
                   원하는 음식 종류와 1인 예산을 고르면 현재 상권 주변의 딱 맞는 메뉴와 식당을 골라드려요.
@@ -638,13 +670,23 @@ export function ExploreClientView() {
                           <button
                             type="button"
                             onClick={() => handleToggleDraft(item)}
-                            className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
                               inDraft
                                 ? "bg-surface-dark text-white"
                                 : "bg-primary-soft text-primary"
                             }`}
                           >
-                            {inDraft ? "담김 ✓" : "+ 담기"}
+                            {inDraft ? (
+                              <>
+                                <Check className="h-3 w-3 text-amber-300" />
+                                <span>담김</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-3 w-3" />
+                                <span>담기</span>
+                              </>
+                            )}
                           </button>
                         </div>
                       );
@@ -698,7 +740,7 @@ export function ExploreClientView() {
           <div className="flex items-baseline justify-between">
             <div>
               <h2 className="text-lg font-extrabold tracking-tight text-foreground">
-                &lsquo;{appliedKeyword}&rsquo; 주변 탐색 결과{" "}
+                &lsquo;{activeRegionDisplay}&rsquo; 주변 탐색 결과{" "}
                 <span className="text-primary">{places.length}곳</span>
               </h2>
               <p className="text-xs text-muted">
@@ -811,8 +853,9 @@ export function ExploreClientView() {
 
                   {spot.aiSummary && (
                     <div className="mt-3.5 rounded-2xl bg-surface-subtle/75 px-4 py-2.5 text-xs leading-relaxed text-foreground/85">
-                      <span className="mr-1.5 font-bold text-primary">
-                        ✦ 요약
+                      <span className="mr-1.5 inline-flex items-center gap-1 align-middle font-bold text-primary">
+                        <Sparkles className="h-3 w-3 shrink-0" />
+                        <span>요약</span>
                       </span>
                       {spot.aiSummary}
                     </div>
@@ -836,16 +879,26 @@ export function ExploreClientView() {
           )}
         </div>
 
-        {/* Right: Dynamic Route / Spot Map ([F-05] Google Maps JS + Vector Fallback) */}
+        {/* Right: Dynamic Route / Spot Map ([F-05] Google Maps JS + Interactive Tile Map) */}
         <aside className="lg:col-span-5">
           <div className="sticky top-24">
             <CourseRouteMap
               stops={mapStops}
-              connectRoute={draftPlaces.length >= 2}
+              connectRoute={isShowingDraftRoute}
+              searchAnchor={
+                appliedCoords
+                  ? {
+                      latitude: appliedCoords.latitude,
+                      longitude: appliedCoords.longitude,
+                    }
+                  : null
+              }
+              onSearchInArea={handleSearchInMapArea}
+              isSearchingArea={isLoadingPlaces}
               headerTitle={
-                draftPlaces.length >= 2
+                isShowingDraftRoute
                   ? `내가 담은 동선 (${draftPlaces.length}곳)`
-                  : `'${appliedKeyword}' 스팟 분포 프리뷰`
+                  : `'${activeRegionDisplay}' 스팟 분포 프리뷰`
               }
               onSelectStop={(stop) => {
                 const found =
@@ -857,16 +910,34 @@ export function ExploreClientView() {
               }}
               footerNode={
                 draftPlaces.length > 0 ? (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-extrabold text-foreground">
-                      담은 {draftPlaces.length}곳 · 2인 약{" "}
-                      {totalDraftCostForTwo.toLocaleString()}원
-                    </span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-foreground">
+                        담은 {draftPlaces.length}곳 · 2인 약{" "}
+                        {totalDraftCostForTwo.toLocaleString()}원
+                      </span>
+                      {draftPlaces.length >= 2 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMapPreviewMode((m) =>
+                              m === "draft" ? "places" : "draft",
+                            )
+                          }
+                          className="rounded-full border border-line bg-surface-subtle px-2 py-0.5 text-[10px] font-bold text-muted hover:text-foreground"
+                        >
+                          {isShowingDraftRoute
+                            ? "탐색 스팟 보기"
+                            : "담은 동선 보기"}
+                        </button>
+                      )}
+                    </div>
                     <Link
                       href="/courses/new"
-                      className="font-extrabold text-primary hover:underline"
+                      className="inline-flex items-center gap-1 font-extrabold text-primary hover:underline"
                     >
-                      코스 메이커로 이동 →
+                      <span>코스 메이커로 이동</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
                   </div>
                 ) : (

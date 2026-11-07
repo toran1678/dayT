@@ -15,24 +15,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/AuthContext";
+import { PetStageIcon } from "@/features/together/PetStageIcon";
 import {
   fetchMyPetApi,
   PET_UPDATED_EVENT,
 } from "@/features/together/together-api";
 import type { CouplePetResponse } from "@/shared/api/types";
-
-function getPetEmoji(characterType?: string): string {
-  switch (characterType) {
-    case "LOVEBIRD":
-      return "🐥";
-    case "SWAN":
-      return "🦢";
-    case "PHOENIX":
-      return "🔥";
-    default:
-      return "🐣";
-  }
-}
 
 interface NavItem {
   href: string;
@@ -213,10 +201,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Brand Logo */}
           <div className="flex items-center gap-4">
             <Link href="/" className="group flex items-center gap-2.5">
-              <span className=" relative flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-xs transition-transform group-hover:scale-105">
+              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-xs transition-transform group-hover:scale-105">
                 <MapPin className="h-4 w-4 stroke-[2.5]" />
-                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-surface-dark text-[8px] font-bold text-amber-300">
-                  ✦
+                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-surface-dark text-amber-300">
+                  <Sparkles className="h-2 w-2" />
                 </span>
               </span>
               <div className="flex flex-col">
@@ -241,9 +229,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               href="/together"
               className="hidden items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-primary-soft/50 sm:inline-flex"
             >
-              <span className="text-sm leading-none">
-                {getPetEmoji(activeHeaderPet?.characterType)}
-              </span>
+              <PetStageIcon
+                characterType={activeHeaderPet?.characterType}
+                className="h-4 w-4 shrink-0"
+              />
               {activeHeaderPet ? (
                 <>
                   <span>Lv.{activeHeaderPet.level}</span>

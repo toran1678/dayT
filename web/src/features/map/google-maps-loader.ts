@@ -15,9 +15,12 @@ export interface GoogleLatLngBoundsInstance {
 
 export interface GoogleMapInstance {
   setCenter: (center: GoogleLatLngLiteral) => void;
+  getCenter?: () => { lat: () => number; lng: () => number } | undefined;
   setZoom: (zoom: number) => void;
+  getZoom: () => number | undefined;
   panTo: (center: GoogleLatLngLiteral) => void;
   setOptions: (options: { styles?: GoogleMapStyleElement[] }) => void;
+  addListener: (eventName: string, handler: () => void) => { remove: () => void };
   fitBounds: (
     bounds: GoogleLatLngBoundsInstance,
     padding?:
@@ -35,6 +38,10 @@ export interface GooglePolylineInstance {
   setMap: (map: GoogleMapInstance | null) => void;
 }
 
+export interface GoogleTransitLayerInstance {
+  setMap: (map: GoogleMapInstance | null) => void;
+}
+
 export interface GoogleInfoWindowInstance {
   setContent: (htmlOrNode: string | HTMLElement) => void;
   open: (options: { map: GoogleMapInstance; anchor: GoogleMarkerInstance }) => void;
@@ -49,6 +56,7 @@ export interface GoogleMapsNamespace {
       zoom: number;
       disableDefaultUI?: boolean;
       zoomControl?: boolean;
+      scaleControl?: boolean;
       clickableIcons?: boolean;
       gestureHandling?: string;
       styles?: GoogleMapStyleElement[];
@@ -84,6 +92,7 @@ export interface GoogleMapsNamespace {
     }[];
     map?: GoogleMapInstance;
   }) => GooglePolylineInstance;
+  TransitLayer: new () => GoogleTransitLayerInstance;
   InfoWindow: new () => GoogleInfoWindowInstance;
   LatLngBounds: new () => GoogleLatLngBoundsInstance;
   Size: new (width: number, height: number) => unknown;
@@ -183,7 +192,7 @@ export const DAYT_WARM_MAP_STYLES: GoogleMapStyleElement[] = [
   },
   {
     elementType: "labels.text.fill",
-    stylers: [{ color: "#57534e" }],
+    stylers: [{ color: "#44403c" }],
   },
   {
     elementType: "labels.text.stroke",
@@ -192,7 +201,12 @@ export const DAYT_WARM_MAP_STYLES: GoogleMapStyleElement[] = [
   {
     featureType: "poi.park",
     elementType: "geometry",
-    stylers: [{ color: "#e5efe2" }],
+    stylers: [{ color: "#dfeee0" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#0f766e" }],
   },
   {
     featureType: "road",
@@ -202,12 +216,12 @@ export const DAYT_WARM_MAP_STYLES: GoogleMapStyleElement[] = [
   {
     featureType: "road.arterial",
     elementType: "geometry",
-    stylers: [{ color: "#efeae0" }],
+    stylers: [{ color: "#ebe4d8" }],
   },
   {
     featureType: "water",
     elementType: "geometry",
-    stylers: [{ color: "#dce9f2" }],
+    stylers: [{ color: "#cfe4f2" }],
   },
 ];
 
@@ -228,6 +242,11 @@ export const DAYT_SUNSET_MAP_STYLES: GoogleMapStyleElement[] = [
     featureType: "poi.park",
     elementType: "geometry",
     stylers: [{ color: "#fde2e4" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#be123c" }],
   },
   {
     featureType: "road",
@@ -253,7 +272,7 @@ export const DAYT_NIGHT_MAP_STYLES: GoogleMapStyleElement[] = [
   },
   {
     elementType: "labels.text.fill",
-    stylers: [{ color: "#d6d3d1" }],
+    stylers: [{ color: "#e7e5e4" }],
   },
   {
     elementType: "labels.text.stroke",
@@ -263,6 +282,11 @@ export const DAYT_NIGHT_MAP_STYLES: GoogleMapStyleElement[] = [
     featureType: "poi.park",
     elementType: "geometry",
     stylers: [{ color: "#1f2922" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#38bdf8" }],
   },
   {
     featureType: "road",
@@ -291,6 +315,8 @@ export interface DaytMapThemeSpec {
   roadSecondary: string;
   routeStroke: string;
   isDark: boolean;
+  tileCssFilter: string;
+  tileOverlayTint: string;
   googleStyles: GoogleMapStyleElement[];
 }
 
@@ -298,32 +324,39 @@ export const DAYT_MAP_THEMES: Record<DaytMapThemeId, DaytMapThemeSpec> = {
   WARM: {
     id: "WARM",
     label: "웜 에디토리얼",
-    canvasBg: "#F4F1EA",
+    canvasBg: "#EDE8DF",
     roadPrimary: "#E7E2D8",
     roadSecondary: "#EAE5DC",
     routeStroke: "#E85D3F",
     isDark: false,
+    tileCssFilter: "sepia(0.15) saturate(0.88) brightness(1.02) contrast(0.97)",
+    tileOverlayTint: "rgba(244, 239, 228, 0.13)",
     googleStyles: DAYT_WARM_MAP_STYLES,
   },
   SUNSET: {
     id: "SUNSET",
     label: "로맨틱 선셋",
-    canvasBg: "#FFF1EB",
+    canvasBg: "#FBE8E0",
     roadPrimary: "#FED7AA",
     roadSecondary: "#FECDD3",
     routeStroke: "#E11D48",
     isDark: false,
+    tileCssFilter:
+      "sepia(0.24) hue-rotate(-14deg) saturate(1.06) brightness(1.01) contrast(0.97)",
+    tileOverlayTint: "rgba(255, 232, 224, 0.16)",
     googleStyles: DAYT_SUNSET_MAP_STYLES,
   },
   NIGHT: {
     id: "NIGHT",
     label: "미드나잇 야경",
-    canvasBg: "#1C1917",
+    canvasBg: "#18181B",
     roadPrimary: "#292524",
     roadSecondary: "#44403C",
     routeStroke: "#FBBF24",
     isDark: true,
+    tileCssFilter:
+      "invert(0.91) hue-rotate(180deg) saturate(0.82) brightness(0.95) contrast(1.08)",
+    tileOverlayTint: "rgba(15, 23, 42, 0.18)",
     googleStyles: DAYT_NIGHT_MAP_STYLES,
   },
 };
-

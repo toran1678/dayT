@@ -7,14 +7,14 @@
 
 ## 1. 전체 개발 로드맵 (Phases)
 
-| 단계 | 목표 | 핵심 범위 |
-| :--- | :--- | :--- |
-| **Phase 0** | 기획 · 설계 · 하네스 구축 | PRD, PostGIS ERD, OpenAPI 3.0 명세 확정, 에이전트 API/워크플로우 가드레일 설정 |
-| **Phase 1** | 인프라 & 서비스 스캐폴딩 | `docker-compose`(PostgreSQL 16 + PostGIS, Redis), `backend`(Spring Boot), `ai-service`(FastAPI), `web`(Next.js TS + API 타입 생성) 초기 세팅 |
-| **Phase 2** | **P0 핵심 MVP** (`F-01`~`F-05`) | 반응형 웹 대시보드 기반 소셜 로그인(JWT) → 지역·음식 장소 탐색(PostGIS·Redis) → 커스텀 코스 CRUD → 지도 마커·폴리라인 동선 렌더링 |
-| **Phase 3** | **P1 AI · 공유 고도화** (`F-06`~`F-10`) | 공공/리뷰 수집 및 Gemini 해시태그 요약 → 조건 맞춤 AI 코스 자동 추천 → 카톡 공유 & 구글맵 원클릭 길안내 |
-| **Phase 4** | **P2 실시간 · 커플 확장** (`F-11`~`F-14`) | KML 내보내기, STOMP 실시간 공동 코스 편집(`/ws/collab`), 커플 연결·펫 성장·데이트 일기장 |
-| **Phase 5** | **모바일 앱 확장** *(추후)* | `web/`의 API 타입·비즈니스 로직을 재사용하여 `mobile/`(Expo React Native) 네이티브 앱으로 이식 |
+| 단계        | 목표                                      | 핵심 범위                                                                                                                                    |
+| :---------- | :---------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Phase 0** | 기획 · 설계 · 하네스 구축                 | PRD, PostGIS ERD, OpenAPI 3.0 명세 확정, 에이전트 API/워크플로우 가드레일 설정                                                               |
+| **Phase 1** | 인프라 & 서비스 스캐폴딩                  | `docker-compose`(PostgreSQL 16 + PostGIS, Redis), `backend`(Spring Boot), `ai-service`(FastAPI), `web`(Next.js TS + API 타입 생성) 초기 세팅 |
+| **Phase 2** | **P0 핵심 MVP** (`F-01`~`F-05`)           | 반응형 웹 대시보드 기반 소셜 로그인(JWT) → 지역·음식 장소 탐색(PostGIS·Redis) → 커스텀 코스 CRUD → 지도 마커·폴리라인 동선 렌더링            |
+| **Phase 3** | **P1 AI · 공유 고도화** (`F-06`~`F-10`)   | 공공/리뷰 수집 및 Gemini 해시태그 요약 → 조건 맞춤 AI 코스 자동 추천 → 카톡 공유 & 구글맵 원클릭 길안내                                      |
+| **Phase 4** | **P2 실시간 · 커플 확장** (`F-11`~`F-14`) | KML 내보내기, STOMP 실시간 공동 코스 편집(`/ws/collab`), 커플 연결·펫 성장·데이트 일기장                                                     |
+| **Phase 5** | **모바일 앱 확장** _(추후)_               | `web/`의 API 타입·비즈니스 로직을 재사용하여 `mobile/`(Expo React Native) 네이티브 앱으로 이식                                               |
 
 ---
 
@@ -29,10 +29,16 @@
 
 ## 3. 현재 작업 계획 (Active Plan)
 
-> *새로운 기능이나 단계(Phase) 구현에 착수할 때 에이전트가 아래 섹션을 현재 작업의 세부 설계(대상 파일, 구현 순서, 검증 방법)로 갱신합니다.*
+> _새로운 기능이나 단계(Phase) 구현에 착수할 때 에이전트가 아래 섹션을 현재 작업의 세부 설계(대상 파일, 구현 순서, 검증 방법)로 갱신합니다._
 
-- **현재 목표**: **Phase 0 ~ Phase 4 (`F-01` ~ `F-14`) 웹 기반 올인원 플랫폼 구현 완료 → 운영/실사용 점검 또는 Phase 5 (`mobile/` 확장) 선택 대기**
-- **최근 완료 범위 요약 (Phase 4)**:
-  1. **`backend/` (`[F-11]`, `[F-13]`, `[F-14]`)**: `V3__seed_daily_missions.sql` 시드, `CoupleController`/`CoupleService`(6자리 초대 코드 발급·커플 연결), `PetMissionController`/`PetMissionService`(커플 펫 경험치·레벨 진화, 일 1회 만남 인증 `409` 중복 방지, 일일 미션 3종 자동 배정·완료 보상), `DiaryController`/`DiaryService`(커플 공유 일기장 CRUD·코스 연동·사진 저장), `CourseService.exportCourseKml` 및 `WebSocketCollabConfig`/`CourseCollabWsController`(STOMP `/ws/collab` 실시간 공동 편집 브로드캐스트) 구현 완료
-  2. **`web/` (`[F-11]` ~ `[F-14]`)**: `CourseRouteMap` 3종 커스텀 무드 테마 전환기, 공유 뷰어 보관함 복제 및 KML 다운로드, 무의존성 STOMP 1.2 클라이언트(`collab-stomp-client.ts`) 기반 실시간 동시 편집 동기화, `TogetherClientView`·`AppShell` 실시간 펫 배지, `DiariesClientView`(기기 사진 압축 첨부·URL 첨부·코스 연동) 구현 완료
-  3. **통합 검증**: 백엔드 `gradlew test`(KML·STOMP WebSocket·커플/펫/일기장 통합 테스트 15종 전원 통과), 프론트엔드 `eslint`·`tsc --noEmit`·`next build`(`cacheComponents` 11/11 라우트 프리렌더링) 검증 완료
+- **현재 목표**: **전역 SVG 아이콘 일원화 · 지도 이동 시 역/명소·공원/주차장 실시간 표시 · 현 지도 조건 유지 재탐색 · SSR 하이드레이션 일치 수정**
+- **세부 구현 계획**:
+  1. **SSR/클라이언트 Hydration 불일치 완전 해결 (`draft-course-storage.ts`, `ExploreClientView.tsx`, `CourseBuilderClientView.tsx`)**:
+     - `useSyncExternalStore`(`getServerSnapshot` 빈 배열 반환) 기반 `useDraftPlaces()` 훅을 도입해 서버 렌더링 HTML과 초기 하이드레이션 트리를 100% 일치시킴
+  2. **이모지·유니코드 기호 → 순수 SVG 아이콘 교체 (`PetStageIcon.tsx`, `AppShell.tsx`, `TogetherClientView.tsx`, `ExploreClientView.tsx`, `CourseRouteMap.tsx`)**:
+     - 커플 펫 성장 단계별 전용 벡터 SVG 컴포넌트(`PetStageIcon`) 신설 및 주차장(`SquareParking`), 명소·공원(`Trees`·`Landmark`), 지하철역(`TrainFront`), 메뉴 추천기(`UtensilsCrossed`), 요약(`Sparkles`) 등 모든 이모지·특수문자를 SVG로 전환
+  3. **지도 이동(Pan/Zoom) 시 주변 정보(역·명소/공원·주차장) 상시 자동 로드 (`CourseRouteMap.tsx`, `web/src/app/api/map/context/route.ts`)**:
+     - `역`·`명소·공원`·`주차장` 레이어를 모두 기본 활성화(`true`)하고, 공원 키워드 보강 및 지도 중심 이동 디바운스 조회를 적용해 지도를 어느 지역으로 옮기든 주변 정보가 즉시 표시되도록 개선
+  4. **현 지도 영역 조건 유지 재탐색 버튼 (`CourseRouteMap.tsx`, `ExploreClientView.tsx`)**:
+     - 탐색 기준점으로부터 지도를 이동했을 때 상단 중앙에 **`이 지역에서 다시 탐색`** 플로팅 버튼을 노출하고, 클릭 시 기존 선택 필터(카테고리·반경·1인 예산·실내 여부) 그대로 이동한 좌표의 데이트 스팟을 재조회하도록 연결
+  5. **검증**: `npm run typecheck`, `npm run lint` 통과 확인 및 `progress.md` 반영

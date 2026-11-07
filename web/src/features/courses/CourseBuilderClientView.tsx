@@ -144,25 +144,8 @@ function recalculateStopTransfers(
   });
 }
 
-function buildInitialStops(initialCourse?: CourseDetail): EditableCourseStop[] {
-  if (initialCourse) {
-    const mapped: EditableCourseStop[] = initialCourse.places.map(
-      (item, idx) => ({
-        uid: `${item.place.id}-${idx}-${item.visitOrder}`,
-        place: item.place,
-        estimatedCost: item.estimatedCost,
-        stayMinutes: item.stayMinutes,
-        travelMinutesToNext: item.travelMinutesToNext,
-        walkingMetersToNext: 0,
-        isManualTravelTime: item.travelMinutesToNext > 0,
-        memo: item.memo ?? "",
-      }),
-    );
-    return recalculateStopTransfers(mapped);
-  }
-
-  const drafts = readDraftPlaces();
-  const mapped: EditableCourseStop[] = drafts.map((place, idx) => ({
+function mapPlacesToEditableStops(places: PlaceDetail[]): EditableCourseStop[] {
+  const mapped: EditableCourseStop[] = places.map((place, idx) => ({
     uid: `${place.id}-${idx}`,
     place,
     estimatedCost:
@@ -173,6 +156,25 @@ function buildInitialStops(initialCourse?: CourseDetail): EditableCourseStop[] {
     isManualTravelTime: false,
     memo: "",
   }));
+  return recalculateStopTransfers(mapped);
+}
+
+function buildInitialStops(initialCourse?: CourseDetail): EditableCourseStop[] {
+  if (!initialCourse) {
+    return [];
+  }
+  const mapped: EditableCourseStop[] = initialCourse.places.map(
+    (item, idx) => ({
+      uid: `${item.place.id}-${idx}-${item.visitOrder}`,
+      place: item.place,
+      estimatedCost: item.estimatedCost,
+      stayMinutes: item.stayMinutes,
+      travelMinutesToNext: item.travelMinutesToNext,
+      walkingMetersToNext: 0,
+      isManualTravelTime: item.travelMinutesToNext > 0,
+      memo: item.memo ?? "",
+    }),
+  );
   return recalculateStopTransfers(mapped);
 }
 
@@ -213,6 +215,22 @@ export function CourseBuilderClientView({
   const [stops, setStops] = useState<EditableCourseStop[]>(() =>
     buildInitialStops(initialCourse),
   );
+  const hydratedDraftRef = useRef(false);
+
+  useEffect(() => {
+    if (isEditMode || hydratedDraftRef.current) {
+      return;
+    }
+    hydratedDraftRef.current = true;
+    const drafts = readDraftPlaces();
+    if (drafts.length > 0) {
+      queueMicrotask(() => {
+        setStops((prev) =>
+          prev.length === 0 ? mapPlacesToEditableStops(drafts) : prev,
+        );
+      });
+    }
+  }, [isEditMode]);
   const [focusedOrder, setFocusedOrder] = useState<number | null>(null);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState<boolean>(
