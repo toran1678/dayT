@@ -540,8 +540,6 @@ export function CourseRouteMap({
     }
 
     let active = true;
-    let started = false;
-    const controller = new AbortController();
 
     const roundedLat = Math.round(activeCenter.lat * 1000) / 1000;
     const roundedLng = Math.round(activeCenter.lng * 1000) / 1000;
@@ -549,16 +547,13 @@ export function CourseRouteMap({
 
     const timer = setTimeout(async () => {
       if (!active) return;
-      started = true;
       try {
         const params = new URLSearchParams({
           lat: String(roundedLat),
           lng: String(roundedLng),
           radius: String(queryRadius),
         });
-        const res = await fetch(`/api/map/context?${params.toString()}`, {
-          signal: controller.signal,
-        });
+        const res = await fetch(`/api/map/context?${params.toString()}`);
         if (!active || !res.ok) return;
         const data = (await res.json()) as MapSurroundingContext;
         if (active && Array.isArray(data.stations)) {
@@ -566,10 +561,7 @@ export function CourseRouteMap({
             mergeSurroundingContext(prev, data, roundedLat, roundedLng),
           );
         }
-      } catch (err: unknown) {
-        if (!active || (err instanceof Error && err.name === "AbortError")) {
-          return;
-        }
+      } catch {
         if (active) {
           const fb = buildFallbackMapContext(
             roundedLat,
@@ -586,13 +578,6 @@ export function CourseRouteMap({
     return () => {
       active = false;
       clearTimeout(timer);
-      if (started) {
-        try {
-          controller.abort();
-        } catch {
-          // Ignore
-        }
-      }
     };
   }, [
     activeCenter.lat,

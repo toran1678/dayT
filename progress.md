@@ -93,4 +93,4 @@
   1. **주변 역 표시 개수 축소**: 최대 3개에서 가장 가까운 2개(`slice(0, 2)`)로 축소하여 지도 상단 바 여백 확보.
   2. **담은 코스 개수 텍스트 분리**: 좌측 원형 뱃지 대신 타이틀 바로 우측에 포인트 컬러 텍스트(`내가 담은 코스 <span className="text-primary font-black">N개</span>`)로 자연스럽게 정돈.
   3. **스팟 칩 디자인 세련화**: 투박한 `"1."` 텍스트를 제거하고 카테고리 컬러 원형 뱃지 우측 상단에 미니 인덱스 태그(1, 2)를 일체형으로 배치하여 장소명이 시원하게 읽히도록 개선.
-  4. **`Runtime AbortError` (signal is aborted without reason) 완전 해결**: `CourseRouteMap` 및 `PlaceSpotlightCard`의 `useEffect` fetch cleanup 시 `started` 플래그 관리 및 catch 블록의 `AbortError` 안전 조기 반환 처리로 Next.js 런타임 에러 오버레이 원천 차단 (`typecheck` & `eslint` 0 error/0 warning 통과).
+  4. **`Runtime AbortError` 원인 분석 및 완전 제거**: Next.js 개발 모드에서 `AbortController.abort()` 호출 시 uncaught promise rejection으로 감지되어 발생하던 런타임 에러 오버레이 문제를 해결하기 위해, 불필요한 `AbortController`를 걷어내고 React 공식 권장 패턴인 `active` 플래그(Ignore Pattern)로 안전하게 상태 갱신을 차단하도록 수정 (`typecheck` & `eslint` 0 error/0 warning 통과).
