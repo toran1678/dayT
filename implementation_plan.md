@@ -31,14 +31,28 @@
 
 > _새로운 기능이나 단계(Phase) 구현에 착수할 때 에이전트가 아래 섹션을 현재 작업의 세부 설계(대상 파일, 구현 순서, 검증 방법)로 갱신합니다._
 
-- **현재 목표**: **전역 SVG 아이콘 일원화 · 지도 이동 시 역/명소·공원/주차장 실시간 표시 · 현 지도 조건 유지 재탐색 · SSR 하이드레이션 일치 수정**
+- **현재 목표**: **지도 SSR 하이드레이션 소수점 불일치 해결 및 고정 칩 제거 후 지하철역 자동완성 텍스트 힌트 도입 완료**
 - **세부 구현 계획**:
-  1. **SSR/클라이언트 Hydration 불일치 완전 해결 (`draft-course-storage.ts`, `ExploreClientView.tsx`, `CourseBuilderClientView.tsx`)**:
-     - `useSyncExternalStore`(`getServerSnapshot` 빈 배열 반환) 기반 `useDraftPlaces()` 훅을 도입해 서버 렌더링 HTML과 초기 하이드레이션 트리를 100% 일치시킴
-  2. **이모지·유니코드 기호 → 순수 SVG 아이콘 교체 (`PetStageIcon.tsx`, `AppShell.tsx`, `TogetherClientView.tsx`, `ExploreClientView.tsx`, `CourseRouteMap.tsx`)**:
-     - 커플 펫 성장 단계별 전용 벡터 SVG 컴포넌트(`PetStageIcon`) 신설 및 주차장(`SquareParking`), 명소·공원(`Trees`·`Landmark`), 지하철역(`TrainFront`), 메뉴 추천기(`UtensilsCrossed`), 요약(`Sparkles`) 등 모든 이모지·특수문자를 SVG로 전환
-  3. **지도 이동(Pan/Zoom) 시 주변 정보(역·명소/공원·주차장) 상시 자동 로드 (`CourseRouteMap.tsx`, `web/src/app/api/map/context/route.ts`)**:
-     - `역`·`명소·공원`·`주차장` 레이어를 모두 기본 활성화(`true`)하고, 공원 키워드 보강 및 지도 중심 이동 디바운스 조회를 적용해 지도를 어느 지역으로 옮기든 주변 정보가 즉시 표시되도록 개선
-  4. **현 지도 영역 조건 유지 재탐색 버튼 (`CourseRouteMap.tsx`, `ExploreClientView.tsx`)**:
-     - 탐색 기준점으로부터 지도를 이동했을 때 상단 중앙에 **`이 지역에서 다시 탐색`** 플로팅 버튼을 노출하고, 클릭 시 기존 선택 필터(카테고리·반경·1인 예산·실내 여부) 그대로 이동한 좌표의 데이트 스팟을 재조회하도록 연결
-  5. **검증**: `npm run typecheck`, `npm run lint` 통과 확인 및 `progress.md` 반영
+  0. **지도 Hydration 불일치 해결 (`CourseRouteMap.tsx`, `slippy-tile-math.ts`)**:
+     - `latLngToContainerPx`에 `Math.round()`를 적용해 pixel 좌표를 정수화하고, 타일 핀 인라인 스타일에 `suppressHydrationWarning`을 적용하여 Next.js 서버/클라이언트 소수점 렌더링 불일치(569.004px vs 569.0036...px)를 완벽 제거
+  0.1. **검색창 지하철역 텍스트 힌트 드롭다운 (`subway-search-data.ts`, `ExploreClientView.tsx`)**:
+     - 고정 프리셋 칩(`성수역`, `연남동`, `한남동` 등)을 제거하고 검색창 단일화
+     - 검색창 포커스 또는 입력 시 수도권 주요 데이트 역세권/상권 자동완성 텍스트 힌트 드롭다운 노출 (호선 컬러 배지, 핫스팟 태그, 방향키/Enter 선택 지원)
+  1. **이미지 로딩 안정화 & Referrer 차단 방지 (`PlaceSpotlightCard.tsx`)**:
+     - `<Image unoptimized referrerPolicy="no-referrer" />` 적용으로 네이버·티스토리 등 외부 블로그 403 차단 해제
+     - `onError` 발생 시 카카오 CDN `thumbnailUrl` 및 카테고리별 큐레이션 이미지 다중 폴백 체인 구축
+     - 이미지 좌우 넘김 버튼(`<`, `>`) 추가로 갤러리 편의성 향상
+  2. **슬라이더 UI 정돈 (`ExploreClientView.tsx`)**:
+     - thumb 위치와 어긋나는 중간 텍스트(`2km`, `5만`) 제거, 최소/최대 양 끝 라벨만 직관적으로 표시
+  3. **지도 텍스트 제거 (`CourseRouteMap.tsx`)**:
+     - 헤더의 '상세 거리·역세권 맵' 배지/전환 버튼 완전 삭제
+  4. **메뉴 추천 지도 실시간 연동**:
+     - '다시 추천' 클릭 시 카테고리 순환 및 추천 식당 목록을 지도 마커(`places`)에 즉시 반영하고 첫 번째 추천 식당 모달 자동 팝업
+  5. **스크롤 없는 풀화면 고정 지도 레이아웃**:
+     - 데스크톱 기준 `lg:h-[calc(100vh-130px)] lg:overflow-hidden` 적용
+     - 좌측 검색/필터 패널만 독립 스크롤되고 지도는 100% 화면에 고정되어 위아래 스크롤 제거
+  6. **스팟 선택 시 팝업 창(Modal) 전환**:
+     - 좌측 인라인 확장 대신 클릭 시 `PlaceSpotlightCard`가 뜨는 중앙 플로팅 모달창 구현
+  7. **현 지도 재탐색 시 담은 장소 영구 유지**:
+     - `mapStops`에 `draftPlaces`를 1순위(`isDraft: true`, 코스 번호)로 유지하고 새 검색 스팟을 후보로 병합하여, 다른 지역으로 이동해 재탐색해도 담은 장소가 지도에서 사라지지 않도록 보장
+  8. **검증**: `npm run typecheck`, `npm run lint` 통과 확인 및 `progress.md` 갱신

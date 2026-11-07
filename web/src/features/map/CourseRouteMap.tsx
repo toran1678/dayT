@@ -18,7 +18,6 @@ import {
   Maximize2,
   Minimize2,
   Minus,
-  Navigation,
   Palette,
   Plus,
   RotateCw,
@@ -75,6 +74,7 @@ export interface RouteMapStop {
   estimatedCost?: number;
   memo?: string | null;
   placeUrl?: string | null;
+  isDraft?: boolean;
 }
 
 export interface MapAreaSearchRequest {
@@ -88,6 +88,7 @@ interface CourseRouteMapProps {
   polyline?: LatLngPoint[];
   connectRoute?: boolean;
   activeOrder?: number | null;
+  selectedStopId?: number | null;
   onSelectStop?: (stop: RouteMapStop) => void;
   searchAnchor?: { latitude: number; longitude: number } | null;
   onSearchInArea?: (area: MapAreaSearchRequest) => void;
@@ -235,6 +236,7 @@ export function CourseRouteMap({
   polyline,
   connectRoute = true,
   activeOrder = null,
+  selectedStopId: externalSelectedStopId = null,
   onSelectStop,
   searchAnchor = null,
   onSearchInArea,
@@ -256,7 +258,11 @@ export function CourseRouteMap({
   const [showLandmarkLayer, setShowLandmarkLayer] = useState(true);
   const [showParkingLayer, setShowParkingLayer] = useState(true);
 
-  const [selectedStopId, setSelectedStopId] = useState<number | null>(null);
+  const [internalSelectedStopId, setInternalSelectedStopId] = useState<number | null>(null);
+  const selectedStopId = externalSelectedStopId ?? internalSelectedStopId;
+  const setSelectedStopId = useCallback((id: number | null) => {
+    setInternalSelectedStopId(id);
+  }, []);
   const [hoveredStopId, setHoveredStopId] = useState<number | null>(null);
   const [selectedContext, setSelectedContext] =
     useState<SelectedContextTarget>(null);
@@ -802,6 +808,7 @@ export function CourseRouteMap({
     activeOrder,
     activeTheme,
     searchAnchor,
+    setSelectedStopId,
   ]);
 
   // Google Maps Effect 2: Surrounding Stations, Landmarks/Parks & Parking markers (updates on pan without resetting camera)
@@ -1285,27 +1292,6 @@ export function CourseRouteMap({
               );
             })}
           </div>
-
-          {apiKey ? (
-            <button
-              type="button"
-              onClick={() =>
-                setMapMode((m) => (m === "google" ? "tile" : "google"))
-              }
-              className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-bold text-primary transition-colors hover:bg-primary hover:text-white"
-              title="지도 엔진 전환"
-            >
-              <Navigation className="h-3 w-3" />
-              <span>
-                {mapMode === "google" ? "Google Maps" : "상세 거리 맵"}
-              </span>
-            </button>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-bold text-primary">
-              <Navigation className="h-3 w-3" />
-              <span>상세 거리·역세권 맵</span>
-            </span>
-          )}
         </div>
       </div>
 
@@ -1421,13 +1407,14 @@ export function CourseRouteMap({
       {/* 3. Interactive Map Canvas */}
       <div
         style={{ backgroundColor: activeTheme.canvasBg }}
-        className={`relative select-none overflow-hidden transition-[height,background-color] duration-200 ${effectiveHeightClass}`}
+        className={`relative select-none overflow-hidden transition-[height,background-color] duration-200 min-h-[460px] ${effectiveHeightClass}`}
       >
         {mapMode === "google" ? (
           <div ref={mapContainerRef} className="h-full w-full" />
         ) : (
           <div
             ref={tileContainerRef}
+            suppressHydrationWarning
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -1551,9 +1538,10 @@ export function CourseRouteMap({
               seg.pixelLen >= 68 ? (
                 <div
                   key={`badge-${seg.key}`}
+                  suppressHydrationWarning
                   style={{
-                    left: `${seg.midX}px`,
-                    top: `${seg.midY}px`,
+                    left: `${Math.round(seg.midX)}px`,
+                    top: `${Math.round(seg.midY)}px`,
                   }}
                   className="pointer-events-none absolute z-[16] -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/30 bg-surface/95 px-2 py-0.5 text-[10px] font-extrabold whitespace-nowrap text-primary shadow-xs"
                 >
@@ -1582,12 +1570,16 @@ export function CourseRouteMap({
                 <button
                   key={poi.id}
                   type="button"
+                  suppressHydrationWarning
                   onClick={() =>
                     setSelectedContext(
                       isSelected ? null : { type: "POI", poi },
                     )
                   }
-                  style={{ left: `${x}px`, top: `${y}px` }}
+                  style={{
+                    left: `${Math.round(x)}px`,
+                    top: `${Math.round(y)}px`,
+                  }}
                   className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold whitespace-nowrap shadow-xs transition-transform hover:scale-105 ${
                     isSelected
                       ? "z-30 border-amber-300 bg-surface-dark text-white"
@@ -1639,8 +1631,12 @@ export function CourseRouteMap({
                 <button
                   key={station.id}
                   type="button"
+                  suppressHydrationWarning
                   onClick={() => handleFocusStation(station)}
-                  style={{ left: `${x}px`, top: `${y}px` }}
+                  style={{
+                    left: `${Math.round(x)}px`,
+                    top: `${Math.round(y)}px`,
+                  }}
                   className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 ${
                     isSelected
                       ? "z-30 border-amber-300 bg-slate-900 text-white ring-2 ring-amber-300"
@@ -1677,6 +1673,7 @@ export function CourseRouteMap({
                 <button
                   key={`${pin.stop.id}-${pin.stop.order}`}
                   type="button"
+                  suppressHydrationWarning
                   onMouseEnter={() => setHoveredStopId(pin.stop.id)}
                   onMouseLeave={() =>
                     setHoveredStopId((cur) =>
@@ -1690,8 +1687,8 @@ export function CourseRouteMap({
                   }}
                   title={`${pin.stop.order}. ${pin.stop.name} (${pin.stop.categoryLabel})`}
                   style={{
-                    left: `${pin.x}px`,
-                    top: `${pin.y}px`,
+                    left: `${Math.round(pin.x)}px`,
+                    top: `${Math.round(pin.y)}px`,
                   }}
                   className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center rounded-full font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 ${
                     pin.showFullLabel
@@ -1700,7 +1697,9 @@ export function CourseRouteMap({
                   } ${
                     pin.isFocused
                       ? "z-30 bg-surface-dark text-white ring-2 ring-amber-300"
-                      : "z-20 bg-surface text-foreground ring-2 ring-primary"
+                      : pin.stop.isDraft
+                        ? "z-25 bg-primary text-white ring-2 ring-white shadow-primary/30"
+                        : "z-20 bg-surface text-foreground ring-2 ring-primary"
                   }`}
                 >
                   <span
@@ -1711,7 +1710,9 @@ export function CourseRouteMap({
                     } ${
                       pin.isFocused
                         ? "bg-amber-300 text-surface-dark"
-                        : "bg-primary text-white"
+                        : pin.stop.isDraft
+                          ? "bg-white text-primary"
+                          : "bg-primary text-white"
                     }`}
                   >
                     {pin.stop.order}

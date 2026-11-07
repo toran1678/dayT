@@ -69,8 +69,8 @@ export function latLngToContainerPx(
   );
   const pointWorld = latLngToWorldPx(lat, lng, viewport.zoom);
   return {
-    x: width / 2 + (pointWorld.x - centerWorld.x),
-    y: height / 2 + (pointWorld.y - centerWorld.y),
+    x: Math.round(width / 2 + (pointWorld.x - centerWorld.x)),
+    y: Math.round(height / 2 + (pointWorld.y - centerWorld.y)),
   };
 }
 

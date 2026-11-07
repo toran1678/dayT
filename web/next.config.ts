@@ -32,6 +32,22 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   env: loadRootPublicEnv(),
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.daumcdn.net",
+      },
+      {
+        protocol: "http",
+        hostname: "*.daumcdn.net",
+      },
+    ],
+  },
   turbopack: {
     root: WEB_DIR,
     rules: {

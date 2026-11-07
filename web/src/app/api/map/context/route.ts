@@ -1,6 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
 import { cacheLife } from "next/cache";
+import { readServerSecret } from "@/shared/server/root-env";
 import {
   buildFallbackMapContext,
   resolveSubwayLineBadge,
@@ -26,51 +25,11 @@ interface KakaoCategoryResponse {
 }
 
 function readServerKakaoRestApiKey(): string | null {
-  const candidates = [
-    process.env.KAKAO_REST_API_KEY,
-    process.env.KAKAO_CLIENT_ID,
-    process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID,
-  ];
-
-  for (const val of candidates) {
-    const trimmed = val?.trim();
-    if (trimmed && !trimmed.startsWith("your_") && trimmed !== "CHANGE_ME") {
-      return trimmed;
-    }
-  }
-
-  try {
-    const rootEnvCandidates = [
-      path.resolve(process.cwd(), "..", ".env"),
-      path.resolve(process.cwd(), ".env"),
-    ];
-    for (const envPath of rootEnvCandidates) {
-      if (!fs.existsSync(envPath)) continue;
-      const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
-      for (const rawLine of lines) {
-        const line = rawLine.trim();
-        if (!line || line.startsWith("#")) continue;
-        const eqIdx = line.indexOf("=");
-        if (eqIdx <= 0) continue;
-        const k = line.slice(0, eqIdx).trim();
-        const v = line
-          .slice(eqIdx + 1)
-          .trim()
-          .replace(/^['"]|['"]$/g, "");
-        if (
-          (k === "KAKAO_REST_API_KEY" || k === "KAKAO_CLIENT_ID") &&
-          v &&
-          !v.startsWith("your_")
-        ) {
-          return v;
-        }
-      }
-    }
-  } catch {
-    // Ignore fs errors in restricted runtimes
-  }
-
-  return null;
+  return readServerSecret(
+    "KAKAO_REST_API_KEY",
+    "KAKAO_CLIENT_ID",
+    "NEXT_PUBLIC_KAKAO_CLIENT_ID",
+  );
 }
 
 async function queryKakaoCategory(
