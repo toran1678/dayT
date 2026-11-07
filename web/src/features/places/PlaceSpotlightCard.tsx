@@ -70,12 +70,14 @@ export function PlaceSpotlightCard({
 
   useEffect(() => {
     let active = true;
+    let started = false;
     const controller = new AbortController();
 
     async function loadPhotos() {
       setIsLoadingPhotos(true);
       setSelectedPhotoIdx(0);
       setFailedUrls({});
+      started = true;
       try {
         const params = new URLSearchParams({
           name: place.name,
@@ -90,6 +92,8 @@ export function PlaceSpotlightCard({
           signal: controller.signal,
         });
 
+        if (!active) return;
+
         if (res.ok) {
           const data = (await res.json()) as { photos?: PlacePhotoItem[] };
           if (active && Array.isArray(data.photos) && data.photos.length > 0) {
@@ -97,8 +101,10 @@ export function PlaceSpotlightCard({
             return;
           }
         }
-      } catch {
-        // Fallback handled below
+      } catch (err: unknown) {
+        if (!active || (err instanceof Error && err.name === "AbortError")) {
+          return;
+        }
       } finally {
         if (active) {
           setIsLoadingPhotos(false);
@@ -109,7 +115,13 @@ export function PlaceSpotlightCard({
     void loadPhotos();
     return () => {
       active = false;
-      controller.abort();
+      if (started) {
+        try {
+          controller.abort();
+        } catch {
+          // Ignore
+        }
+      }
     };
   }, [
     place.id,

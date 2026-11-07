@@ -12,55 +12,163 @@ import {
 import {
   ArrowRight,
   CloudRain,
+  Coffee,
   Compass,
-  Loader2,
+  Drumstick,
+  Fish,
+  Flame,
   MapPin,
+  Palette,
+  Pizza,
+  RotateCcw,
+  Sandwich,
   Search,
+  Soup,
   Sparkles,
+  Ticket,
   TrainFront,
+  Trash2,
+  Trees,
   UtensilsCrossed,
   Wallet,
+  X,
 } from "lucide-react";
 import { ApiError } from "@/shared/api/client";
 import type {
   FoodCategory,
-  FoodRecommendationResponse,
   PlaceCategoryGroup,
   PlaceDetail,
 } from "@/shared/api/types";
 import {
   CourseRouteMap,
+  getStopCategoryVisual,
   type MapAreaSearchRequest,
   type RouteMapStop,
 } from "@/features/map/CourseRouteMap";
 import { useDraftPlaces, writeDraftPlaces } from "./draft-course-storage";
 import { PlaceSpotlightCard } from "./PlaceSpotlightCard";
-import { recommendFoodsApi, searchPlacesApi } from "./places-api";
+import { searchPlacesApi } from "./places-api";
 import {
   searchSubwayStations,
   type SubwayStationHint,
 } from "./subway-search-data";
 
-const CATEGORY_FILTERS: {
-  code: PlaceCategoryGroup | "ALL";
+// Multi-selectable date spot categories with dedicated Lucide SVG icons and fixed 1px border geometry
+const CATEGORY_MULTI_FILTERS: {
+  code: PlaceCategoryGroup;
   label: string;
+  icon: typeof Coffee;
+  color: string;
+  activeBorder: string;
+  activeBg: string;
 }[] = [
-  { code: "ALL", label: "전체" },
-  { code: "RESTAURANT", label: "식당" },
-  { code: "CAFE", label: "카페" },
-  { code: "EXHIBITION", label: "전시" },
-  { code: "ACTIVITY", label: "액티비티" },
-  { code: "PARK", label: "공원" },
+  {
+    code: "CAFE",
+    label: "감성 카페",
+    icon: Coffee,
+    color: "#B45309",
+    activeBorder: "border-amber-600",
+    activeBg: "bg-amber-600",
+  },
+  {
+    code: "RESTAURANT",
+    label: "맛집 투어",
+    icon: UtensilsCrossed,
+    color: "#E11D48",
+    activeBorder: "border-rose-600",
+    activeBg: "bg-rose-600",
+  },
+  {
+    code: "ACTIVITY",
+    label: "액티비티",
+    icon: Ticket,
+    color: "#4F46E5",
+    activeBorder: "border-indigo-600",
+    activeBg: "bg-indigo-600",
+  },
+  {
+    code: "EXHIBITION",
+    label: "전시·문화",
+    icon: Palette,
+    color: "#9333EA",
+    activeBorder: "border-purple-600",
+    activeBg: "bg-purple-600",
+  },
+  {
+    code: "PARK",
+    label: "산책·야외",
+    icon: Trees,
+    color: "#059669",
+    activeBorder: "border-emerald-600",
+    activeBg: "bg-emerald-600",
+  },
 ];
 
-const FOOD_CATEGORIES: FoodCategory[] = [
-  "일식",
-  "양식",
-  "한식",
-  "고기",
-  "중식",
-  "치킨",
-  "분식",
+// Multi-selectable food categories styled identically to main categories with matching Lucide SVG icons
+const FOOD_MULTI_FILTERS: {
+  category: FoodCategory;
+  label: string;
+  icon: typeof UtensilsCrossed;
+  color: string;
+  activeBorder: string;
+  activeBg: string;
+}[] = [
+  {
+    category: "일식",
+    label: "일식",
+    icon: Fish,
+    color: "#0284C7",
+    activeBorder: "border-sky-600",
+    activeBg: "bg-sky-600",
+  },
+  {
+    category: "양식",
+    label: "양식",
+    icon: Pizza,
+    color: "#D97706",
+    activeBorder: "border-amber-600",
+    activeBg: "bg-amber-600",
+  },
+  {
+    category: "한식",
+    label: "한식",
+    icon: Soup,
+    color: "#DC2626",
+    activeBorder: "border-red-600",
+    activeBg: "bg-red-600",
+  },
+  {
+    category: "고기",
+    label: "고기",
+    icon: Flame,
+    color: "#EA580C",
+    activeBorder: "border-orange-600",
+    activeBg: "bg-orange-600",
+  },
+  {
+    category: "중식",
+    label: "중식",
+    icon: UtensilsCrossed,
+    color: "#B91C1C",
+    activeBorder: "border-red-700",
+    activeBg: "bg-red-700",
+  },
+  {
+    category: "치킨",
+    label: "치킨",
+    icon: Drumstick,
+    color: "#CA8A04",
+    activeBorder: "border-yellow-600",
+    activeBg: "bg-yellow-600",
+  },
+  {
+    category: "분식",
+    label: "분식",
+    icon: Sandwich,
+    color: "#DB2777",
+    activeBorder: "border-pink-600",
+    activeBg: "bg-pink-600",
+  },
 ];
 
 const BUDGET_SLIDER_MIN = 10000;
@@ -95,7 +203,8 @@ const CATEGORY_BADGE_LABELS: Record<PlaceCategoryGroup, string> = {
 };
 
 export function ExploreClientView() {
-  const [keywordInput, setKeywordInput] = useState("성수역");
+  // Input field starts empty as requested by user, while default search region is "성수역"
+  const [keywordInput, setKeywordInput] = useState("");
   const [appliedKeyword, setAppliedKeyword] = useState("성수역");
   const [appliedCoords, setAppliedCoords] = useState<{
     latitude: number;
@@ -105,18 +214,24 @@ export function ExploreClientView() {
 
   // Subway station autocomplete hints dropdown state
   const [isSearchHintOpen, setIsSearchHintOpen] = useState(false);
-  const [searchHints, setSearchHints] = useState<SubwayStationHint[]>(() =>
-    searchSubwayStations("성수역"),
-  );
+  const [searchHints, setSearchHints] = useState<SubwayStationHint[]>([]);
   const [activeHintIdx, setActiveHintIdx] = useState<number>(-1);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
 
   const [mapPreviewMode, setMapPreviewMode] = useState<"places" | "draft">(
     "places",
   );
-  const [selectedCategory, setSelectedCategory] = useState<
-    PlaceCategoryGroup | "ALL"
-  >("ALL");
+
+  // Multi-category selection state (empty array = all categories)
+  const [selectedCategories, setSelectedCategories] = useState<
+    PlaceCategoryGroup[]
+  >([]);
+
+  // Multi-food-category selection state for restaurants (empty array = all food types)
+  const [selectedFoodCategories, setSelectedFoodCategories] = useState<
+    FoodCategory[]
+  >([]);
+
   const [radiusMeters, setRadiusMeters] = useState<number>(2000);
   const [sliderDraftRadiusIdx, setSliderDraftRadiusIdx] = useState<number>(2);
   const committedRadiusRef = useRef<number>(2000);
@@ -137,17 +252,6 @@ export function ExploreClientView() {
   // Spotlight active selected spot & modal window state
   const [selectedPlaceId, setSelectedPlaceId] = useState<number | null>(null);
   const [isSpotlightModalOpen, setIsSpotlightModalOpen] = useState(false);
-
-  // [F-03] Food Recommendation Widget State
-  const [isFoodPanelOpen, setIsFoodPanelOpen] = useState(false);
-  const [recFoodCategory, setRecFoodCategory] = useState<
-    FoodCategory | undefined
-  >(undefined);
-  const [recBudget, setRecBudget] = useState<number | undefined>(30000);
-  const [foodRecommendation, setFoodRecommendation] =
-    useState<FoodRecommendationResponse | null>(null);
-  const [isRecommendingFood, setIsRecommendingFood] = useState(false);
-  const nextFoodCategoryIdxRef = useRef(0);
 
   // Draft Course Cart (Hydration-Safe)
   const draftPlaces = useDraftPlaces();
@@ -178,31 +282,70 @@ export function ExploreClientView() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Search Places API Effect
+  // Search Places API Effect with consistent candidate pool (size: 40)
   useEffect(() => {
     let active = true;
 
     async function loadPlaces() {
       try {
+        const backendCategory =
+          selectedCategories.length === 1 ? selectedCategories[0] : undefined;
+        // Consistent pool of 40 candidates to avoid sudden list-size jumps when selecting food types
+        const backendSize = 40;
+
         const res = await searchPlacesApi({
           keyword: appliedCoords ? undefined : appliedKeyword,
           latitude: appliedCoords?.latitude,
           longitude: appliedCoords?.longitude,
           radiusMeters,
-          categoryGroup:
-            selectedCategory === "ALL" ? undefined : selectedCategory,
+          categoryGroup: backendCategory,
           maxPricePerPerson: maxPrice,
           isIndoor: indoorOnly ? true : undefined,
           page: 0,
-          size: 20,
+          size: backendSize,
         });
+
         if (active) {
-          setPlaces(res.items);
+          let filtered = res.items;
+
+          // 1. Filter by major categories if multiple selected
+          if (selectedCategories.length > 1) {
+            filtered = filtered.filter((p) =>
+              selectedCategories.includes(p.categoryGroup),
+            );
+          }
+
+          // 2. Filter by food categories if specified (narrows down restaurants from the 40 places)
+          if (selectedFoodCategories.length > 0) {
+            filtered = filtered.filter((p) => {
+              if (p.categoryGroup === "RESTAURANT") {
+                const matchCategory =
+                  p.foodCategory &&
+                  selectedFoodCategories.includes(p.foodCategory);
+                const matchSub =
+                  p.subCategory &&
+                  selectedFoodCategories.some((fc) =>
+                    p.subCategory?.includes(fc),
+                  );
+                return Boolean(matchCategory || matchSub);
+              }
+              // If only RESTAURANT category is selected, non-restaurants are excluded
+              if (
+                selectedCategories.length === 1 &&
+                selectedCategories[0] === "RESTAURANT"
+              ) {
+                return false;
+              }
+              return true;
+            });
+          }
+
+          setPlaces(filtered);
           setSearchError(null);
-          if (res.items.length > 0) {
+          if (filtered.length > 0) {
             setSelectedPlaceId((prev) => {
-              const stillExists = res.items.some((p) => p.id === prev);
-              return stillExists ? prev : res.items[0].id;
+              const stillExists = filtered.some((p) => p.id === prev);
+              return stillExists ? prev : filtered[0].id;
             });
           }
         }
@@ -230,7 +373,8 @@ export function ExploreClientView() {
     appliedKeyword,
     appliedCoords,
     radiusMeters,
-    selectedCategory,
+    selectedCategories,
+    selectedFoodCategories,
     maxPrice,
     indoorOnly,
     reloadTick,
@@ -245,7 +389,7 @@ export function ExploreClientView() {
   function handleSearchSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsSearchHintOpen(false);
-    const nextKw = keywordInput.trim() || "성수역";
+    const nextKw = keywordInput.trim() || appliedKeyword || "성수역";
     setIsLoadingPlaces(true);
     setSearchError(null);
     setAppliedCoords(null);
@@ -282,38 +426,32 @@ export function ExploreClientView() {
     });
   }
 
-  async function handleRunFoodRecommend() {
-    setIsRecommendingFood(true);
-    try {
-      let targetCategory = recFoodCategory;
-      if (!targetCategory) {
-        targetCategory =
-          FOOD_CATEGORIES[
-            nextFoodCategoryIdxRef.current % FOOD_CATEGORIES.length
-          ];
-        nextFoodCategoryIdxRef.current += 1;
+  // Category Multi-toggle Handlers
+  function handleToggleCategory(code: PlaceCategoryGroup) {
+    setIsLoadingPlaces(true);
+    setSelectedCategories((prev) => {
+      if (prev.includes(code)) {
+        return prev.filter((c) => c !== code);
       }
+      return [...prev, code];
+    });
+  }
 
-      const anchor = places[0];
-      const res = await recommendFoodsApi({
-        foodCategory: targetCategory,
-        latitude: appliedCoords?.latitude ?? anchor?.latitude,
-        longitude: appliedCoords?.longitude ?? anchor?.longitude,
-        budgetPerPerson: recBudget,
-      });
-      setFoodRecommendation(res);
+  function handleSelectAllCategories() {
+    setIsLoadingPlaces(true);
+    setSelectedCategories([]);
+    setSelectedFoodCategories([]);
+  }
 
-      // If recommended places exist, update map candidates and pop open first place detail
-      if (res.places.length > 0) {
-        setPlaces(res.places);
-        setSelectedPlaceId(res.places[0].id);
-        setIsSpotlightModalOpen(true);
+  // Food Subcategory Multi-toggle Handlers
+  function handleToggleFoodCategory(fc: FoodCategory) {
+    setIsLoadingPlaces(true);
+    setSelectedFoodCategories((prev) => {
+      if (prev.includes(fc)) {
+        return prev.filter((item) => item !== fc);
       }
-    } catch {
-      // Keep UI responsive on error
-    } finally {
-      setIsRecommendingFood(false);
-    }
+      return [...prev, fc];
+    });
   }
 
   function handleToggleDraft(place: PlaceDetail) {
@@ -342,13 +480,14 @@ export function ExploreClientView() {
 
   // Preserve drafted places on map across area searches, appending new area candidates
   const mapStops = useMemo<RouteMapStop[]>(() => {
-    // 1. Draft course places (always stay pinned on the map with course order numbers)
+    // 1. Draft course places (always stay pinned on the map with category icon + course badge)
     const draftStops: RouteMapStop[] = draftPlaces.map((place, index) => ({
       id: place.id,
       order: index + 1,
       name: place.name,
       address: place.address,
       categoryLabel: CATEGORY_BADGE_LABELS[place.categoryGroup],
+      categoryGroup: place.categoryGroup,
       latitude: place.latitude,
       longitude: place.longitude,
       estimatedCost:
@@ -368,13 +507,14 @@ export function ExploreClientView() {
     const candidatePlaces = places.filter((p) => !draftIds.has(p.id));
 
     const candidateStops: RouteMapStop[] = candidatePlaces
-      .slice(0, 16)
+      .slice(0, 32)
       .map((place, index) => ({
         id: place.id,
         order: draftStops.length + index + 1,
         name: place.name,
         address: place.address,
         categoryLabel: CATEGORY_BADGE_LABELS[place.categoryGroup],
+        categoryGroup: place.categoryGroup,
         latitude: place.latitude,
         longitude: place.longitude,
         estimatedCost:
@@ -412,49 +552,58 @@ export function ExploreClientView() {
   }, [activeSpotlightPlace, mapStops]);
 
   return (
-    <div className="h-full">
+    <div className="h-full space-y-5">
+      {/* Editorial Page Top Header (DayT Style: PLAN YOUR DAY) */}
+      <header className="pt-1">
+        <div className="flex items-center gap-2 text-xs font-black tracking-widest text-primary uppercase">
+          <span className="h-0.5 w-6 bg-primary" />
+          <span>PLAN YOUR DAY</span>
+        </div>
+        <h1 className="mt-2 text-2xl font-black tracking-tight text-foreground sm:text-3xl leading-snug">
+          오늘은 어떤 하루를 <br className="hidden sm:inline" />
+          <span className="text-primary">함께 만들어 볼까요?</span>
+        </h1>
+        <p className="mt-1 text-xs sm:text-sm font-medium text-muted">
+          지역과 취향, 예산을 고르면 DayT가 하루를 알차게 채워드려요.
+        </p>
+      </header>
+
       {/* 2-Column Split View: Desktop Sticky Map Layout */}
       <section className="grid gap-5 lg:grid-cols-12 items-start">
         {/* Left Side: Exploration Filter Panel (lg:col-span-5) */}
         <div className="space-y-4 lg:col-span-5 pb-6">
-          {/* 1. Header & Search Control Card */}
+          {/* 1. Header & Unified Search / Category / Food / Budget Filter Card */}
           <div className="rounded-[28px] border border-line bg-surface p-5 sm:p-6 shadow-[0_10px_32px_rgba(24,24,27,0.03)] space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-[11px] font-black text-primary">
                   <Sparkles className="h-3 w-3" />
                   <span>실시간 데이트 상권 탐색</span>
                 </span>
-                <h1 className="mt-1.5 text-xl font-black tracking-tight text-foreground sm:text-2xl">
-                  {activeRegionDisplay}{" "}
-                  <span className="text-primary">
-                    {places.length > 0
-                      ? `${places.length}곳 탐색됨`
-                      : "데이트 스팟"}
-                  </span>
-                </h1>
+                <h2 className="mt-1.5 text-lg sm:text-xl font-black tracking-tight text-foreground truncate">
+                  {activeRegionDisplay}
+                </h2>
+                <p className="mt-0.5 text-xs font-black text-primary">
+                  {places.length > 0
+                    ? `${places.length}곳 탐색됨`
+                    : "데이트 스팟"}
+                </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsFoodPanelOpen((prev) => !prev);
-                  if (!foodRecommendation) {
-                    void handleRunFoodRecommend();
-                  }
-                }}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-extrabold transition-all ${
-                  isFoodPanelOpen
-                    ? "bg-primary text-white"
-                    : "border border-line bg-surface-subtle text-foreground hover:border-primary/40"
-                }`}
-              >
-                <UtensilsCrossed className="h-3.5 w-3.5" />
-                <span>메뉴 추천</span>
-              </button>
+              {(selectedCategories.length > 0 ||
+                selectedFoodCategories.length > 0) && (
+                <button
+                  type="button"
+                  onClick={handleSelectAllCategories}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-surface-subtle px-2.5 py-1 text-[11px] font-bold text-muted hover:text-foreground transition-colors mt-1"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>필터 초기화</span>
+                </button>
+              )}
             </div>
 
-            {/* Keyword Search Form with Subway Station Hints Dropdown */}
+            {/* Keyword Search Form with Empty Input Default and Subway Station Hints Dropdown */}
             <div ref={searchContainerRef} className="relative">
               <form onSubmit={handleSearchSubmit} className="relative">
                 <div className="flex items-center gap-2 rounded-2xl border border-line bg-background px-3.5 py-2.5 shadow-2xs focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
@@ -463,13 +612,15 @@ export function ExploreClientView() {
                     type="text"
                     value={keywordInput}
                     onFocus={() => {
-                      setSearchHints(searchSubwayStations(keywordInput));
+                      setSearchHints(
+                        searchSubwayStations(keywordInput || "성수역"),
+                      );
                       setIsSearchHintOpen(true);
                     }}
                     onChange={(e) => {
                       const val = e.target.value;
                       setKeywordInput(val);
-                      setSearchHints(searchSubwayStations(val));
+                      setSearchHints(searchSubwayStations(val || "성수역"));
                       setIsSearchHintOpen(true);
                       setActiveHintIdx(-1);
                     }}
@@ -657,155 +808,143 @@ export function ExploreClientView() {
               </div>
             </div>
 
-            {/* Category Filter Tabs & Indoor Toggle */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3">
-              <div className="flex items-center gap-1 overflow-x-auto">
-                {CATEGORY_FILTERS.map((tab) => (
-                  <button
-                    key={tab.code}
-                    type="button"
-                    onClick={() => {
-                      if (selectedCategory !== tab.code) {
-                        setIsLoadingPlaces(true);
-                        setSelectedCategory(tab.code);
-                      }
-                    }}
-                    className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition-colors ${
-                      selectedCategory === tab.code
-                        ? "bg-surface-dark text-white"
-                        : "border border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
+            {/* Category Multi-Selection & Differentiated Indoor Toggle Switch */}
+            <div className="border-t border-line/70 pt-3 space-y-3">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold text-muted">
+                  카테고리 선택 (복수 선택 가능)
+                </span>
+
+                {/* Differentiated Indoor Toggle Switch (스위치 형태의 명확한 차별화) */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={indoorOnly}
+                  onClick={() => {
+                    setIsLoadingPlaces(true);
+                    setIndoorOnly((prev) => !prev);
+                  }}
+                  className={`inline-flex items-center gap-2 rounded-full border border-solid px-2.5 py-1 text-xs font-bold transition-all shadow-2xs ${
+                    indoorOnly
+                      ? "border-primary bg-primary-soft text-primary"
+                      : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
+                  }`}
+                >
+                  <CloudRain
+                    className={`h-3.5 w-3.5 ${
+                      indoorOnly ? "text-primary" : "text-muted"
+                    }`}
+                  />
+                  <span>실내 전용</span>
+                  <span
+                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
+                      indoorOnly ? "bg-primary" : "bg-line"
                     }`}
                   >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLoadingPlaces(true);
-                  setIndoorOnly((prev) => !prev);
-                }}
-                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors ${
-                  indoorOnly
-                    ? "border-primary bg-primary-soft text-primary"
-                    : "border-line bg-surface text-muted hover:text-foreground"
-                }`}
-              >
-                <CloudRain className="h-3 w-3" />
-                <span>{indoorOnly ? "실내 ON" : "실내·야외"}</span>
-              </button>
-            </div>
-
-            {/* [F-03] Expandable Food Recommendation Drawer */}
-            {isFoodPanelOpen && (
-              <div className="rounded-2xl border border-primary/25 bg-primary-soft/40 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-primary">
-                    오늘의 추천 메뉴 & 식당
+                    <span
+                      className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out mt-0.5 ${
+                        indoorOnly ? "translate-x-3.5" : "translate-x-0.5"
+                      }`}
+                    />
                   </span>
-                  <button
-                    type="button"
-                    disabled={isRecommendingFood}
-                    onClick={() => void handleRunFoodRecommend()}
-                    className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white hover:bg-primary-hover disabled:opacity-60"
-                  >
-                    {isRecommendingFood && (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    )}
-                    <span>다시 추천</span>
-                  </button>
+                </button>
+              </div>
+
+              {/* 5 Distinct Categories with 100% Fixed Border Geometry (No jumping/growing on click) */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* '전체' Button */}
+                <button
+                  type="button"
+                  onClick={handleSelectAllCategories}
+                  className={`shrink-0 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${
+                    selectedCategories.length === 0
+                      ? "border-surface-dark bg-surface-dark text-white"
+                      : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
+                  }`}
+                >
+                  전체
+                </button>
+
+                {/* Major Categories: strictly identical 1px border & padding before and after selection */}
+                {CATEGORY_MULTI_FILTERS.map((cat) => {
+                  const isSelected = selectedCategories.includes(cat.code);
+                  const Icon = cat.icon;
+                  return (
+                    <button
+                      key={cat.code}
+                      type="button"
+                      onClick={() => handleToggleCategory(cat.code)}
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${
+                        isSelected
+                          ? `${cat.activeBorder} ${cat.activeBg} text-white`
+                          : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
+                      }`}
+                    >
+                      <Icon
+                        className="h-3.5 w-3.5 shrink-0"
+                        style={{ color: isSelected ? "#FFFFFF" : cat.color }}
+                      />
+                      <span>{cat.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Sub-Filter: Food Categories (Border/Background box removed, matching Category style 100%) */}
+              <div className="pt-2.5 border-t border-line/60 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-1.5 font-bold text-muted">
+                    <UtensilsCrossed className="h-3.5 w-3.5 text-rose-500" />
+                    <span>음식 종류 선택 (중복 선택 가능)</span>
+                  </div>
+
+                  <span className="text-[10px] font-medium text-muted">
+                    ※ 맛집 투어 선택 시 적용
+                  </span>
                 </div>
 
-                {/* Food Category Quick Tabs */}
-                <div className="flex flex-wrap items-center gap-1">
+                {/* Food Category Pills: identical rounded pill design with dedicated SVG icons & fixed geometry */}
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setRecFoodCategory(undefined)}
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                      recFoodCategory === undefined
-                        ? "bg-surface-dark text-white"
-                        : "bg-surface text-muted hover:text-foreground"
+                    onClick={() => setSelectedFoodCategories([])}
+                    className={`shrink-0 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${
+                      selectedFoodCategories.length === 0
+                        ? "border-surface-dark bg-surface-dark text-white"
+                        : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
                     }`}
                   >
-                    자동
+                    음식 전체
                   </button>
-                  {FOOD_CATEGORIES.map((fc) => (
-                    <button
-                      key={fc}
-                      type="button"
-                      onClick={() => setRecFoodCategory(fc)}
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                        recFoodCategory === fc
-                          ? "bg-surface-dark text-white"
-                          : "bg-surface text-muted hover:text-foreground"
-                      }`}
-                    >
-                      {fc}
-                    </button>
-                  ))}
+
+                  {FOOD_MULTI_FILTERS.map((food) => {
+                    const isFoodSelected =
+                      selectedFoodCategories.includes(food.category);
+                    const FoodIcon = food.icon;
+                    return (
+                      <button
+                        key={food.category}
+                        type="button"
+                        onClick={() => handleToggleFoodCategory(food.category)}
+                        className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${
+                          isFoodSelected
+                            ? `${food.activeBorder} ${food.activeBg} text-white`
+                            : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
+                        }`}
+                      >
+                        <FoodIcon
+                          className="h-3.5 w-3.5 shrink-0"
+                          style={{
+                            color: isFoodSelected ? "#FFFFFF" : food.color,
+                          }}
+                        />
+                        <span>{food.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-
-                {/* 1인 희망 예산 선택 */}
-                <div className="flex items-center gap-1.5 text-[11px] pt-1">
-                  <span className="font-bold text-muted">1인 예산:</span>
-                  {[15000, 30000, 50000, undefined].map((b) => (
-                    <button
-                      key={b ?? "all"}
-                      type="button"
-                      onClick={() => setRecBudget(b)}
-                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold transition-colors ${
-                        recBudget === b
-                          ? "bg-primary text-white"
-                          : "border border-line bg-surface text-muted hover:text-foreground"
-                      }`}
-                    >
-                      {b ? `${b / 10000}만원` : "무관"}
-                    </button>
-                  ))}
-                </div>
-
-                {foodRecommendation && (
-                  <div className="rounded-xl bg-surface p-3 text-xs space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-black text-white">
-                        {foodRecommendation.recommendedFoodCategory}
-                      </span>
-                      <strong className="font-extrabold text-foreground">
-                        {foodRecommendation.recommendedSubMenu}
-                      </strong>
-                    </div>
-                    <p className="text-[11px] text-muted leading-relaxed">
-                      {foodRecommendation.reason}
-                    </p>
-
-                    {foodRecommendation.places.length > 0 && (
-                      <div className="grid grid-cols-2 gap-1.5 pt-1">
-                        {foodRecommendation.places.slice(0, 4).map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedPlaceId(item.id);
-                              setIsSpotlightModalOpen(true);
-                            }}
-                            className="flex flex-col rounded-lg border border-line bg-background p-2 text-left hover:border-primary/50 transition-colors"
-                          >
-                            <span className="truncate text-xs font-extrabold text-foreground">
-                              {item.name}
-                            </span>
-                            <span className="truncate text-[10px] text-muted">
-                              {item.subCategory ?? item.foodCategory}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Search Error Notice */}
@@ -822,50 +961,116 @@ export function ExploreClientView() {
             </div>
           )}
 
-          {/* 2. Draft Course Cart Panel (Always visible when items exist) */}
-          {draftPlaces.length > 0 && (
-            <div className="rounded-[24px] border border-primary/30 bg-primary-soft/40 p-4 space-y-3 shadow-xs">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-black text-foreground">
-                    담은 코스 {draftPlaces.length}곳 · 2인 약{" "}
-                    {totalDraftCostForTwo.toLocaleString()}원
-                  </p>
-                  <p className="text-[11px] text-muted">
-                    장소를 클릭하면 상세 사진과 정보를 확인할 수 있습니다.
-                  </p>
+          {/* 2. Draft Course Cart Panel (Always visible in clean white card styling) */}
+          <div className="rounded-[28px] border border-line bg-surface p-5 sm:p-6 shadow-[0_10px_32px_rgba(24,24,27,0.03)] space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-sm font-black text-foreground">
+                    내가 담은 코스
+                  </h3>
+                  <span className="text-sm font-black text-primary">
+                    {draftPlaces.length}개
+                  </span>
                 </div>
-
-                <Link
-                  href="/courses/new"
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-primary-hover transition-colors"
-                >
-                  <span>코스 완성</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
+                <p className="mt-1 text-xs font-semibold text-muted">
+                  {draftPlaces.length > 0
+                    ? `2인 예상 약 ${totalDraftCostForTwo.toLocaleString()}원 · 장소 클릭 시 상세 확인`
+                    : "마음에 드는 장소를 클릭해 나만의 코스를 완성해보세요."}
+                </p>
               </div>
 
-              {/* Draft Spots List Pills */}
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {draftPlaces.map((dp, idx) => (
+              {draftPlaces.length > 0 && (
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
-                    key={dp.id}
                     type="button"
                     onClick={() => {
-                      setSelectedPlaceId(dp.id);
-                      setIsSpotlightModalOpen(true);
+                      writeDraftPlaces([]);
+                      setMapPreviewMode("places");
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/35 bg-surface px-2.5 py-1 text-xs font-bold text-foreground hover:border-primary hover:text-primary transition-colors shadow-2xs"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-extrabold text-muted hover:border-red-300 hover:text-red-600 transition-colors shadow-2xs"
                   >
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-black text-white">
-                      {idx + 1}
-                    </span>
-                    <span className="max-w-28 truncate">{dp.name}</span>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>전체 취소</span>
                   </button>
-                ))}
-              </div>
+
+                  <Link
+                    href="/courses/new"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-primary-hover transition-colors"
+                  >
+                    <span>코스 완성</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Empty State vs Draft Spots Pill List */}
+            {draftPlaces.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-line bg-surface-subtle/50 p-6 text-center space-y-2">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary shadow-2xs">
+                  <MapPin className="h-5 w-5" />
+                </div>
+                <p className="text-xs font-extrabold text-foreground">
+                  아직 담은 데이트 스팟이 없습니다
+                </p>
+                <p className="text-[11px] text-muted leading-relaxed">
+                  지도 마커나 추천 장소를 클릭해 나만의 데이트 코스를 완성해보세요.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {draftPlaces.map((dp, idx) => {
+                  const visual = getStopCategoryVisual(dp.categoryGroup);
+                  const CategoryIcon = visual.icon;
+                  return (
+                    <div
+                      key={dp.id}
+                      className="group inline-flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1.5 pr-2.5 text-xs font-bold text-foreground shadow-2xs hover:border-primary transition-all"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPlaceId(dp.id);
+                          setIsSpotlightModalOpen(true);
+                        }}
+                        className="flex items-center gap-2 text-left"
+                      >
+                        {/* Category SVG badge with micro order tag */}
+                        <span
+                          style={{ backgroundColor: visual.color }}
+                          className="relative flex h-5 w-5 items-center justify-center rounded-full text-white shadow-2xs shrink-0"
+                        >
+                          <CategoryIcon className="h-2.5 w-2.5" />
+                          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-surface-dark text-[8px] font-black text-white ring-1 ring-surface">
+                            {idx + 1}
+                          </span>
+                        </span>
+                        <span className="max-w-36 truncate font-bold text-foreground group-hover:text-primary transition-colors">
+                          {dp.name}
+                        </span>
+                      </button>
+
+                      {/* Individual Spot Remove Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const next = draftPlaces.filter((p) => p.id !== dp.id);
+                          writeDraftPlaces(next);
+                        }}
+                        title={`${dp.name} 코스에서 제거`}
+                        aria-label={`${dp.name} 코스에서 제거`}
+                        className="flex h-4 w-4 items-center justify-center rounded-full text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Side: Large Interactive Sticky Full-Height Route & Spot Map (lg:col-span-7) */}
@@ -884,7 +1089,7 @@ export function ExploreClientView() {
             }
             onSearchInArea={handleSearchInMapArea}
             isSearchingArea={isLoadingPlaces}
-            heightClassName="h-[540px] lg:h-[calc(100vh-210px)] min-h-[500px]"
+            heightClassName="h-[520px] lg:h-[600px] min-h-[460px]"
             headerTitle={
               isShowingDraftRoute
                 ? `내가 담은 코스 동선 (${draftPlaces.length}곳)`
@@ -928,8 +1133,7 @@ export function ExploreClientView() {
                 </div>
               ) : (
                 <p className="text-xs font-semibold text-muted">
-                  지도에서 마커를 클릭하면 음식·매장 실제 사진과 상세 정보 창이
-                  열립니다.
+                  지도에서 마커를 클릭하면 음식·매장 실제 사진과 상세 정보 창이 열립니다.
                 </p>
               )
             }

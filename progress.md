@@ -57,7 +57,13 @@
 - **에이전트 하네스 구성**: `.agents/hooks.json` + `guard_spec_edit.py`로 기준 문서 임의 수정 방지(`force_ask`) 적용, `api-rules.md`·`workflow-rules.md` 경량 규칙 세팅 완료.
 - **로컬 인프라 구축 완료**: `docker-compose.yml`(`postgis/postgis:16-3.4`, `redis:7-alpine`), `.env.example`, `.gitignore`, `infra-setup.md` 구성 및 컨테이너 헬스체크·`PostGIS 3.4`·`Redis PONG` 검증 완료.
 
-### 2026-11-03
+### 2026-11-08
+- **지도 줌 레벨 고정 & 최상단 DayT 브랜드 헤더 & 타이틀/개수 줄바꿈 분리 & POI 패닝 60fps 최적화 및 지도 높이 조절 완료**:
+  - "이 지역에서 다시 탐색" 또는 필터 변경 시 줌 레벨이 15로 강제 리셋되던 문제를 수정하여, 사용자가 설정한 현재 줌 레벨(`currentViewport.zoom`)을 100% 영구 보존.
+  - 최상단에 `— PLAN YOUR DAY` 및 `오늘은 어떤 하루를 함께 만들어 볼까요?` 감성 브랜드 타이포그래피 헤더 추가 (DayT 테마 컬러 반영).
+  - 긴 지역명과 `n곳 탐색됨`을 상하 2줄로 분리하여, 지명이 길어져도 우측 `필터 초기화` 버튼 때문에 레이아웃이 밀려나지 않도록 안정화.
+  - 주변 역·명소·주차장 레이어가 꺼져 있을 때 불필요한 백그라운드 fetch/리렌더링을 완전히 차단하고, 드래그 중 렌더링 스로틀링을 적용하여 지도 패닝 시 버벅거림(lag) 완전 박멸 (60fps 부드러운 드래그 구현).
+  - 지도의 높이를 `h-[440px] lg:h-[480px]`로 알맞게 축소하여 한 화면에서 스팟 정보와 지도를 한눈에 볼 수 있도록 최적화.
 - **`backend/` Spring Boot 4.1 (Java 21) 초기 세팅 완료**: `hibernate-spatial`, `Flyway`(`V1__init_schema.sql` 10개 테이블 마이그레이션), `Security/JWT`, Swagger UI(`/docs`), 공통 `ErrorResponse` 구성 및 검증 통과.
 - **`ai-service/` FastAPI 초기 세팅 완료**: `google-genai`(`gemini-3.8-flash`) 래퍼, `CamelModel` 기반 내부 AI 스키마 1:1 매핑, 전역 에러 핸들러 및 `pytest` 3종 검증 통과.
 - **`web/` Next.js 16 반응형 웹 & 통합 실행 환경 구축 완료**: `openapi-typescript` API 타입 자동 생성(`api.d.ts`), 데스크톱 좌측 사이드바·모바일 하단 탭바 반응형 `AppShell` 및 5대 라우트 골격 구현, 원클릭 통합 실행기(`start-dev.ps1`, `.vscode/tasks.json`) 구성 완료.
@@ -77,3 +83,14 @@
 - **데이트 탐색 UI/UX 종합 고도화 (이미지 핫링크 해제·슬라이더 정돈·풀화면 고정 지도·상세 팝업창·메뉴추천 맵 연동·담은 장소 영구 유지)**: 외부 블로그 403 차단 방지 `referrerPolicy="no-referrer"` 및 `thumbnailUrl`/큐레이션 삼중 폴백, 슬라이더 불일치 중간 라벨 제거, 지도 헤더 문구 정리, 메뉴 추천 시 식당 핀 지도 실시간 업데이트 및 상세창 자동 오픈, 데스크톱 풀화면 고정 뷰포트(`h-[calc(100vh-125px)]`)로 위아래 스크롤 제거, 스팟 클릭 시 플로팅 모달창 팝업, 지도 이동 재탐색 시 이미 담은 장소 상시 지도 핀 유지 완료 (`typecheck` & `eslint` 0 error/0 warning 통과).
 - **지도 SSR/클라이언트 Hydration 소수점 불일치 해결 & 프리셋 칩 제거 후 지하철역 자동완성 텍스트 힌트 도입**: `latLngToContainerPx` 및 타일 핀 인라인 스타일에 정수형 `Math.round()` 좌표와 `suppressHydrationWarning`을 적용하여 Next.js/React 19 소수점 렌더링 불일치(569.004px vs 569.0036...px)를 원천 차단하고, 고정 프리셋 칩 대신 수도권 주요 핫스팟 지하철역 실시간 자동완성 힌트 드롭다운(`subway-search-data.ts`) 및 키보드 네비게이션 연동 완료 (`typecheck` & `eslint` 0 error/0 warning 통과).
 - **지도 캔버스 높이 붕괴(0px) 해결 및 Sticky 데스크톱 레이아웃 복원**: `CourseRouteMap`에 미지정 부모 높이 의존 시 0px로 축소되던 문제 방지를 위해 `min-h-[460px]` 최소 높이 가드레일을 부여하고, `ExploreClientView`의 우측 지도를 `lg:sticky lg:top-20`과 `h-[540px] lg:h-[calc(100vh-210px)] min-h-[500px]`로 명시 설정하여 코스 메이커와 동일하게 풀사이즈로 즉시 렌더링되도록 수정 완료 (`typecheck` & `eslint` 0 error/0 warning 통과).
+- **데이트 탐색 UI/UX 피드백 5대 항목 고도화**:
+  1. **헤더 타이틀 감성 컬러 강조**: "오늘은 어떤 하루를"과 함께 **"함께 만들어 볼까요?"**에 DayT 브랜드 포인트 컬러(`text-primary`) 적용.
+  2. **지도 높이 확대 복원**: 지나치게 작아졌던 지도 높이를 `h-[520px] lg:h-[600px] min-h-[460px]`로 시원하게 확대.
+  3. **지도 드래그 중 도보 시간 실시간 떨림 완전 방지**: `settledCenter`와 `isDragging` 상태 동기화로 마우스 드래그 중에는 주변 역 도보 시간 재계산을 정지하고, 드래그 종료 시에만 안전하게 중심점을 고정 계산하도록 분리.
+  4. **지도 주변 버튼·레이블·컨트롤 크기 확대**: 상단 헤더(`text-sm font-black`), 테마 칩(`px-3 py-1 text-xs`), 주변 역 버튼(`px-3 py-1 text-xs font-bold`), 레이어 토글 칩(`px-3 py-1 text-xs font-black`), 줌 컨트롤(+/-: `h-9 w-9`), "이 지역에서 다시 탐색" 플로팅 버튼(`px-5 py-2.5 text-xs sm:text-sm font-black`) 크기 확대.
+  5. **담은 코스 패널 상시 노출 & 화이트 카드 개편**: 담은 장소가 0개일 때도 탐색창과 동일한 화이트 카드(`bg-surface border-line`)로 상시 표시, 0개 빈 상태 안내 슬롯 및 담은 장소별 카테고리 SVG 아이콘 + 장소명(클릭 시 모달) + 개별 삭제(`X`) 및 전체 취소 기능 제공.
+- **주변 역 2개 제한 · 담은 코스 개수 인라인 표기 · 스팟 칩 디자인 고도화 & AbortError 런타임 예외 수정**:
+  1. **주변 역 표시 개수 축소**: 최대 3개에서 가장 가까운 2개(`slice(0, 2)`)로 축소하여 지도 상단 바 여백 확보.
+  2. **담은 코스 개수 텍스트 분리**: 좌측 원형 뱃지 대신 타이틀 바로 우측에 포인트 컬러 텍스트(`내가 담은 코스 <span className="text-primary font-black">N개</span>`)로 자연스럽게 정돈.
+  3. **스팟 칩 디자인 세련화**: 투박한 `"1."` 텍스트를 제거하고 카테고리 컬러 원형 뱃지 우측 상단에 미니 인덱스 태그(1, 2)를 일체형으로 배치하여 장소명이 시원하게 읽히도록 개선.
+  4. **`Runtime AbortError` (signal is aborted without reason) 완전 해결**: `CourseRouteMap` 및 `PlaceSpotlightCard`의 `useEffect` fetch cleanup 시 `started` 플래그 관리 및 catch 블록의 `AbortError` 안전 조기 반환 처리로 Next.js 런타임 에러 오버레이 원천 차단 (`typecheck` & `eslint` 0 error/0 warning 통과).

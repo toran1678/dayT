@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  Coffee,
   ExternalLink,
   Landmark,
   Loader2,
@@ -22,11 +23,13 @@ import {
   Plus,
   RotateCw,
   SquareParking,
+  Ticket,
   TrainFront,
   Trees,
+  UtensilsCrossed,
   X,
 } from "lucide-react";
-import type { LatLngPoint } from "@/shared/api/types";
+import type { LatLngPoint, PlaceCategoryGroup } from "@/shared/api/types";
 import {
   calculateStraightMeters,
   estimateWalkingRoute,
@@ -68,6 +71,7 @@ export interface RouteMapStop {
   name: string;
   address: string;
   categoryLabel: string;
+  categoryGroup?: PlaceCategoryGroup;
   latitude: number;
   longitude: number;
   stayMinutes?: number;
@@ -103,12 +107,69 @@ type SelectedContextTarget =
   | { type: "POI"; poi: SurroundingPoi }
   | null;
 
-function buildNumberedMarkerSvgUrl(order: number, isActive: boolean): string {
-  const fill = isActive ? "#1C1917" : "#E85D3F";
+export function getStopCategoryVisual(
+  categoryGroup?: PlaceCategoryGroup,
+  categoryLabel = "",
+) {
+  if (categoryGroup === "CAFE" || categoryLabel.includes("카페")) {
+    return { icon: Coffee, color: "#B45309", bg: "bg-amber-600" };
+  }
+  if (categoryGroup === "RESTAURANT" || categoryLabel.includes("식당")) {
+    return { icon: UtensilsCrossed, color: "#E11D48", bg: "bg-rose-600" };
+  }
+  if (categoryGroup === "ACTIVITY" || categoryLabel.includes("액티비티")) {
+    return { icon: Ticket, color: "#4F46E5", bg: "bg-indigo-600" };
+  }
+  if (
+    categoryGroup === "EXHIBITION" ||
+    categoryLabel.includes("전시") ||
+    categoryLabel.includes("문화")
+  ) {
+    return { icon: Palette, color: "#9333EA", bg: "bg-purple-600" };
+  }
+  if (
+    categoryGroup === "PARK" ||
+    categoryLabel.includes("공원") ||
+    categoryLabel.includes("산책")
+  ) {
+    return { icon: Trees, color: "#059669", bg: "bg-emerald-600" };
+  }
+  return { icon: MapPin, color: "#E85D3F", bg: "bg-primary" };
+}
+
+function buildCategoryMarkerSvgUrl(
+  categoryGroup?: PlaceCategoryGroup,
+  categoryLabel = "",
+  isActive = false,
+): string {
+  const visual = getStopCategoryVisual(categoryGroup, categoryLabel);
+  const fill = isActive ? "#1C1917" : visual.color;
   const ring = isActive ? "#FBBF24" : "#FFFFFF";
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 38 38">
-    <circle cx="19" cy="19" r="16" fill="${fill}" stroke="${ring}" stroke-width="3"/>
-    <text x="19" y="23.5" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="800" fill="#FFFFFF">${order}</text>
+
+  let iconPath = "";
+  if (categoryGroup === "CAFE" || categoryLabel.includes("카페")) {
+    iconPath = `<path d="M12 11V18C12 19.1 12.9 20 14 20H18C19.1 20 20 19.1 20 18V11H12ZM20 13H22C22.6 13 23 13.4 23 14V16C23 16.6 22.6 17 22 17H20V13ZM11 22H21V23H11V22Z" fill="#FFFFFF"/>`;
+  } else if (categoryGroup === "RESTAURANT" || categoryLabel.includes("식당")) {
+    iconPath = `<path d="M13 10V14C13 14.8 13.5 15.4 14.2 15.8V22H15.8V15.8C16.5 15.4 17 14.8 17 14V10H16V13H15V10H14V13H13V10ZM19 10C18.2 10 17.6 10.9 17.6 12.2V15H18.8V22H20.2V10H19Z" fill="#FFFFFF"/>`;
+  } else if (
+    categoryGroup === "PARK" ||
+    categoryLabel.includes("공원") ||
+    categoryLabel.includes("산책")
+  ) {
+    iconPath = `<path d="M16 9L12 14.5H14.2L12.5 17.5H19.5L17.8 14.5H20L16 9Z" fill="#FFFFFF"/><rect x="15.2" y="17.2" width="1.6" height="3" rx="0.4" fill="#FFFFFF"/>`;
+  } else if (
+    categoryGroup === "EXHIBITION" ||
+    categoryLabel.includes("전시") ||
+    categoryLabel.includes("문화")
+  ) {
+    iconPath = `<circle cx="16" cy="15" r="5.5" stroke="#FFFFFF" stroke-width="1.6" fill="none"/><circle cx="14" cy="13.5" r="1.1" fill="#FFFFFF"/><circle cx="18" cy="13.5" r="1.1" fill="#FFFFFF"/><circle cx="16" cy="17" r="1.1" fill="#FFFFFF"/>`;
+  } else {
+    iconPath = `<path d="M16 9C14 9 12.5 10.5 12.5 12.5C12.5 15.5 16 20.5 16 20.5C16 20.5 19.5 15.5 19.5 12.5C19.5 10.5 18 9 16 9ZM16 14C15.2 14 14.5 13.3 14.5 12.5C14.5 11.7 15.2 11 16 11C16.8 11 17.5 11.7 17.5 12.5C17.5 13.3 16.8 14 16 14Z" fill="#FFFFFF"/>`;
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 32 32">
+    <circle cx="16" cy="16" r="13.5" fill="${fill}" stroke="${ring}" stroke-width="2.5"/>
+    ${iconPath}
   </svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
@@ -253,10 +314,10 @@ export function CourseRouteMap({
   const activeTheme = DAYT_MAP_THEMES[themeId];
 
   const [isExpanded, setIsExpanded] = useState(false);
-  // All 3 surrounding layers ON by default so subway stations, parks/landmarks & parking are immediately visible
-  const [showSubwayLayer, setShowSubwayLayer] = useState(true);
-  const [showLandmarkLayer, setShowLandmarkLayer] = useState(true);
-  const [showParkingLayer, setShowParkingLayer] = useState(true);
+  // Default layer visibility set to false per user requirement (subway, landmarks, parking start OFF)
+  const [showSubwayLayer, setShowSubwayLayer] = useState(false);
+  const [showLandmarkLayer, setShowLandmarkLayer] = useState(false);
+  const [showParkingLayer, setShowParkingLayer] = useState(false);
 
   const [internalSelectedStopId, setInternalSelectedStopId] = useState<number | null>(null);
   const selectedStopId = externalSelectedStopId ?? internalSelectedStopId;
@@ -336,56 +397,62 @@ export function CourseRouteMap({
     return () => observer.disconnect();
   }, [mapMode, isExpanded]);
 
-  const stopsSignature = useMemo(() => {
-    const stopPart = stops
-      .map(
-        (s) => `${s.id}:${s.latitude.toFixed(4)},${s.longitude.toFixed(4)}`,
-      )
-      .join("|");
-    const anchorPart = searchAnchor
-      ? `@${searchAnchor.latitude.toFixed(4)},${searchAnchor.longitude.toFixed(4)}`
-      : "";
-    return `${stopPart}${anchorPart}`;
-  }, [stops, searchAnchor]);
-
-  const fitPoints = useMemo(() => {
-    if (stops.length === 0) {
-      return searchAnchor
-        ? [
-            {
-              latitude: searchAnchor.latitude,
-              longitude: searchAnchor.longitude,
-            },
-          ]
-        : [];
+  const currentAnchorKey = useMemo(() => {
+    if (searchAnchor) {
+      return `${searchAnchor.latitude.toFixed(4)},${searchAnchor.longitude.toFixed(4)}`;
     }
-    return stops.map((s) => ({
-      latitude: s.latitude,
-      longitude: s.longitude,
-    }));
-  }, [stops, searchAnchor]);
+    return "default-anchor";
+  }, [searchAnchor]);
 
-  const autoFitViewport = useMemo(
-    () =>
-      computeBestFitViewport(
-        fitPoints,
-        containerSize.width,
-        containerSize.height,
-        {
-          top: 58,
-          right: 60,
-          bottom: footerNode ? 104 : 68,
-          left: 48,
-        },
-      ),
-    [fitPoints, containerSize.width, containerSize.height, footerNode],
-  );
+  // Stable anchor center (guarantees map stays 100% steady when user filters categories or foods)
+  const defaultAnchorCenter = useMemo<MapViewportState>(() => {
+    if (searchAnchor) {
+      return {
+        centerLat: searchAnchor.latitude,
+        centerLng: searchAnchor.longitude,
+        zoom: 15,
+      };
+    }
+    if (stops.length > 0) {
+      return {
+        centerLat: stops[0].latitude,
+        centerLng: stops[0].longitude,
+        zoom: 15,
+      };
+    }
+    return {
+      centerLat: 37.54458,
+      centerLng: 127.05597,
+      zoom: 15,
+    };
+  }, [searchAnchor, stops]);
 
-  const [viewportOverride, setViewportOverride] = useState<{
-    signature: string;
-    activeOrderSnapshot: number | null;
-    viewport: MapViewportState;
-  } | null>(null);
+  const [currentViewport, setCurrentViewport] =
+    useState<MapViewportState>(defaultAnchorCenter);
+  const [settledCenter, setSettledCenter] = useState<{
+    lat: number;
+    lng: number;
+  }>(() => ({
+    lat: defaultAnchorCenter.centerLat,
+    lng: defaultAnchorCenter.centerLng,
+  }));
+  const lastKnownAnchorRef = useRef<string>(currentAnchorKey);
+
+  // Only update map center when user explicitly searches a brand new area via search bar, preserving user zoom
+  useEffect(() => {
+    if (lastKnownAnchorRef.current !== currentAnchorKey) {
+      lastKnownAnchorRef.current = currentAnchorKey;
+      setCurrentViewport((prev) => ({
+        centerLat: defaultAnchorCenter.centerLat,
+        centerLng: defaultAnchorCenter.centerLng,
+        zoom: prev.zoom, // Preserve current zoom level
+      }));
+      setSettledCenter({
+        lat: defaultAnchorCenter.centerLat,
+        lng: defaultAnchorCenter.centerLng,
+      });
+    }
+  }, [currentAnchorKey, defaultAnchorCenter]);
 
   const activeFocusedViewport = useMemo<MapViewportState | null>(() => {
     if (activeOrder === null) return null;
@@ -394,43 +461,32 @@ export function CourseRouteMap({
     return {
       centerLat: target.latitude,
       centerLng: target.longitude,
-      zoom: Math.max(autoFitViewport.zoom, 16),
+      zoom: Math.max(currentViewport.zoom, 16),
     };
-  }, [activeOrder, stops, autoFitViewport.zoom]);
+  }, [activeOrder, stops, currentViewport.zoom]);
 
   const viewport: MapViewportState = useMemo(() => {
-    if (
-      viewportOverride &&
-      viewportOverride.signature === stopsSignature &&
-      viewportOverride.activeOrderSnapshot === activeOrder
-    ) {
-      return viewportOverride.viewport;
-    }
     if (activeFocusedViewport) {
       return activeFocusedViewport;
     }
-    return autoFitViewport;
-  }, [
-    viewportOverride,
-    stopsSignature,
-    activeOrder,
-    activeFocusedViewport,
-    autoFitViewport,
-  ]);
+    return currentViewport;
+  }, [activeFocusedViewport, currentViewport]);
 
   const commitViewport = useCallback(
-    (next: MapViewportState) => {
-      setViewportOverride({
-        signature: stopsSignature,
-        activeOrderSnapshot: activeOrder,
-        viewport: {
-          centerLat: next.centerLat,
-          centerLng: next.centerLng,
-          zoom: clampZoom(next.zoom),
-        },
+    (next: MapViewportState, isSettled = false) => {
+      setCurrentViewport({
+        centerLat: next.centerLat,
+        centerLng: next.centerLng,
+        zoom: clampZoom(next.zoom),
       });
+      if (isSettled) {
+        setSettledCenter({
+          lat: next.centerLat,
+          lng: next.centerLng,
+        });
+      }
     },
-    [stopsSignature, activeOrder],
+    [],
   );
 
   // Google Maps JS API state
@@ -442,6 +498,7 @@ export function CourseRouteMap({
   const polylineRef = useRef<GooglePolylineInstance | null>(null);
   const infoWindowRef = useRef<GoogleInfoWindowInstance | null>(null);
   const onSelectStopRef = useRef(onSelectStop);
+  const lastFitAnchorKeyRef = useRef<string>("");
   const [googleView, setGoogleView] = useState<{
     lat: number;
     lng: number;
@@ -472,9 +529,18 @@ export function CourseRouteMap({
     };
   }, [mapMode, googleView, viewport]);
 
-  // Debounced fetch of surrounding Subway Stations, Parks/Landmarks & Parking as user pans/zooms anywhere!
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Debounced fetch of surrounding context (stations, landmarks, parking) only when active and not actively dragging
   useEffect(() => {
+    const isAnyLayerActive =
+      showSubwayLayer || showLandmarkLayer || showParkingLayer;
+    if (!isAnyLayerActive || isDragging) {
+      return;
+    }
+
     let active = true;
+    let started = false;
     const controller = new AbortController();
 
     const roundedLat = Math.round(activeCenter.lat * 1000) / 1000;
@@ -482,6 +548,8 @@ export function CourseRouteMap({
     const queryRadius = computeZoomQueryRadius(activeCenter.zoom);
 
     const timer = setTimeout(async () => {
+      if (!active) return;
+      started = true;
       try {
         const params = new URLSearchParams({
           lat: String(roundedLat),
@@ -491,14 +559,17 @@ export function CourseRouteMap({
         const res = await fetch(`/api/map/context?${params.toString()}`, {
           signal: controller.signal,
         });
-        if (!res.ok) return;
+        if (!active || !res.ok) return;
         const data = (await res.json()) as MapSurroundingContext;
         if (active && Array.isArray(data.stations)) {
           setSurrounding((prev) =>
             mergeSurroundingContext(prev, data, roundedLat, roundedLng),
           );
         }
-      } catch {
+      } catch (err: unknown) {
+        if (!active || (err instanceof Error && err.name === "AbortError")) {
+          return;
+        }
         if (active) {
           const fb = buildFallbackMapContext(
             roundedLat,
@@ -510,32 +581,47 @@ export function CourseRouteMap({
           );
         }
       }
-    }, 260);
+    }, 450);
 
     return () => {
       active = false;
       clearTimeout(timer);
-      controller.abort();
+      if (started) {
+        try {
+          controller.abort();
+        } catch {
+          // Ignore
+        }
+      }
     };
-  }, [activeCenter.lat, activeCenter.lng, activeCenter.zoom]);
+  }, [
+    activeCenter.lat,
+    activeCenter.lng,
+    activeCenter.zoom,
+    showSubwayLayer,
+    showLandmarkLayer,
+    showParkingLayer,
+    isDragging,
+  ]);
 
-  // Closest stations sorted relative to current map center for top quick bar
+  // Closest stations sorted relative to settled map center (no recalculation jitter while dragging)
+  // Showing at most 2 stations as per user request
   const visibleClosestStations = useMemo(() => {
     return [...surrounding.stations]
       .map((st) => ({
         ...st,
         distanceFromCenter: Math.round(
           calculateStraightMeters(
-            activeCenter.lat,
-            activeCenter.lng,
+            settledCenter.lat,
+            settledCenter.lng,
             st.latitude,
             st.longitude,
           ),
         ),
       }))
       .sort((a, b) => a.distanceFromCenter - b.distanceFromCenter)
-      .slice(0, 3);
-  }, [surrounding.stations, activeCenter.lat, activeCenter.lng]);
+      .slice(0, 2);
+  }, [surrounding.stations, settledCenter.lat, settledCenter.lng]);
 
   // Mouse wheel zoom inside tile canvas without scrolling page
   const viewportRef = useRef(viewport);
@@ -562,7 +648,7 @@ export function CourseRouteMap({
           centerLat: cur.centerLat,
           centerLng: cur.centerLng,
           zoom: nextZoom,
-        });
+        }, true);
       }
     }
 
@@ -579,7 +665,6 @@ export function CourseRouteMap({
     lastY: number;
     moved: boolean;
   } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
 
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (mapMode !== "tile") return;
@@ -626,6 +711,11 @@ export function CourseRouteMap({
     }
     dragStateRef.current = null;
     setIsDragging(false);
+    const finalVp = viewportRef.current;
+    setSettledCenter({
+      lat: finalVp.centerLat,
+      lng: finalVp.centerLng,
+    });
   }
 
   // Google Maps Effect 1: Stops & Route Polyline (only fits bounds when stops/route change)
@@ -664,15 +754,23 @@ export function CourseRouteMap({
             gestureHandling: "greedy",
             styles: activeTheme.googleStyles,
           });
+          mapInst.addListener("dragstart", () => {
+            setIsDragging(true);
+          });
+          mapInst.addListener("dragend", () => {
+            setIsDragging(false);
+          });
           mapInst.addListener("idle", () => {
+            setIsDragging(false);
             const c = mapInst.getCenter?.();
             const z = mapInst.getZoom();
             if (c) {
+              const nextCenter = { lat: c.lat(), lng: c.lng() };
               setGoogleView((prev) => ({
-                lat: c.lat(),
-                lng: c.lng(),
+                ...nextCenter,
                 zoom: typeof z === "number" ? z : prev.zoom,
               }));
+              setSettledCenter(nextCenter);
             }
           });
           mapInstanceRef.current = mapInst;
@@ -712,7 +810,11 @@ export function CourseRouteMap({
             title: `${stop.order}. ${stop.name}`,
             zIndex: isActive ? 100 : 20 + stop.order,
             icon: {
-              url: buildNumberedMarkerSvgUrl(stop.order, isActive),
+              url: buildCategoryMarkerSvgUrl(
+                stop.categoryGroup,
+                stop.categoryLabel,
+                isActive,
+              ),
               scaledSize: new gmaps.Size(36, 36),
               anchor: new gmaps.Point(18, 18),
             },
@@ -746,10 +848,18 @@ export function CourseRouteMap({
           markersRef.current.push(marker);
         });
 
+        const draftOnlyStops = stops.filter((s) => s.isDraft);
+        const stopsToConnect =
+          draftOnlyStops.length >= 2
+            ? draftOnlyStops
+            : stops.every((s) => s.isDraft) && stops.length >= 2
+              ? stops
+              : [];
+
         const pathPoints =
           polyline && polyline.length >= 2
             ? polyline.map((pt) => ({ lat: pt.latitude, lng: pt.longitude }))
-            : stops.map((s) => ({ lat: s.latitude, lng: s.longitude }));
+            : stopsToConnect.map((s) => ({ lat: s.latitude, lng: s.longitude }));
 
         if (connectRoute && pathPoints.length >= 2) {
           polylineRef.current = new gmaps.Polyline({
@@ -775,11 +885,15 @@ export function CourseRouteMap({
           });
         }
 
-        if (stops.length === 1) {
-          map.setCenter({ lat: stops[0].latitude, lng: stops[0].longitude });
-          map.setZoom(16);
-        } else {
-          map.fitBounds(bounds, { top: 56, right: 56, bottom: 88, left: 56 });
+        // Only fit bounds on initial load or when explicit searchAnchor changes to a new area
+        if (lastFitAnchorKeyRef.current !== currentAnchorKey) {
+          lastFitAnchorKeyRef.current = currentAnchorKey;
+          if (stops.length === 1) {
+            map.setCenter({ lat: stops[0].latitude, lng: stops[0].longitude });
+            map.setZoom(16);
+          } else {
+            map.fitBounds(bounds, { top: 56, right: 56, bottom: 88, left: 56 });
+          }
         }
 
         if (activeOrder !== null) {
@@ -808,6 +922,7 @@ export function CourseRouteMap({
     activeOrder,
     activeTheme,
     searchAnchor,
+    currentAnchorKey,
     setSelectedStopId,
   ]);
 
@@ -896,24 +1011,25 @@ export function CourseRouteMap({
   ]);
 
   // Detect whether map was panned away from the searched reference center (> 220m)
+  // Evaluated against settledCenter so walking time calculations never flicker during active mouse drag
   const hasMovedFromSearchOrigin = useMemo(() => {
     if (!onSearchInArea) return false;
-    const refLat = searchAnchor?.latitude ?? autoFitViewport.centerLat;
-    const refLng = searchAnchor?.longitude ?? autoFitViewport.centerLng;
+    const refLat = searchAnchor?.latitude ?? defaultAnchorCenter.centerLat;
+    const refLng = searchAnchor?.longitude ?? defaultAnchorCenter.centerLng;
     const dist = calculateStraightMeters(
       refLat,
       refLng,
-      activeCenter.lat,
-      activeCenter.lng,
+      settledCenter.lat,
+      settledCenter.lng,
     );
     return dist >= 220;
   }, [
     onSearchInArea,
     searchAnchor,
-    autoFitViewport.centerLat,
-    autoFitViewport.centerLng,
-    activeCenter.lat,
-    activeCenter.lng,
+    defaultAnchorCenter.centerLat,
+    defaultAnchorCenter.centerLng,
+    settledCenter.lat,
+    settledCenter.lng,
   ]);
 
   const inferredAreaHint = useMemo(() => {
@@ -1019,7 +1135,19 @@ export function CourseRouteMap({
   ]);
 
   const projectedPolylines = useMemo(() => {
-    if (!connectRoute || projectedStops.length < 2) return [];
+    if (!connectRoute) return [];
+    // Only connect stops that the user has explicitly drafted into the course
+    const draftedStops = projectedStops.filter((p) => p.stop.isDraft);
+    const candidateToConnect =
+      draftedStops.length >= 2
+        ? draftedStops
+        : projectedStops.every((p) => p.stop.isDraft) &&
+            projectedStops.length >= 2
+          ? projectedStops
+          : [];
+
+    if (candidateToConnect.length < 2) return [];
+
     const segs: {
       key: string;
       x1: number;
@@ -1033,9 +1161,9 @@ export function CourseRouteMap({
       distanceLabel: string;
     }[] = [];
 
-    for (let i = 0; i < projectedStops.length - 1; i++) {
-      const a = projectedStops[i];
-      const b = projectedStops[i + 1];
+    for (let i = 0; i < candidateToConnect.length - 1; i++) {
+      const a = candidateToConnect[i];
+      const b = candidateToConnect[i + 1];
       const walk = estimateWalkingRoute(
         a.stop.latitude,
         a.stop.longitude,
@@ -1164,7 +1292,7 @@ export function CourseRouteMap({
       centerLat: viewport.centerLat,
       centerLng: viewport.centerLng,
       zoom: clampZoom(viewport.zoom + delta),
-    });
+    }, true);
   }
 
   function handleResetFit() {
@@ -1198,7 +1326,7 @@ export function CourseRouteMap({
       });
       return;
     }
-    setViewportOverride(null);
+    setCurrentViewport(defaultAnchorCenter);
   }
 
   function handleFocusStation(station: SubwayStationPoi) {
@@ -1240,7 +1368,7 @@ export function CourseRouteMap({
           containerSize.height,
           { top: 72, right: 64, bottom: footerNode ? 120 : 88, left: 64 },
         );
-        commitViewport(fitted);
+        commitViewport(fitted, true);
         return;
       }
     }
@@ -1249,7 +1377,7 @@ export function CourseRouteMap({
       centerLat: station.latitude,
       centerLng: station.longitude,
       zoom: 16,
-    });
+    }, true);
   }
 
   const effectiveHeightClass = isExpanded
@@ -1263,16 +1391,16 @@ export function CourseRouteMap({
         <div className="flex items-center gap-2">
           <span
             style={{ backgroundColor: activeTheme.routeStroke }}
-            className="h-2.5 w-2.5 rounded-full"
+            className="h-3 w-3 rounded-full shrink-0"
           />
-          <span className="text-xs font-extrabold text-foreground">
+          <span className="text-sm font-black text-foreground">
             {headerTitle}
           </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <div className="inline-flex items-center gap-0.5 rounded-full border border-line bg-surface-subtle p-0.5">
-            <Palette className="ml-2 mr-1 h-3 w-3 text-muted" />
+          <div className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-subtle p-1">
+            <Palette className="ml-2 mr-1 h-3.5 w-3.5 text-muted" />
             {(Object.keys(DAYT_MAP_THEMES) as DaytMapThemeId[]).map((key) => {
               const spec = DAYT_MAP_THEMES[key];
               const selected = themeId === key;
@@ -1281,7 +1409,7 @@ export function CourseRouteMap({
                   key={key}
                   type="button"
                   onClick={() => setThemeId(key)}
-                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold transition-colors ${
+                  className={`rounded-full px-3 py-1 text-xs font-extrabold transition-colors ${
                     selected
                       ? "bg-surface-dark text-white"
                       : "text-muted hover:text-foreground"
@@ -1296,15 +1424,15 @@ export function CourseRouteMap({
       </div>
 
       {/* 2. Nearby Subway Quick Chips & Surrounding Layer Toggles */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-subtle/55 px-4 py-2 text-[11px]">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-          <span className="inline-flex shrink-0 items-center gap-1 font-extrabold text-muted">
-            <TrainFront className="h-3.5 w-3.5 text-primary" />
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-subtle/55 px-4 py-2.5 sm:px-5 text-xs">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <span className="inline-flex shrink-0 items-center gap-1.5 font-black text-muted">
+            <TrainFront className="h-4 w-4 text-primary" />
             <span>주변 역</span>
           </span>
 
           {visibleClosestStations.length === 0 ? (
-            <span className="text-[11px] font-medium text-muted">
+            <span className="text-xs font-medium text-muted">
               반경 내 지하철역 없음
             </span>
           ) : (
@@ -1331,7 +1459,7 @@ export function CourseRouteMap({
                   key={st.id}
                   type="button"
                   onClick={() => handleFocusStation(st)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
                     isSelected
                       ? "border-surface-dark bg-surface-dark text-white"
                       : "border-line bg-surface text-foreground hover:border-primary/50"
@@ -1342,14 +1470,14 @@ export function CourseRouteMap({
                       <span
                         key={line.label}
                         style={{ backgroundColor: line.color }}
-                        className="h-2 w-2 rounded-full"
+                        className="h-2.5 w-2.5 rounded-full"
                         title={line.label}
                       />
                     ))}
                   </span>
                   <span>{st.name}</span>
                   <span
-                    className={`text-[10px] font-semibold ${
+                    className={`text-xs font-semibold ${
                       isSelected ? "text-amber-300" : "text-muted"
                     }`}
                   >
@@ -1362,43 +1490,43 @@ export function CourseRouteMap({
         </div>
 
         {/* Surrounding Layer Toggles (All 3 active by default) */}
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             onClick={() => setShowSubwayLayer((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black transition-colors ${
               showSubwayLayer
                 ? "bg-slate-800 text-white"
                 : "border border-line bg-surface text-muted hover:text-foreground"
             }`}
           >
-            <TrainFront className="h-2.5 w-2.5" />
+            <TrainFront className="h-3.5 w-3.5" />
             <span>역</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowLandmarkLayer((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black transition-colors ${
               showLandmarkLayer
                 ? "bg-emerald-700 text-white"
                 : "border border-line bg-surface text-muted hover:text-foreground"
             }`}
           >
-            <Trees className="h-2.5 w-2.5" />
+            <Trees className="h-3.5 w-3.5" />
             <span>명소·공원</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowParkingLayer((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black transition-colors ${
               showParkingLayer
                 ? "bg-blue-600 text-white"
                 : "border border-line bg-surface text-muted hover:text-foreground"
             }`}
           >
-            <SquareParking className="h-2.5 w-2.5" />
+            <SquareParking className="h-3.5 w-3.5" />
             <span>주차장</span>
           </button>
         </div>
@@ -1659,7 +1787,7 @@ export function CourseRouteMap({
               );
             })}
 
-            {/* Numbered Date Spot Markers (Smart De-cluttered) */}
+            {/* Numbered Date Spot Markers with Category SVG Icons */}
             {projectedStops.map((pin) => {
               if (
                 pin.x < -80 ||
@@ -1669,6 +1797,13 @@ export function CourseRouteMap({
               ) {
                 return null;
               }
+
+              const visual = getStopCategoryVisual(
+                pin.stop.categoryGroup,
+                pin.stop.categoryLabel,
+              );
+              const CategoryIcon = visual.icon;
+
               return (
                 <button
                   key={`${pin.stop.id}-${pin.stop.order}`}
@@ -1698,27 +1833,29 @@ export function CourseRouteMap({
                     pin.isFocused
                       ? "z-30 bg-surface-dark text-white ring-2 ring-amber-300"
                       : pin.stop.isDraft
-                        ? "z-25 bg-primary text-white ring-2 ring-white shadow-primary/30"
-                        : "z-20 bg-surface text-foreground ring-2 ring-primary"
+                        ? "z-25 bg-surface text-foreground ring-2 ring-primary shadow-primary/30"
+                        : "z-20 bg-surface text-foreground ring-1.5 ring-line"
                   }`}
                 >
                   <span
-                    className={`flex items-center justify-center rounded-full font-black ${
-                      pin.showFullLabel
-                        ? "h-4.5 w-4.5 text-[10px]"
-                        : "h-6 w-6 text-[11px]"
-                    } ${
-                      pin.isFocused
-                        ? "bg-amber-300 text-surface-dark"
-                        : pin.stop.isDraft
-                          ? "bg-white text-primary"
-                          : "bg-primary text-white"
+                    style={{ backgroundColor: visual.color }}
+                    className={`flex items-center justify-center rounded-full text-white shadow-2xs ${
+                      pin.showFullLabel ? "h-4.5 w-4.5" : "h-6 w-6"
                     }`}
                   >
-                    {pin.stop.order}
+                    <CategoryIcon
+                      className={
+                        pin.showFullLabel ? "h-2.5 w-2.5" : "h-3.5 w-3.5"
+                      }
+                    />
                   </span>
                   {pin.showFullLabel && (
                     <span className="max-w-28 truncate">{pin.stop.name}</span>
+                  )}
+                  {pin.stop.isDraft && (
+                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-black text-white -ml-0.5">
+                      {pin.stop.order}
+                    </span>
                   )}
                 </button>
               );
@@ -1754,12 +1891,12 @@ export function CourseRouteMap({
                   areaHint: inferredAreaHint,
                 })
               }
-              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-surface-dark/95 px-4 py-2 text-xs font-extrabold text-white shadow-lg backdrop-blur-md transition-transform hover:scale-[1.02] hover:bg-primary disabled:opacity-70"
+              className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-primary/30 bg-surface-dark/95 px-5 py-2.5 text-xs sm:text-sm font-black text-white shadow-xl backdrop-blur-md transition-transform hover:scale-[1.02] hover:bg-primary disabled:opacity-70"
             >
               {isSearchingArea ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-300" />
+                <Loader2 className="h-4 w-4 animate-spin text-amber-300" />
               ) : (
-                <RotateCw className="h-3.5 w-3.5 text-amber-300" />
+                <RotateCw className="h-4 w-4 text-amber-300" />
               )}
               <span>
                 {isSearchingArea
@@ -1771,7 +1908,7 @@ export function CourseRouteMap({
         )}
 
         {/* 4. Floating Zoom / Fit / Expand Controls (Top-Right) */}
-        <div className="absolute top-3 right-3 z-30 flex flex-col gap-1.5">
+        <div className="absolute top-3 right-3 z-30 flex flex-col gap-2">
           <div className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface/95 shadow-md backdrop-blur-md">
             <button
               type="button"
@@ -1779,11 +1916,11 @@ export function CourseRouteMap({
               disabled={currentZoom >= MAX_MAP_ZOOM}
               title="지도 확대 (+)"
               aria-label="지도 확대"
-              className="flex h-8 w-8 items-center justify-center text-foreground transition-colors hover:bg-primary-soft hover:text-primary disabled:opacity-35"
+              className="flex h-9 w-9 items-center justify-center text-foreground transition-colors hover:bg-primary-soft hover:text-primary disabled:opacity-35"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4.5 w-4.5" />
             </button>
-            <div className="border-y border-line py-0.5 text-center font-mono text-[9px] font-extrabold text-muted">
+            <div className="border-y border-line py-1 text-center font-mono text-[10px] font-extrabold text-muted">
               Z{currentZoom}
             </div>
             <button
@@ -1792,9 +1929,9 @@ export function CourseRouteMap({
               disabled={currentZoom <= MIN_MAP_ZOOM}
               title="지도 축소 (-)"
               aria-label="지도 축소"
-              className="flex h-8 w-8 items-center justify-center text-foreground transition-colors hover:bg-primary-soft hover:text-primary disabled:opacity-35"
+              className="flex h-9 w-9 items-center justify-center text-foreground transition-colors hover:bg-primary-soft hover:text-primary disabled:opacity-35"
             >
-              <Minus className="h-4 w-4" />
+              <Minus className="h-4.5 w-4.5" />
             </button>
           </div>
 
@@ -1803,9 +1940,9 @@ export function CourseRouteMap({
             onClick={handleResetFit}
             title="전체 스팟 한눈에 맞추기"
             aria-label="전체 스팟 한눈에 맞추기"
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-surface/95 text-foreground shadow-md backdrop-blur-md transition-colors hover:bg-primary-soft hover:text-primary"
+            className="flex h-9 w-9 items-center justify-center rounded-2xl border border-line bg-surface/95 text-foreground shadow-md backdrop-blur-md transition-colors hover:bg-primary-soft hover:text-primary"
           >
-            <LocateFixed className="h-4 w-4" />
+            <LocateFixed className="h-4.5 w-4.5" />
           </button>
 
           <button
@@ -1813,18 +1950,18 @@ export function CourseRouteMap({
             onClick={() => setIsExpanded((v) => !v)}
             title={isExpanded ? "기본 크기로 줄이기" : "지도 크게 보기"}
             aria-label={isExpanded ? "기본 크기로 줄이기" : "지도 크게 보기"}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-surface/95 text-foreground shadow-md backdrop-blur-md transition-colors hover:bg-primary-soft hover:text-primary"
+            className="flex h-9 w-9 items-center justify-center rounded-2xl border border-line bg-surface/95 text-foreground shadow-md backdrop-blur-md transition-colors hover:bg-primary-soft hover:text-primary"
           >
             {isExpanded ? (
-              <Minimize2 className="h-4 w-4" />
+              <Minimize2 className="h-4.5 w-4.5" />
             ) : (
-              <Maximize2 className="h-4 w-4" />
+              <Maximize2 className="h-4.5 w-4.5" />
             )}
           </button>
         </div>
 
         {/* 5. Real Metric Scale Bar (Top-Left) */}
-        <div className="pointer-events-none absolute top-3 left-3 z-20 flex items-center gap-2 rounded-full border border-line/80 bg-surface/90 px-2.5 py-1 text-[10px] font-extrabold text-foreground shadow-xs backdrop-blur-xs">
+        <div className="pointer-events-none absolute top-3 left-3 z-20 flex items-center gap-2 rounded-full border border-line/80 bg-surface/90 px-3 py-1 text-xs font-extrabold text-foreground shadow-xs backdrop-blur-xs">
           <span>{scaleBar.label}</span>
           <span
             style={{ width: `${scaleBar.widthPx}px` }}
