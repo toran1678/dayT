@@ -48,6 +48,7 @@ interface AuthContextValue {
     payload: OAuthLoginRequest,
   ) => Promise<UserSummary>;
   updateProfile: (payload: UserUpdateRequest) => Promise<UserSummary>;
+  refreshProfile: () => Promise<UserSummary | null>;
   logout: () => Promise<void>;
   authenticatedFetch: <TResponse>(
     endpoint: `/api/v1/${string}`,
@@ -221,6 +222,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [tokens],
   );
 
+  const refreshProfile = useCallback(async (): Promise<UserSummary | null> => {
+    const current = tokens ?? readStoredTokens();
+    if (!current) return null;
+    try {
+      const latest = await getMyProfileApi(current.accessToken);
+      setUser(latest);
+      return latest;
+    } catch {
+      return null;
+    }
+  }, [tokens]);
+
   const logout = useCallback(async () => {
     const current = tokens ?? readStoredTokens();
     try {
@@ -248,6 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       closeProfileModal: () => setIsProfileModalOpen(false),
       loginWithOAuth,
       updateProfile,
+      refreshProfile,
       logout,
       authenticatedFetch,
     }),
@@ -259,6 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isProfileModalOpen,
       loginWithOAuth,
       updateProfile,
+      refreshProfile,
       logout,
       authenticatedFetch,
     ],

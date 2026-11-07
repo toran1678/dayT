@@ -6,8 +6,8 @@
 ---
 
 ## 1. 현재 포커스 (Current Focus)
-- **현재 단계**: **`Phase 3 (P1 AI · 데이터 · 공유 고도화: F-06 ~ F-10)` 완료 → `Phase 4 (P2 실시간 협업 · 커플 리텐션: F-11 ~ F-14)` 착수 대기**
-- **현재 진행 작업**: Phase 3 전 기능(`[F-06]`~`[F-10]`) 풀스택 구현 및 `pytest` · `gradlew test` · `next build`(`cacheComponents`) 통합 검증 완료
+- **현재 단계**: **`Phase 4 (P2 실시간 협업 · 커플 리텐션: F-11 ~ F-14)` 완료 (웹 올인원 MVP ~ P2 전 기능 완주)**
+- **현재 진행 작업**: Phase 0 ~ Phase 4(`F-01` ~ `F-14`) 풀스택 구현 및 `pytest` · `gradlew test` · `next build`(`cacheComponents`) 전 서비스 통합 검증 완료 (추후 필요 시 `Phase 5` 모바일 네이티브 앱 확장 대기)
 
 ---
 
@@ -40,10 +40,10 @@
 - [x] **[F-10] 원클릭 길안내**: 완성 코스 경유지 포함 Google Maps Deep Link 연동
 
 ### Phase 4: P2 실시간 협업 · 커플 리텐션 (`F-11` ~ `F-14`)
-- [ ] **[F-11] KML Export**: 구글 '내 지도(My Maps)' 임포트용 KML 다운로드 (`/api/v1/courses/{courseId}/export.kml`)
-- [ ] **[F-12] 커스텀 테마 맵 & 공유 뷰어**: Google Maps JS API 기반 서비스 무드 커스텀 스타일(JSON) 및 카톡 OG 프리뷰 고도화
-- [ ] **[F-13] 실시간 공동 편집**: STOMP WebSocket(`/ws/collab`) 기반 동시 장소 추가·삭제·순서 변경
-- [ ] **[F-14] Grow Together & 일기장**: 커플 연결, 펫 성장·일일 미션, 데이트 일기장 CRUD
+- [x] **[F-11] KML Export**: 구글 '내 지도(My Maps)' 임포트용 KML 다운로드 (`/api/v1/courses/{courseId}/export.kml`)
+- [x] **[F-12] 커스텀 테마 맵 & 공유 뷰어**: Google Maps JS API 기반 서비스 무드 커스텀 스타일(JSON) 및 카톡 OG 프리뷰 고도화
+- [x] **[F-13] 실시간 공동 편집**: STOMP WebSocket(`/ws/collab`) 기반 동시 장소 추가·삭제·순서 변경
+- [x] **[F-14] Grow Together & 일기장**: 커플 연결, 펫 성장·일일 미션, 데이트 일기장 CRUD
 
 ### Phase 5: 모바일 네이티브 앱 확장 *(추후 선택)*
 - [ ] `mobile/` Expo (React Native + TS) 초기화 및 `web/`의 API 타입·비즈니스 로직 이식
@@ -68,3 +68,4 @@
 - **Phase 2 `[F-04] 코스 메이커` & `[F-05] 지도 동선 시각화` 풀스택 구현 완료 (Phase 2 완주)**: 백엔드 `/api/v1/courses` CRUD·Haversine 도보 이동시간 보정·`routePolyline` 반환(`CourseIntegrationTest` 통과) 및 프론트엔드 코스 메이커(`/courses/new`), 보관함(`/courses`), 상세·수정·공유 뷰어(`/courses/[courseId]`, `/courses/shared/[shareToken]`), Google Maps JS API + WGS84 벡터 동선 맵(`CourseRouteMap`) 연동 완료.
 - **Phase 3 `[F-06]`~`[F-10]` P1 AI · 데이터 · 공유 고도화 풀스택 구현 완료 (Phase 3 완주)**: `ai-service`의 공공/리뷰 수집·`gemini-3.8-flash` 해시태그 요약(`/internal/ai/v1/places/enrich`) 및 환각 차단 코스 조합(`/internal/ai/v1/courses/generate`), `backend`의 온디맨드 AI 보강·`/api/v1/courses/recommend`·구글맵 딥링크(`/api/v1/courses/{courseId}/google-maps-link`), `web`의 `AiCourseRecommendModal`·카톡 동적 OG 썸네일(`/api/og/course/[shareToken]`)·원클릭 길안내 연동 및 전 서비스 빌드·테스트 검증 완료.
 - **전국 지역 검색 · 사용자 반경 슬라이더 · Google Places `priceRange` 실측 가격 연동 고도화**: 카카오 주소/키워드 분리 조회로 전국 모든 행정구역·역·랜드마크 탐색 정상화, 프론트엔드 탐색 반경 슬라이더(`500m`~`10km`) 도입, 임의 업종 추정가 제거 후 Google Places API (New) `priceRange`/`priceLevel` 매칭 및 미확인 매장 `'가격 미확인'` 투명 표기 적용 완료.
+- **Phase 4 `[F-11]`~`[F-14]` P2 실시간 협업 · 커플 리텐션 풀스택 구현 완료 (Phase 4 완주)**: 구글 '내 지도' KML 다운로드(`/export.kml`), 커스텀 무드 맵 3종(`Warm Editorial`·`Romantic Sunset`·`Midnight Noir`) 및 공유 패스 보관함 복제, STOMP 1.2 WebSocket(`/ws/collab`) 실시간 동시 코스 편집, 6자리 코드 커플 연결·펫 진화·만남 인증·일일 미션(`/together`) 및 코스 연동 데이트 일기장(`/diaries`) 구현·통합 테스트 통과 완료.

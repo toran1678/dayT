@@ -17,6 +17,7 @@ export interface GoogleMapInstance {
   setCenter: (center: GoogleLatLngLiteral) => void;
   setZoom: (zoom: number) => void;
   panTo: (center: GoogleLatLngLiteral) => void;
+  setOptions: (options: { styles?: GoogleMapStyleElement[] }) => void;
   fitBounds: (
     bounds: GoogleLatLngBoundsInstance,
     padding?:
@@ -209,4 +210,120 @@ export const DAYT_WARM_MAP_STYLES: GoogleMapStyleElement[] = [
     stylers: [{ color: "#dce9f2" }],
   },
 ];
+
+export const DAYT_SUNSET_MAP_STYLES: GoogleMapStyleElement[] = [
+  {
+    elementType: "geometry",
+    stylers: [{ color: "#fff1eb" }],
+  },
+  {
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#7c2d12" }],
+  },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#fffaf5" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#fde2e4" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#ffffff" }],
+  },
+  {
+    featureType: "road.arterial",
+    elementType: "geometry",
+    stylers: [{ color: "#fed7aa" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#fecdd3" }],
+  },
+];
+
+export const DAYT_NIGHT_MAP_STYLES: GoogleMapStyleElement[] = [
+  {
+    elementType: "geometry",
+    stylers: [{ color: "#1c1917" }],
+  },
+  {
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d6d3d1" }],
+  },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#1c1917" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#1f2922" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#292524" }],
+  },
+  {
+    featureType: "road.arterial",
+    elementType: "geometry",
+    stylers: [{ color: "#44403c" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#0f172a" }],
+  },
+];
+
+export type DaytMapThemeId = "WARM" | "SUNSET" | "NIGHT";
+
+export interface DaytMapThemeSpec {
+  id: DaytMapThemeId;
+  label: string;
+  canvasBg: string;
+  roadPrimary: string;
+  roadSecondary: string;
+  routeStroke: string;
+  isDark: boolean;
+  googleStyles: GoogleMapStyleElement[];
+}
+
+export const DAYT_MAP_THEMES: Record<DaytMapThemeId, DaytMapThemeSpec> = {
+  WARM: {
+    id: "WARM",
+    label: "웜 에디토리얼",
+    canvasBg: "#F4F1EA",
+    roadPrimary: "#E7E2D8",
+    roadSecondary: "#EAE5DC",
+    routeStroke: "#E85D3F",
+    isDark: false,
+    googleStyles: DAYT_WARM_MAP_STYLES,
+  },
+  SUNSET: {
+    id: "SUNSET",
+    label: "로맨틱 선셋",
+    canvasBg: "#FFF1EB",
+    roadPrimary: "#FED7AA",
+    roadSecondary: "#FECDD3",
+    routeStroke: "#E11D48",
+    isDark: false,
+    googleStyles: DAYT_SUNSET_MAP_STYLES,
+  },
+  NIGHT: {
+    id: "NIGHT",
+    label: "미드나잇 야경",
+    canvasBg: "#1C1917",
+    roadPrimary: "#292524",
+    roadSecondary: "#44403C",
+    routeStroke: "#FBBF24",
+    isDark: true,
+    googleStyles: DAYT_NIGHT_MAP_STYLES,
+  },
+};
 

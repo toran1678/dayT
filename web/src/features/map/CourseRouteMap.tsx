@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ExternalLink, MapPin, Navigation } from "lucide-react";
+import { ExternalLink, MapPin, Navigation, Palette } from "lucide-react";
 import type { LatLngPoint } from "@/shared/api/types";
 import { estimateWalkingRoute, formatDistanceKo } from "./geo-utils";
 import {
-  DAYT_WARM_MAP_STYLES,
+  DAYT_MAP_THEMES,
   getConfiguredGoogleMapsApiKey,
   loadGoogleMapsApi,
   subscribeGoogleMapsAuthFailure,
+  type DaytMapThemeId,
   type GoogleInfoWindowInstance,
   type GoogleMapInstance,
   type GoogleMarkerInstance,
@@ -72,6 +73,8 @@ export function CourseRouteMap({
   const [mapMode, setMapMode] = useState<"google" | "vector">(() =>
     apiKey ? "google" : "vector",
   );
+  const [themeId, setThemeId] = useState<DaytMapThemeId>("WARM");
+  const activeTheme = DAYT_MAP_THEMES[themeId];
   const [selectedVectorStopId, setSelectedVectorStopId] = useState<
     number | null
   >(null);
@@ -118,9 +121,13 @@ export function CourseRouteMap({
             zoomControl: true,
             clickableIcons: false,
             gestureHandling: "greedy",
-            styles: DAYT_WARM_MAP_STYLES,
+            styles: activeTheme.googleStyles,
           });
           infoWindowRef.current = new gmaps.InfoWindow();
+        } else {
+          mapInstanceRef.current.setOptions({
+            styles: activeTheme.googleStyles,
+          });
         }
 
         const map = mapInstanceRef.current;
@@ -194,7 +201,7 @@ export function CourseRouteMap({
           polylineRef.current = new gmaps.Polyline({
             path: pathPoints,
             geodesic: true,
-            strokeColor: "#E85D3F",
+            strokeColor: activeTheme.routeStroke,
             strokeOpacity: 0.92,
             strokeWeight: 4,
             icons: [
@@ -202,8 +209,8 @@ export function CourseRouteMap({
                 icon: {
                   path: gmaps.SymbolPath.FORWARD_CLOSED_ARROW,
                   scale: 3,
-                  strokeColor: "#E85D3F",
-                  fillColor: "#E85D3F",
+                  strokeColor: activeTheme.routeStroke,
+                  fillColor: activeTheme.routeStroke,
                   fillOpacity: 1,
                 },
                 offset: "50%",
@@ -238,7 +245,7 @@ export function CourseRouteMap({
       cancelled = true;
       unsubscribeAuthError();
     };
-  }, [apiKey, mapMode, stops, polyline, connectRoute, activeOrder]);
+  }, [apiKey, mapMode, stops, polyline, connectRoute, activeOrder, activeTheme]);
 
   // Normalized coordinates for interactive WGS84 vector fallback mode
   const vectorPins = useMemo(() => {
@@ -315,21 +322,52 @@ export function CourseRouteMap({
       {/* Map Top Bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3.5">
         <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+          <span
+            style={{ backgroundColor: activeTheme.routeStroke }}
+            className="h-2.5 w-2.5 rounded-full"
+          />
           <span className="text-xs font-extrabold text-foreground">
             {headerTitle}
           </span>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-bold text-primary">
-          <Navigation className="h-3 w-3" />
-          <span>
-            {mapMode === "google" ? "Google Maps 동선" : "WGS84 실시간 동선 맵"}
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div className="inline-flex items-center gap-0.5 rounded-full border border-line bg-surface-subtle p-0.5">
+            <Palette className="ml-2 mr-1 h-3 w-3 text-muted" />
+            {(Object.keys(DAYT_MAP_THEMES) as DaytMapThemeId[]).map((key) => {
+              const spec = DAYT_MAP_THEMES[key];
+              const selected = themeId === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setThemeId(key)}
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold transition-colors ${
+                    selected
+                      ? "bg-surface-dark text-white"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  {spec.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-bold text-primary">
+            <Navigation className="h-3 w-3" />
+            <span>
+              {mapMode === "google" ? "Google Maps" : "WGS84 동선 맵"}
+            </span>
           </span>
-        </span>
+        </div>
       </div>
 
       {/* Canvas Container */}
-      <div className={`relative bg-[#F4F1EA] ${heightClassName}`}>
+      <div
+        style={{ backgroundColor: activeTheme.canvasBg }}
+        className={`relative transition-colors ${heightClassName}`}
+      >
         {mapMode === "google" ? (
           <div ref={mapContainerRef} className="h-full w-full" />
         ) : (
@@ -350,31 +388,31 @@ export function CourseRouteMap({
                   markerHeight="4"
                   orient="auto-start-reverse"
                 >
-                  <path d="M 0 1 L 10 5 L 0 9 z" fill="#E85D3F" />
+                  <path d="M 0 1 L 10 5 L 0 9 z" fill={activeTheme.routeStroke} />
                 </marker>
               </defs>
               {/* Subtle Editorial Road Grid */}
               <path
                 d="M0 24 Q42 30 100 16"
-                stroke="#E7E2D8"
+                stroke={activeTheme.roadPrimary}
                 strokeWidth="3.5"
                 fill="none"
               />
               <path
                 d="M22 0 L34 100"
-                stroke="#E7E2D8"
+                stroke={activeTheme.roadPrimary}
                 strokeWidth="2.8"
                 fill="none"
               />
               <path
                 d="M72 0 L64 100"
-                stroke="#EAE5DC"
+                stroke={activeTheme.roadSecondary}
                 strokeWidth="2.2"
                 fill="none"
               />
               <path
                 d="M0 68 L100 54"
-                stroke="#E7E2D8"
+                stroke={activeTheme.roadPrimary}
                 strokeWidth="4.2"
                 fill="none"
               />
@@ -391,7 +429,7 @@ export function CourseRouteMap({
                       y1={pin.yPercent}
                       x2={nextPin.xPercent}
                       y2={nextPin.yPercent}
-                      stroke="#E85D3F"
+                      stroke={activeTheme.routeStroke}
                       strokeWidth="1.35"
                       strokeDasharray="2.6 1.6"
                       markerEnd="url(#dayt-route-arrow)"

@@ -31,8 +31,8 @@
 
 > *새로운 기능이나 단계(Phase) 구현에 착수할 때 에이전트가 아래 섹션을 현재 작업의 세부 설계(대상 파일, 구현 순서, 검증 방법)로 갱신합니다.*
 
-- **현재 목표**: **Phase 3 (`P1 AI · 데이터 · 공유 고도화: F-06 ~ F-10`) 구현 완료 → Phase 4 (`P2 실시간 협업 · 커플 리텐션: F-11 ~ F-14`) 착수 대기**
-- **최근 완료 범위 요약 (Phase 3)**:
-  1. **`ai-service/` (`[F-07·08]` & `[F-06]`)**: `ExternalPlaceCollector`(네이버 블로그·TourAPI 스니펫 수집), `PlaceEnrichService`(`gemini-3.8-flash` 정형 해시태그·메뉴·예산 추출 + 휴리스틱 폴백), `CourseGenerateService`(`candidatePlaces` 환각 차단 최적 동선 조합 + Haversine 이동시간·폴리라인 산출) 구현 및 `pytest` 통과
-  2. **`backend/` (`[F-06]`, `[F-08]`, `[F-10]`)**: `DefaultAiServiceClient` 내부 API 연동, `PlaceService.getPlaceDetail` 온디맨드 AI 요약 보강, `POST /api/v1/courses/recommend`, `GET /api/v1/courses/{courseId}/google-maps-link` 구현 및 `gradlew test` 통합 검증 완료
-  3. **`web/` (`[F-06]`, `[F-09]`, `[F-10]`)**: `AiCourseRecommendModal`(조건 맞춤 추천 프리뷰 → 메이커 편집/즉시 확정 저장), `/courses/shared/[shareToken]` 동적 Open Graph 메타데이터 및 `/api/og/course/[shareToken]` 썸네일 렌더링, 모바일 앱 딥링크·웹 폴백 원클릭 길안내 연동 및 Next.js 16 `cacheComponents` 프로덕션 빌드 검증 완료
+- **현재 목표**: **Phase 0 ~ Phase 4 (`F-01` ~ `F-14`) 웹 기반 올인원 플랫폼 구현 완료 → 운영/실사용 점검 또는 Phase 5 (`mobile/` 확장) 선택 대기**
+- **최근 완료 범위 요약 (Phase 4)**:
+  1. **`backend/` (`[F-11]`, `[F-13]`, `[F-14]`)**: `V3__seed_daily_missions.sql` 시드, `CoupleController`/`CoupleService`(6자리 초대 코드 발급·커플 연결), `PetMissionController`/`PetMissionService`(커플 펫 경험치·레벨 진화, 일 1회 만남 인증 `409` 중복 방지, 일일 미션 3종 자동 배정·완료 보상), `DiaryController`/`DiaryService`(커플 공유 일기장 CRUD·코스 연동·사진 저장), `CourseService.exportCourseKml` 및 `WebSocketCollabConfig`/`CourseCollabWsController`(STOMP `/ws/collab` 실시간 공동 편집 브로드캐스트) 구현 완료
+  2. **`web/` (`[F-11]` ~ `[F-14]`)**: `CourseRouteMap` 3종 커스텀 무드 테마 전환기, 공유 뷰어 보관함 복제 및 KML 다운로드, 무의존성 STOMP 1.2 클라이언트(`collab-stomp-client.ts`) 기반 실시간 동시 편집 동기화, `TogetherClientView`·`AppShell` 실시간 펫 배지, `DiariesClientView`(기기 사진 압축 첨부·URL 첨부·코스 연동) 구현 완료
+  3. **통합 검증**: 백엔드 `gradlew test`(KML·STOMP WebSocket·커플/펫/일기장 통합 테스트 15종 전원 통과), 프론트엔드 `eslint`·`tsc --noEmit`·`next build`(`cacheComponents` 11/11 라우트 프리렌더링) 검증 완료

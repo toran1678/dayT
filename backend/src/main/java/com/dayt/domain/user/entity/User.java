@@ -64,5 +64,9 @@ public class User extends BaseTimeEntity {
 		this.nickname = nickname;
 		this.profileImageUrl = profileImageUrl;
 	}
+
+	public void linkCouple(Long coupleId) {
+		this.coupleId = coupleId;
+	}
 }
 

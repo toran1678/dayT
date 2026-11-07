@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import {
   BookOpenText,
   Compass,
@@ -15,6 +15,24 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/AuthContext";
+import {
+  fetchMyPetApi,
+  PET_UPDATED_EVENT,
+} from "@/features/together/together-api";
+import type { CouplePetResponse } from "@/shared/api/types";
+
+function getPetEmoji(characterType?: string): string {
+  switch (characterType) {
+    case "LOVEBIRD":
+      return "🐥";
+    case "SWAN":
+      return "🦢";
+    case "PHOENIX":
+      return "🔥";
+    default:
+      return "🐣";
+  }
+}
 
 interface NavItem {
   href: string;
@@ -148,7 +166,44 @@ function MobileFloatingDock() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, isInitializing, openLoginModal, openProfileModal } = useAuth();
+  const {
+    user,
+    isInitializing,
+    openLoginModal,
+    openProfileModal,
+    authenticatedFetch,
+  } = useAuth();
+  const [headerPet, setHeaderPet] = useState<CouplePetResponse | null>(null);
+  const activeHeaderPet = user?.coupleId ? headerPet : null;
+
+  useEffect(() => {
+    const coupleId = user?.coupleId;
+    if (!coupleId) {
+      return;
+    }
+    let active = true;
+    async function syncPetBadge() {
+      try {
+        const pet = await fetchMyPetApi(authenticatedFetch);
+        if (active) setHeaderPet(pet);
+      } catch {
+        if (active) setHeaderPet(null);
+      }
+    }
+    void syncPetBadge();
+
+    function handlePetUpdated(event: Event) {
+      const custom = event as CustomEvent<CouplePetResponse>;
+      if (custom.detail) {
+        setHeaderPet(custom.detail);
+      }
+    }
+    window.addEventListener(PET_UPDATED_EVENT, handlePetUpdated);
+    return () => {
+      active = false;
+      window.removeEventListener(PET_UPDATED_EVENT, handlePetUpdated);
+    };
+  }, [user?.coupleId, authenticatedFetch]);
 
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
@@ -186,10 +241,20 @@ export function AppShell({ children }: { children: ReactNode }) {
               href="/together"
               className="hidden items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-primary-soft/50 sm:inline-flex"
             >
-              <span className="text-sm leading-none">🐣</span>
-              <span>Lv.2</span>
-              <span className="h-3 w-px bg-line" />
-              <span className="text-primary">D+6</span>
+              <span className="text-sm leading-none">
+                {getPetEmoji(activeHeaderPet?.characterType)}
+              </span>
+              {activeHeaderPet ? (
+                <>
+                  <span>Lv.{activeHeaderPet.level}</span>
+                  <span className="h-3 w-px bg-line" />
+                  <span className="text-primary">
+                    만남 {activeHeaderPet.totalMeetDays}회
+                  </span>
+                </>
+              ) : (
+                <span className="text-muted">커플 스페이스</span>
+              )}
             </Link>
 
             <Link

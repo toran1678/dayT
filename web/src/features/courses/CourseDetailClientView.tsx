@@ -5,16 +5,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
+  BookmarkPlus,
   Check,
   Clock,
+  Download,
   ExternalLink,
   Footprints,
   Loader2,
   Navigation,
   Pencil,
+  Radio,
   Share2,
   Sparkles,
   Trash2,
+  Users,
   Wallet,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -35,14 +39,18 @@ import type {
   PlaceCategoryGroup,
 } from "@/shared/api/types";
 import { CourseBuilderClientView } from "./CourseBuilderClientView";
+import { connectCourseCollabStomp } from "./collab-stomp-client";
 import {
   openCourseGoogleMapsNavigation,
   shareCoursePass,
 } from "./course-actions";
 import {
+  createCourse,
   deleteCourse,
+  downloadCourseKml,
   fetchCourseDetail,
   fetchSharedCourseApi,
+  updateCourseCollaboration,
 } from "./courses-api";
 
 interface CourseDetailClientViewProps {
@@ -71,8 +79,13 @@ export function CourseDetailClientView({
 }: CourseDetailClientViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, isInitializing, openLoginModal, authenticatedFetch } =
-    useAuth();
+  const {
+    user,
+    accessToken,
+    isInitializing,
+    openLoginModal,
+    authenticatedFetch,
+  } = useAuth();
 
   const isSharedPublicView = Boolean(shareToken);
   const [course, setCourse] = useState<CourseDetail | null>(null);
@@ -84,7 +97,14 @@ export function CourseDetailClientView({
   const [focusedOrder, setFocusedOrder] = useState<number | null>(null);
   const [copiedShare, setCopiedShare] = useState(false);
   const [isOpeningMaps, setIsOpeningMaps] = useState(false);
+  const [isDownloadingKml, setIsDownloadingKml] = useState(false);
+  const [isTogglingCollab, setIsTogglingCollab] = useState(false);
+  const [isCloningShared, setIsCloningShared] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [liveCollabState, setLiveCollabState] = useState<
+    "connecting" | "connected" | "disconnected"
+  >("disconnected");
+  const [liveCollabToast, setLiveCollabToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSharedPublicView && (isInitializing || !user)) {
@@ -125,6 +145,47 @@ export function CourseDetailClientView({
     user,
     authenticatedFetch,
   ]);
+
+  const activeCollabCourseId =
+    !isEditing && !isSharedPublicView && course?.isCollabOpen && accessToken
+      ? course.id
+      : null;
+
+  useEffect(() => {
+    if (!activeCollabCourseId || !accessToken) {
+      return;
+    }
+
+    const handle = connectCourseCollabStomp(activeCollabCourseId, accessToken, {
+      onConnectStateChange: (state) => {
+        setLiveCollabState(state);
+      },
+      onBroadcast: (event) => {
+        if (
+          event.clientSessionId &&
+          event.clientSessionId === handle.sessionId
+        ) {
+          return;
+        }
+        if (event.course) {
+          setCourse(event.course);
+        }
+        if (event.action === "SYNC_COURSE") {
+          setLiveCollabToast(
+            `${event.editorNickname}님이 동선을 실시간으로 수정했어요`,
+          );
+        } else if (event.action === "PRESENCE_JOIN") {
+          setLiveCollabToast(
+            `${event.editorNickname}님이 함께 코스를 보고 있어요`,
+          );
+        }
+      },
+    });
+
+    return () => {
+      handle.disconnect();
+    };
+  }, [activeCollabCourseId, accessToken]);
 
   const timelineItems = useMemo(() => {
     if (!course) return [];
@@ -204,6 +265,88 @@ export function CourseDetailClientView({
     }
   }
 
+  async function handleDownloadKml() {
+    if (!course) return;
+    if (!user || !accessToken) {
+      openLoginModal();
+      return;
+    }
+    setIsDownloadingKml(true);
+    try {
+      await downloadCourseKml(accessToken, course.id, course.title);
+    } catch (err) {
+      alert(
+        err instanceof ApiError
+          ? err.message
+          : "KML 파일을 내려받는 중 오류가 발생했습니다.",
+      );
+    } finally {
+      setIsDownloadingKml(false);
+    }
+  }
+
+  async function handleToggleCollaboration() {
+    if (!course) return;
+    setIsTogglingCollab(true);
+    try {
+      const updated = await updateCourseCollaboration(
+        authenticatedFetch,
+        course.id,
+        !course.isCollabOpen,
+      );
+      setCourse(updated);
+      setLiveCollabToast(
+        updated.isCollabOpen
+          ? "실시간 공동 편집이 켜졌어요! 이제 연인과 동시에 경유지를 편집할 수 있습니다."
+          : "실시간 공동 편집이 종료되었습니다.",
+      );
+    } catch (err) {
+      alert(
+        err instanceof ApiError
+          ? err.message
+          : "공동 편집 상태 변경에 실패했습니다.",
+      );
+    } finally {
+      setIsTogglingCollab(false);
+    }
+  }
+
+  async function handleCloneSharedToMyVault() {
+    if (!course) return;
+    if (!user) {
+      openLoginModal();
+      return;
+    }
+    setIsCloningShared(true);
+    try {
+      const cloned = await createCourse(authenticatedFetch, {
+        title: `${course.title} (담아온 코스)`,
+        description: course.description,
+        themeTags: course.themeTags,
+        timeSlot: course.timeSlot,
+        sourceType: course.sourceType,
+        shareWithCouple: Boolean(user.coupleId),
+        places: course.places.map((item, idx) => ({
+          placeId: item.place.id,
+          visitOrder: idx + 1,
+          estimatedCost: item.estimatedCost,
+          stayMinutes: item.stayMinutes,
+          travelMinutesToNext:
+            idx === course.places.length - 1 ? 0 : item.travelMinutesToNext,
+          memo: item.memo,
+        })),
+      });
+      router.push(`/courses/${cloned.id}`);
+    } catch (err) {
+      alert(
+        err instanceof ApiError
+          ? err.message
+          : "내 보관함으로 코스를 담지 못했습니다.",
+      );
+      setIsCloningShared(false);
+    }
+  }
+
   async function handleDelete() {
     if (!course) return;
     if (!window.confirm(`'${course.title}' 코스를 삭제하시겠어요?`)) {
@@ -268,10 +411,13 @@ export function CourseDetailClientView({
     );
   }
 
-  const canModify =
+  const isOwnerOrPartner =
     Boolean(user) &&
     (user?.id === course.creatorId ||
       (course.coupleId !== null && user?.coupleId === course.coupleId));
+
+  const canModify =
+    isOwnerOrPartner || Boolean(user && !isSharedPublicView && course.isCollabOpen);
 
   if (isEditing && canModify) {
     return (
@@ -308,6 +454,31 @@ export function CourseDetailClientView({
           </span>
         )}
       </div>
+
+      {course.isCollabOpen && !isSharedPublicView && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/85 px-4 py-2.5 text-xs font-bold text-emerald-800">
+          <div className="flex items-center gap-2">
+            <Radio className="h-3.5 w-3.5 text-emerald-600" />
+            <span>
+              {liveCollabState === "connected"
+                ? "실시간 공동 편집 채널 연결됨 (/ws/collab)"
+                : "실시간 공동 편집 모드 활성화됨"}
+            </span>
+            {liveCollabToast && (
+              <span className="text-emerald-700/80">· {liveCollabToast}</span>
+            )}
+          </div>
+          {canModify && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-extrabold text-white hover:bg-emerald-700"
+            >
+              동시 편집 참여하기 →
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Course Header */}
       <header className="flex flex-col justify-between gap-4 rounded-3xl border border-line bg-surface p-6 shadow-[0_8px_28px_rgba(24,24,27,0.03)] sm:flex-row sm:items-center sm:p-7">
@@ -358,6 +529,60 @@ export function CourseDetailClientView({
             </button>
           )}
 
+          {hasRouteStops && !isSharedPublicView && (
+            <button
+              type="button"
+              disabled={isDownloadingKml}
+              onClick={() => void handleDownloadKml()}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-background px-4 py-2.5 text-xs font-bold text-foreground hover:border-primary/40 disabled:opacity-60"
+            >
+              {isDownloadingKml ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              ) : (
+                <Download className="h-3.5 w-3.5 text-primary" />
+              )}
+              <span>구글 내 지도 KML</span>
+            </button>
+          )}
+
+          {isSharedPublicView && (
+            <button
+              type="button"
+              disabled={isCloningShared}
+              onClick={() => void handleCloneSharedToMyVault()}
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-xs font-extrabold text-white hover:bg-primary-hover disabled:opacity-60"
+            >
+              {isCloningShared ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <BookmarkPlus className="h-3.5 w-3.5" />
+              )}
+              <span>내 보관함으로 코스 담기</span>
+            </button>
+          )}
+
+          {isOwnerOrPartner && !isSharedPublicView && (
+            <button
+              type="button"
+              disabled={isTogglingCollab}
+              onClick={() => void handleToggleCollaboration()}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2.5 text-xs font-extrabold transition-colors disabled:opacity-60 ${
+                course.isCollabOpen
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                  : "border-line bg-background text-foreground hover:border-primary/40"
+              }`}
+            >
+              {isTogglingCollab ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Users className="h-3.5 w-3.5" />
+              )}
+              <span>
+                {course.isCollabOpen ? "공동 편집 ON" : "공동 편집 열기"}
+              </span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => void handleCopyShareLink()}
@@ -376,26 +601,27 @@ export function CourseDetailClientView({
             )}
           </button>
 
-          {canModify && (
-            <>
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-xs font-extrabold text-white hover:bg-primary-hover"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                <span>코스 수정</span>
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => void handleDelete()}
-                className="inline-flex items-center gap-1 rounded-full border border-line bg-background px-3.5 py-2.5 text-xs font-bold text-muted hover:border-red-300 hover:text-red-600 disabled:opacity-50"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>삭제</span>
-              </button>
-            </>
+          {canModify && !isSharedPublicView && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-xs font-extrabold text-white hover:bg-primary-hover"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              <span>{course.isCollabOpen ? "공동 편집" : "코스 수정"}</span>
+            </button>
+          )}
+
+          {isOwnerOrPartner && !isSharedPublicView && (
+            <button
+              type="button"
+              disabled={isDeleting}
+              onClick={() => void handleDelete()}
+              className="inline-flex items-center gap-1 rounded-full border border-line bg-background px-3.5 py-2.5 text-xs font-bold text-muted hover:border-red-300 hover:text-red-600 disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>삭제</span>
+            </button>
           )}
         </div>
       </header>

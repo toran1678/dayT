@@ -2,8 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import type { NextConfig } from "next";
 
+const WEB_DIR = import.meta.dirname;
+
 function loadRootPublicEnv(): Record<string, string> {
-  const rootEnvPath = path.resolve(process.cwd(), "..", ".env");
+  const rootEnvPath = path.resolve(WEB_DIR, "..", ".env");
   if (!fs.existsSync(rootEnvPath)) {
     return {};
   }
@@ -31,7 +33,7 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   env: loadRootPublicEnv(),
   turbopack: {
-    root: process.cwd(),
+    root: WEB_DIR,
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],

@@ -1,7 +1,9 @@
 package com.dayt.domain.course.controller;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import com.dayt.domain.course.dto.CourseCollaborationRequest;
 import com.dayt.domain.course.dto.CourseDetailResponse;
 import com.dayt.domain.course.dto.CourseListItem;
 import com.dayt.domain.course.dto.CourseRecommendRequest;
@@ -15,12 +17,16 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -33,6 +39,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/courses")
 @RequiredArgsConstructor
 public class CourseController {
+
+	private static final MediaType KML_MEDIA_TYPE =
+			MediaType.parseMediaType("application/vnd.google-earth.kml+xml;charset=UTF-8");
 
 	private final CourseService courseService;
 
@@ -88,6 +97,38 @@ public class CourseController {
 	) {
 		Long userId = extractUserId(jwt);
 		return ResponseEntity.ok(courseService.getGoogleMapsLink(userId, courseId));
+	}
+
+	@Operation(summary = "구글 내 지도(My Maps) 임포트용 KML 파일 다운로드")
+	@GetMapping(value = "/{courseId}/export.kml", produces = "application/vnd.google-earth.kml+xml")
+	public ResponseEntity<byte[]> exportCourseKml(
+			@AuthenticationPrincipal Jwt jwt,
+			@PathVariable Long courseId
+	) {
+		Long userId = extractUserId(jwt);
+		byte[] kmlBytes = courseService.exportCourseKml(userId, courseId);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(KML_MEDIA_TYPE);
+		headers.setContentDisposition(
+				ContentDisposition.attachment()
+						.filename("dayt-course-" + courseId + ".kml", StandardCharsets.UTF_8)
+						.build()
+		);
+		return new ResponseEntity<>(kmlBytes, headers, HttpStatus.OK);
+	}
+
+	@Operation(summary = "실시간 공동 코스 편집 허용 여부 변경")
+	@PatchMapping("/{courseId}/collaboration")
+	public ResponseEntity<CourseDetailResponse> updateCollaboration(
+			@AuthenticationPrincipal Jwt jwt,
+			@PathVariable Long courseId,
+			@Valid @RequestBody CourseCollaborationRequest request
+	) {
+		Long userId = extractUserId(jwt);
+		return ResponseEntity.ok(
+				courseService.updateCollaboration(userId, courseId, Boolean.TRUE.equals(request.isCollabOpen()))
+		);
 	}
 
 	@Operation(summary = "데이트 코스 전체 수정 (제목, 테마, 방문 장소 및 순서 변경)")

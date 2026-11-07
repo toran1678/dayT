@@ -2,6 +2,7 @@ package com.dayt.domain.course.service;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 
 import com.dayt.domain.ai.client.AiServiceClient;
 import com.dayt.domain.ai.dto.InternalAiCourseGenerateRequest;
+import com.dayt.domain.course.collab.CollabBroadcastEvent;
 import com.dayt.domain.course.dto.CourseDetailResponse;
 import com.dayt.domain.course.dto.CourseListItem;
 import com.dayt.domain.course.dto.CoursePlaceDetailItem;
@@ -40,6 +42,8 @@ import com.dayt.domain.user.repository.UserRepository;
 import com.dayt.global.error.BusinessException;
 import com.dayt.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,6 +60,7 @@ public class CourseService {
 	private final PlaceService placeService;
 	private final AiServiceClient aiServiceClient;
 	private final UserRepository userRepository;
+	private final ObjectProvider<SimpMessagingTemplate> messagingTemplateProvider;
 
 	@Transactional(readOnly = true)
 	public List<CourseListItem> getMyCourses(Long userId) {
@@ -229,6 +234,18 @@ public class CourseService {
 
 	@Transactional
 	public CourseDetailResponse updateCourse(Long userId, Long courseId, CourseUpsertRequest request) {
+		CourseDetailResponse saved = applyCourseUpdate(userId, courseId, request);
+		User editor = getRequiredUser(userId);
+		broadcastCourseChange("SYNC_COURSE", courseId, editor, saved);
+		return saved;
+	}
+
+	@Transactional
+	public CourseDetailResponse updateCourseFromCollab(Long userId, Long courseId, CourseUpsertRequest request) {
+		return applyCourseUpdate(userId, courseId, request);
+	}
+
+	private CourseDetailResponse applyCourseUpdate(Long userId, Long courseId, CourseUpsertRequest request) {
 		User user = getRequiredUser(userId);
 		Course course = courseRepository.findWithPlacesById(courseId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "수정할 코스를 찾을 수 없습니다."));
@@ -240,7 +257,11 @@ public class CourseService {
 		PreparedStops prepared = prepareStops(request.places());
 		Long nextCoupleId = Boolean.TRUE.equals(request.shareWithCouple())
 				? (user.getCoupleId() != null ? user.getCoupleId() : course.getCoupleId())
-				: null;
+				: course.getCoupleId();
+
+		if (!Boolean.TRUE.equals(request.shareWithCouple()) && isOwnerOrPartner(course, user)) {
+			nextCoupleId = null;
+		}
 
 		course.updateHeader(
 				nextCoupleId,
@@ -265,15 +286,146 @@ public class CourseService {
 	}
 
 	@Transactional
+	public CourseDetailResponse updateCollaboration(Long userId, Long courseId, boolean isCollabOpen) {
+		User user = getRequiredUser(userId);
+		Course course = courseRepository.findWithPlacesById(courseId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "코스를 찾을 수 없습니다."));
+
+		if (!isOwnerOrPartner(course, user)) {
+			throw new BusinessException(ErrorCode.FORBIDDEN, "공동 편집 설정을 변경할 권한이 없습니다.");
+		}
+
+		course.updateCollaboration(isCollabOpen);
+		if (isCollabOpen && user.getCoupleId() != null) {
+			course.linkCoupleIfAbsent(user.getCoupleId());
+		}
+
+		Course saved = courseRepository.saveAndFlush(course);
+		CourseDetailResponse detail = CourseDetailResponse.from(saved);
+		broadcastCourseChange("COLLAB_STATUS", courseId, user, detail);
+		return detail;
+	}
+
+	@Transactional(readOnly = true)
+	public byte[] exportCourseKml(Long userId, Long courseId) {
+		User user = getRequiredUser(userId);
+		Course course = courseRepository.findWithPlacesById(courseId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "코스를 찾을 수 없습니다."));
+
+		if (!canViewCourse(course, user)) {
+			throw new BusinessException(ErrorCode.FORBIDDEN, "해당 코스의 KML 파일을 내보낼 권한이 없습니다.");
+		}
+
+		List<CoursePlace> sorted = course.getCoursePlaces().stream()
+				.sorted(Comparator.comparingInt(CoursePlace::getVisitOrder))
+				.toList();
+
+		StringBuilder xml = new StringBuilder(2048);
+		xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+		xml.append("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n");
+		xml.append("  <Document>\n");
+		xml.append("    <name>").append(escapeXml(course.getTitle())).append("</name>\n");
+
+		String docDesc = (course.getDescription() != null && !course.getDescription().isBlank()
+				? course.getDescription() + " | "
+				: "")
+				+ "총 예상 비용: " + String.format("%,d원", course.getTotalEstimatedCost())
+				+ " · 총 소요 시간: " + course.getTotalDurationMinutes() + "분";
+		xml.append("    <description>").append(escapeXml(docDesc)).append("</description>\n");
+
+		xml.append("    <Style id=\"daytRouteStyle\">\n");
+		xml.append("      <LineStyle>\n");
+		xml.append("        <color>ff3f5de8</color>\n");
+		xml.append("        <width>5</width>\n");
+		xml.append("      </LineStyle>\n");
+		xml.append("    </Style>\n");
+
+		for (CoursePlace cp : sorted) {
+			Place place = cp.getPlace();
+			String placemarkName = cp.getVisitOrder() + ". " + place.getName();
+			StringBuilder placeDesc = new StringBuilder()
+					.append(place.getAddress())
+					.append(" · 체류 ").append(cp.getStayMinutes()).append("분")
+					.append(" · 2인 ").append(String.format("%,d원", cp.getEstimatedCost()));
+			if (cp.getMemo() != null && !cp.getMemo().isBlank()) {
+				placeDesc.append(" | 메모: ").append(cp.getMemo());
+			}
+
+			xml.append("    <Placemark>\n");
+			xml.append("      <name>").append(escapeXml(placemarkName)).append("</name>\n");
+			xml.append("      <description>").append(escapeXml(placeDesc.toString())).append("</description>\n");
+			xml.append("      <Point>\n");
+			xml.append("        <coordinates>")
+					.append(place.getLongitude()).append(",")
+					.append(place.getLatitude()).append(",0</coordinates>\n");
+			xml.append("      </Point>\n");
+			xml.append("    </Placemark>\n");
+		}
+
+		if (sorted.size() >= 2) {
+			String coordLine = sorted.stream()
+					.map(cp -> cp.getPlace().getLongitude() + "," + cp.getPlace().getLatitude() + ",0")
+					.collect(Collectors.joining(" "));
+
+			xml.append("    <Placemark>\n");
+			xml.append("      <name>").append(escapeXml(course.getTitle() + " 이동 동선")).append("</name>\n");
+			xml.append("      <styleUrl>#daytRouteStyle</styleUrl>\n");
+			xml.append("      <LineString>\n");
+			xml.append("        <tessellate>1</tessellate>\n");
+			xml.append("        <coordinates>").append(coordLine).append("</coordinates>\n");
+			xml.append("      </LineString>\n");
+			xml.append("    </Placemark>\n");
+		}
+
+		xml.append("  </Document>\n");
+		xml.append("</kml>\n");
+		return xml.toString().getBytes(StandardCharsets.UTF_8);
+	}
+
+	@Transactional
 	public void deleteCourse(Long userId, Long courseId) {
 		User user = getRequiredUser(userId);
 		Course course = courseRepository.findById(courseId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "삭제할 코스를 찾을 수 없습니다."));
 
-		if (!canModifyCourse(course, user)) {
+		if (!isOwnerOrPartner(course, user)) {
 			throw new BusinessException(ErrorCode.FORBIDDEN, "해당 코스를 삭제할 권한이 없습니다.");
 		}
 		courseRepository.delete(course);
+	}
+
+	private void broadcastCourseChange(
+			String action,
+			Long courseId,
+			User editor,
+			CourseDetailResponse detail
+	) {
+		SimpMessagingTemplate template = messagingTemplateProvider.getIfAvailable();
+		if (template == null) {
+			return;
+		}
+		CollabBroadcastEvent event = new CollabBroadcastEvent(
+				action,
+				courseId,
+				editor.getId(),
+				editor.getNickname(),
+				null,
+				detail,
+				Instant.now()
+		);
+		template.convertAndSend("/topic/courses/" + courseId, event);
+	}
+
+	private static String escapeXml(String input) {
+		if (input == null) {
+			return "";
+		}
+		return input
+				.replace("&", "&amp;")
+				.replace("<", "&lt;")
+				.replace(">", "&gt;")
+				.replace("\"", "&quot;")
+				.replace("'", "&apos;");
 	}
 
 	private CourseRecommendationPreviewResponse buildBackendFallbackPreview(
@@ -381,21 +533,25 @@ public class CourseService {
 				.orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
 	}
 
-	private static boolean canViewCourse(Course course, User user) {
+	private static boolean isOwnerOrPartner(Course course, User user) {
 		if (Objects.equals(course.getCreatorId(), user.getId())) {
 			return true;
 		}
-		if (course.getCoupleId() != null && Objects.equals(course.getCoupleId(), user.getCoupleId())) {
+		return course.getCoupleId() != null && Objects.equals(course.getCoupleId(), user.getCoupleId());
+	}
+
+	private static boolean canViewCourse(Course course, User user) {
+		if (isOwnerOrPartner(course, user)) {
 			return true;
 		}
 		return Boolean.TRUE.equals(course.getIsCollabOpen());
 	}
 
 	private static boolean canModifyCourse(Course course, User user) {
-		if (Objects.equals(course.getCreatorId(), user.getId())) {
+		if (isOwnerOrPartner(course, user)) {
 			return true;
 		}
-		return course.getCoupleId() != null && Objects.equals(course.getCoupleId(), user.getCoupleId());
+		return Boolean.TRUE.equals(course.getIsCollabOpen());
 	}
 
 	private PreparedStops prepareStops(List<CoursePlaceRequestItem> rawItems) {

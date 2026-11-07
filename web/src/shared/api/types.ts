@@ -18,6 +18,8 @@ export type TokenRefreshRequest = Schemas["TokenRefreshRequest"];
 export type AuthTokenResponse = Schemas["AuthTokenResponse"];
 export type UserSummary = Schemas["UserSummary"];
 export type UserUpdateRequest = Schemas["UserUpdateRequest"];
+export type CoupleInviteResponse = Schemas["CoupleInviteResponse"];
+export type CoupleConnectRequest = Schemas["CoupleConnectRequest"];
 export type CoupleSummary = Schemas["CoupleSummary"];
 
 export type PlaceDetail = Schemas["PlaceDetail"];

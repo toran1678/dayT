@@ -130,5 +130,11 @@ public class Course extends BaseTimeEntity {
 	public void updateCollaboration(boolean open) {
 		this.isCollabOpen = open;
 	}
+
+	public void linkCoupleIfAbsent(Long coupleId) {
+		if (this.coupleId == null && coupleId != null) {
+			this.coupleId = coupleId;
+		}
+	}
 }
 

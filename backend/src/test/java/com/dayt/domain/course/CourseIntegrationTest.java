@@ -20,8 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -158,10 +160,37 @@ class CourseIntegrationTest {
 				.startsWith("https://www.google.com/maps/dir/?api=1")
 				.contains("waypoints=");
 
+		// 4-C. [F-11] 구글 내 지도(My Maps) KML 다운로드 검증 (GET /api/v1/courses/{courseId}/export.kml)
+		MvcResult kmlRes = mockMvc.perform(get("/api/v1/courses/{courseId}/export.kml", courseId)
+						.header("Authorization", "Bearer " + ownerToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-Type", org.hamcrest.Matchers.containsString("application/vnd.google-earth.kml+xml")))
+				.andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("dayt-course-" + courseId + ".kml")))
+				.andReturn();
+
+		String kmlContent = kmlRes.getResponse().getContentAsString(StandardCharsets.UTF_8);
+		assertThat(kmlContent)
+				.contains("<kml xmlns=\"http://www.opengis.net/kml/2.2\">")
+				.contains("<name>성수동 오후 전시 &amp; 로스터리 루트</name>")
+				.contains("<Placemark>")
+				.contains("<LineString>");
+
 		// 5. 제3자 비공개 코스 조회/수정/삭제 시 403 Forbidden 검증
 		mockMvc.perform(get("/api/v1/courses/{courseId}", courseId)
 						.header("Authorization", "Bearer " + strangerToken))
 				.andExpect(status().isForbidden());
+
+		// 5-B. [F-13] 공동 편집 ON(PATCH /collaboration) 시 공동 조회 허용 & 삭제는 여전히 소유자만 가능 검증
+		mockMvc.perform(patch("/api/v1/courses/{courseId}/collaboration", courseId)
+						.header("Authorization", "Bearer " + ownerToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"isCollabOpen\":true}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.isCollabOpen").value(true));
+
+		mockMvc.perform(get("/api/v1/courses/{courseId}", courseId)
+						.header("Authorization", "Bearer " + strangerToken))
+				.andExpect(status().isOk());
 
 		mockMvc.perform(delete("/api/v1/courses/{courseId}", courseId)
 						.header("Authorization", "Bearer " + strangerToken))

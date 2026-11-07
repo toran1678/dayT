@@ -1,5 +1,6 @@
 package com.dayt.domain.user.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.dayt.domain.user.entity.OAuthProvider;
@@ -11,5 +12,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	Optional<User> findByOauthProviderAndOauthId(OAuthProvider oauthProvider, String oauthId);
 
 	boolean existsByEmail(String email);
+
+	List<User> findAllByCoupleId(Long coupleId);
 }
 

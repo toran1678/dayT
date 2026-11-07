@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -13,6 +13,7 @@ import {
   Loader2,
   Map as MapIcon,
   Plus,
+  Radio,
   Save,
   Sparkles,
   Trash2,
@@ -48,6 +49,10 @@ import type {
   PlaceDetail,
 } from "@/shared/api/types";
 import { AiCourseRecommendModal } from "./AiCourseRecommendModal";
+import {
+  connectCourseCollabStomp,
+  type CollabStompHandle,
+} from "./collab-stomp-client";
 import { createCourse, updateCourse } from "./courses-api";
 import { PlacePickerModal } from "./PlacePickerModal";
 
@@ -178,7 +183,7 @@ export function CourseBuilderClientView({
 }: CourseBuilderClientViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, openLoginModal, authenticatedFetch } = useAuth();
+  const { user, accessToken, openLoginModal, authenticatedFetch } = useAuth();
   const isEditMode = Boolean(initialCourse);
 
   const [title, setTitle] = useState<string>(
@@ -217,6 +222,116 @@ export function CourseBuilderClientView({
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<"timeline" | "map">("timeline");
+
+  const isCollabEnabled = Boolean(
+    isEditMode && initialCourse?.isCollabOpen && accessToken,
+  );
+  const [collabStatus, setCollabStatus] = useState<
+    "connecting" | "connected" | "disconnected"
+  >("disconnected");
+  const [collabNotice, setCollabNotice] = useState<string | null>(null);
+  const collabHandleRef = useRef<CollabStompHandle | null>(null);
+  const isApplyingRemoteRef = useRef(false);
+  const skipInitialBroadcastRef = useRef(true);
+
+  useEffect(() => {
+    if (!isCollabEnabled || !initialCourse || !accessToken) {
+      return;
+    }
+
+    skipInitialBroadcastRef.current = true;
+    const handle = connectCourseCollabStomp(initialCourse.id, accessToken, {
+      onConnectStateChange: (state) => {
+        setCollabStatus(state);
+      },
+      onBroadcast: (event) => {
+        if (
+          event.clientSessionId &&
+          event.clientSessionId === handle.sessionId
+        ) {
+          return;
+        }
+        if (event.action === "PRESENCE_JOIN") {
+          setCollabNotice(`${event.editorNickname}님이 공동 편집에 접속했어요`);
+          return;
+        }
+        if (event.action === "SYNC_COURSE" && event.course) {
+          isApplyingRemoteRef.current = true;
+          setTitle(event.course.title);
+          setDescription(event.course.description ?? "");
+          if (event.course.themeTags.length > 0) {
+            setSelectedThemes(event.course.themeTags);
+          }
+          if (event.course.timeSlot) {
+            setTimeSlot(event.course.timeSlot);
+          }
+          setSourceType(event.course.sourceType);
+          setShareWithCouple(Boolean(event.course.coupleId));
+          setStops(buildInitialStops(event.course));
+          setCollabNotice(
+            `방금 ${event.editorNickname}님이 코스를 실시간 수정했어요`,
+          );
+        }
+      },
+    });
+    collabHandleRef.current = handle;
+
+    return () => {
+      handle.disconnect();
+      collabHandleRef.current = null;
+    };
+  }, [isCollabEnabled, initialCourse, accessToken]);
+
+  useEffect(() => {
+    if (!isCollabEnabled || collabStatus !== "connected") {
+      return;
+    }
+    if (skipInitialBroadcastRef.current) {
+      skipInitialBroadcastRef.current = false;
+      return;
+    }
+    if (isApplyingRemoteRef.current) {
+      isApplyingRemoteRef.current = false;
+      return;
+    }
+    if (!title.trim() || stops.length === 0) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      collabHandleRef.current?.sendEdit({
+        title: title.trim(),
+        description: description.trim() || null,
+        themeTags: selectedThemes,
+        timeSlot,
+        sourceType,
+        shareWithCouple,
+        places: stops.map((stop, idx) => ({
+          placeId: stop.place.id,
+          visitOrder: idx + 1,
+          estimatedCost: Math.max(0, Math.round(stop.estimatedCost)),
+          stayMinutes: Math.max(0, Math.round(stop.stayMinutes)),
+          travelMinutesToNext:
+            idx === stops.length - 1
+              ? 0
+              : Math.max(0, Math.round(stop.travelMinutesToNext)),
+          memo: stop.memo.trim() || null,
+        })),
+      });
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [
+    isCollabEnabled,
+    collabStatus,
+    title,
+    description,
+    selectedThemes,
+    timeSlot,
+    sourceType,
+    shareWithCouple,
+    stops,
+  ]);
 
   function syncStops(updater: (prev: EditableCourseStop[]) => EditableCourseStop[]) {
     setStops((prev) => {
@@ -556,8 +671,25 @@ export function CourseBuilderClientView({
               <span className="rounded-full bg-primary-soft px-3 py-0.5 text-[11px] font-extrabold text-primary">
                 {isEditMode ? "EDIT ITINERARY" : "ITINERARY STUDIO"}
               </span>
+              {isCollabEnabled && (
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-[11px] font-extrabold ${
+                    collabStatus === "connected"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  <Radio className="h-3 w-3" />
+                  <span>
+                    {collabStatus === "connected"
+                      ? "실시간 공동 편집 동기화 중"
+                      : "공동 편집 서버 연결 중..."}
+                  </span>
+                </span>
+              )}
               <span className="text-xs font-semibold text-muted">
-                경유지 순서를 바꾸면 도보 거리·소요 시간·예산이 실시간 재계산됩니다
+                {collabNotice ??
+                  "경유지 순서를 바꾸면 도보 거리·소요 시간·예산이 실시간 재계산됩니다"}
               </span>
             </div>
 
