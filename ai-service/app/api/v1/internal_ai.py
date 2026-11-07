@@ -1,16 +1,29 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from functools import lru_cache
 
-from app.core.exceptions import AppError
+from fastapi import APIRouter, Depends
+
 from app.schemas.internal_ai import (
     CourseRecommendationPreview,
     InternalAiCourseGenerateRequest,
     InternalPlaceEnrichRequest,
     InternalPlaceEnrichResponse,
 )
+from app.services.course_generate_service import CourseGenerateService
+from app.services.place_enrich_service import PlaceEnrichService
 
 router = APIRouter(prefix="/internal/ai/v1", tags=["Internal AI"])
+
+
+@lru_cache
+def get_course_generate_service() -> CourseGenerateService:
+    return CourseGenerateService()
+
+
+@lru_cache
+def get_place_enrich_service() -> PlaceEnrichService:
+    return PlaceEnrichService()
 
 
 @router.post(
@@ -20,12 +33,9 @@ router = APIRouter(prefix="/internal/ai/v1", tags=["Internal AI"])
 )
 async def generate_course_recommendation(
     payload: InternalAiCourseGenerateRequest,
+    service: CourseGenerateService = Depends(get_course_generate_service),
 ) -> CourseRecommendationPreview:
-    raise AppError(
-        status_code=501,
-        code="NOT_IMPLEMENTED",
-        message=f"AI 맞춤 코스 추천 파이프라인(Phase 3 F-06) 구현 예정입니다. (지역: {payload.condition.region_keyword})",
-    )
+    return await service.generate_course(payload)
 
 
 @router.post(
@@ -35,10 +45,6 @@ async def generate_course_recommendation(
 )
 async def enrich_place_metadata(
     payload: InternalPlaceEnrichRequest,
+    service: PlaceEnrichService = Depends(get_place_enrich_service),
 ) -> InternalPlaceEnrichResponse:
-    raise AppError(
-        status_code=501,
-        code="NOT_IMPLEMENTED",
-        message=f"장소 리뷰 수집·해시태그 추출 파이프라인(Phase 3 F-07) 구현 예정입니다. (장소: {payload.name})",
-    )
-
+    return await service.enrich_place(payload)

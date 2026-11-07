@@ -31,7 +31,8 @@
 
 > *새로운 기능이나 단계(Phase) 구현에 착수할 때 에이전트가 아래 섹션을 현재 작업의 세부 설계(대상 파일, 구현 순서, 검증 방법)로 갱신합니다.*
 
-- **현재 목표**: **Phase 2 (1/5 완료) → 다음 단계 `[F-02] 장소 탐색` & `[F-03] 음식 추천` 착수 준비**
-- **방금 완료 ([F-01] 인증/회원)**:
-  - `backend/`: `User` 엔티티, `JwtTokenProvider`(Access/Refresh 분리 검증), `RedisRefreshTokenStore`, `DefaultOAuthUserInfoClient`, `AuthController`·`UserController` 및 통합 테스트 완료
-  - `web/`: `AuthProvider`(자동 토큰 갱신 포함), `AuthModals`(소셜 로그인 & 프로필 수정/로그아웃), `/auth/callback/[provider]` 연동 완료
+- **현재 목표**: **Phase 3 (`P1 AI · 데이터 · 공유 고도화: F-06 ~ F-10`) 구현 완료 → Phase 4 (`P2 실시간 협업 · 커플 리텐션: F-11 ~ F-14`) 착수 대기**
+- **최근 완료 범위 요약 (Phase 3)**:
+  1. **`ai-service/` (`[F-07·08]` & `[F-06]`)**: `ExternalPlaceCollector`(네이버 블로그·TourAPI 스니펫 수집), `PlaceEnrichService`(`gemini-3.8-flash` 정형 해시태그·메뉴·예산 추출 + 휴리스틱 폴백), `CourseGenerateService`(`candidatePlaces` 환각 차단 최적 동선 조합 + Haversine 이동시간·폴리라인 산출) 구현 및 `pytest` 통과
+  2. **`backend/` (`[F-06]`, `[F-08]`, `[F-10]`)**: `DefaultAiServiceClient` 내부 API 연동, `PlaceService.getPlaceDetail` 온디맨드 AI 요약 보강, `POST /api/v1/courses/recommend`, `GET /api/v1/courses/{courseId}/google-maps-link` 구현 및 `gradlew test` 통합 검증 완료
+  3. **`web/` (`[F-06]`, `[F-09]`, `[F-10]`)**: `AiCourseRecommendModal`(조건 맞춤 추천 프리뷰 → 메이커 편집/즉시 확정 저장), `/courses/shared/[shareToken]` 동적 Open Graph 메타데이터 및 `/api/og/course/[shareToken]` 썸네일 렌더링, 모바일 앱 딥링크·웹 폴백 원클릭 길안내 연동 및 Next.js 16 `cacheComponents` 프로덕션 빌드 검증 완료

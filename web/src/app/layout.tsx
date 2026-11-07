@@ -21,6 +21,9 @@ const notoSansKr = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  ),
   title: "DayT — 하루 전체를 책임지는 올인원 데이트 코스",
   description:
     "맛집·카페·전시·산책 탐색부터 AI 맞춤 데이트 코스 추천, 동선 지도 시각화, 커플 기록까지 한곳에서 완성하세요.",

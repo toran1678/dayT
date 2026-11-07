@@ -31,6 +31,7 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   env: loadRootPublicEnv(),
   turbopack: {
+    root: process.cwd(),
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],

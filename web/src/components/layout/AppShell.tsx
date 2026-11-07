@@ -193,7 +193,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
 
             <Link
-              href="/courses/new"
+              href="/courses/new?ai=1"
               className="hidden items-center gap-1.5 rounded-full bg-primary-soft px-3.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/15 md:inline-flex"
             >
               <Sparkles className="h-3.5 w-3.5" />

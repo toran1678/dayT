@@ -52,7 +52,7 @@ public class SecurityConfig {
 						.requestMatchers("/actuator/health", "/actuator/info").permitAll()
 						.requestMatchers("/docs", "/docs/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-spec.yaml").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/auth/oauth/*", "/api/v1/auth/refresh").permitAll()
-						.requestMatchers(HttpMethod.GET, "/api/v1/courses/shared/*").permitAll()
+						.requestMatchers(HttpMethod.GET, "/api/v1/places/**", "/api/v1/courses/shared/*").permitAll()
 						.requestMatchers("/ws/collab/**").permitAll()
 						.anyRequest().authenticated()
 				)
