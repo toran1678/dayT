@@ -53,6 +53,7 @@ const FOODS: FoodCategory[] = [
   "중식",
   "치킨",
   "분식",
+  "기타",
 ];
 
 const TIME_SLOTS: { code: DateTimeSlot; label: string }[] = [
@@ -82,7 +83,8 @@ export function AiCourseRecommendModal({
     "전시·문화",
   ]);
   const [selectedFoods, setSelectedFoods] = useState<FoodCategory[]>(["일식"]);
-  const [budgetPerPerson, setBudgetPerPerson] = useState<number>(40000);
+  const [sliderBudget, setSliderBudget] = useState<number>(40000);
+  const [isUnlimitedBudget, setIsUnlimitedBudget] = useState<boolean>(false);
   const [timeSlot, setTimeSlot] = useState<DateTimeSlot>("HALF_DAY");
   const [selectedMoods, setSelectedMoods] = useState<string[]>([
     "도보 이동 최소",
@@ -135,7 +137,7 @@ export function AiCourseRecommendModal({
         regionKeyword: regionKeyword.trim(),
         themeTags: selectedThemes,
         foodCategories: selectedFoods,
-        budgetPerPerson,
+        budgetPerPerson: isUnlimitedBudget ? 0 : sliderBudget,
         timeSlot,
         moodKeywords: selectedMoods,
       });
@@ -244,9 +246,9 @@ export function AiCourseRecommendModal({
                       key={theme}
                       type="button"
                       onClick={() => toggleTheme(theme)}
-                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
+                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold transition-colors ${
                         active
-                          ? "bg-primary text-white"
+                          ? "border border-primary bg-primary text-white"
                           : "border border-line bg-background text-muted hover:text-foreground"
                       }`}
                     >
@@ -268,9 +270,9 @@ export function AiCourseRecommendModal({
                     key={slot.code}
                     type="button"
                     onClick={() => setTimeSlot(slot.code)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
                       timeSlot === slot.code
-                        ? "bg-surface-dark text-white"
+                        ? "border border-surface-dark bg-surface-dark text-white"
                         : "border border-line bg-background text-muted hover:text-foreground"
                     }`}
                   >
@@ -294,9 +296,9 @@ export function AiCourseRecommendModal({
                     key={food}
                     type="button"
                     onClick={() => toggleFood(food)}
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${
+                    className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${
                       active
-                        ? "bg-surface-dark text-white"
+                        ? "border border-surface-dark bg-surface-dark text-white"
                         : "border border-line bg-background text-muted hover:text-foreground"
                     }`}
                   >
@@ -307,37 +309,59 @@ export function AiCourseRecommendModal({
             </div>
           </div>
 
-          {/* 4. 10,000원-step Budget Slider */}
+          {/* 4. 1인 하루 총 예산 설정 (예산 무관 옵션 포함 & 고정 높이 뱃지로 레이아웃 시프트 방지) */}
           <div className="rounded-2xl border border-line bg-background p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <label
                 htmlFor="ai-budget-slider"
                 className="text-xs font-extrabold text-foreground"
               >
-                5. 1인 예산 설정{" "}
-                <span className="font-medium text-muted">(10,000원 단위)</span>
+                5. 1인 하루 총 예산 설정
               </label>
-              <span className="rounded-full bg-primary-soft px-3 py-0.5 text-xs font-extrabold text-primary">
-                1인 {budgetPerPerson.toLocaleString()}원 (2인{" "}
-                {(budgetPerPerson * 2).toLocaleString()}원)
-              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsUnlimitedBudget((prev) => !prev)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors ${
+                    isUnlimitedBudget
+                      ? "border border-primary bg-primary text-white shadow-xs"
+                      : "border border-line bg-surface text-muted hover:text-foreground"
+                  }`}
+                >
+                  {isUnlimitedBudget ? "✓ 예산 무관" : "예산 무관"}
+                </button>
+
+                <span className="inline-flex h-7 items-center rounded-full bg-primary-soft px-3 text-xs font-extrabold text-primary">
+                  {isUnlimitedBudget
+                    ? "1인 예산 무관 (분위기·인기 중심)"
+                    : `1인 하루 ${sliderBudget.toLocaleString()}원 (2인 ${(
+                        sliderBudget * 2
+                      ).toLocaleString()}원)`}
+                </span>
+              </div>
             </div>
-            <input
-              id="ai-budget-slider"
-              type="range"
-              min={10000}
-              max={100000}
-              step={10000}
-              value={budgetPerPerson}
-              onChange={(e) => setBudgetPerPerson(Number(e.target.value))}
-              className="mt-2.5 h-2 w-full cursor-pointer accent-primary"
-            />
-            <div className="mt-1 flex justify-between text-[10px] font-semibold text-muted">
-              <span>1만원</span>
-              <span>3만원</span>
-              <span>5만원</span>
-              <span>7만원</span>
-              <span>10만원</span>
+
+            <div className="mt-3">
+              <input
+                id="ai-budget-slider"
+                type="range"
+                min={10000}
+                max={100000}
+                step={10000}
+                value={sliderBudget}
+                onChange={(e) => {
+                  setSliderBudget(Number(e.target.value));
+                  setIsUnlimitedBudget(false);
+                }}
+                className={`h-2 w-full cursor-pointer accent-primary ${
+                  isUnlimitedBudget ? "opacity-50" : "opacity-100"
+                }`}
+              />
+              <div className="mt-1.5 flex justify-between text-[11px] font-bold text-muted">
+                <span>10,000원</span>
+                <span>100,000원</span>
+              </div>
             </div>
           </div>
 
@@ -354,9 +378,9 @@ export function AiCourseRecommendModal({
                     key={mood}
                     type="button"
                     onClick={() => toggleMood(mood)}
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${
+                    className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${
                       active
-                        ? "bg-primary-soft text-primary ring-1 ring-primary"
+                        ? "border border-primary bg-primary-soft text-primary"
                         : "border border-line bg-background text-muted hover:text-foreground"
                     }`}
                   >

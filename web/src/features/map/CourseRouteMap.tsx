@@ -454,24 +454,6 @@ export function CourseRouteMap({
     }
   }, [currentAnchorKey, defaultAnchorCenter]);
 
-  const activeFocusedViewport = useMemo<MapViewportState | null>(() => {
-    if (activeOrder === null) return null;
-    const target = stops.find((s) => s.order === activeOrder);
-    if (!target) return null;
-    return {
-      centerLat: target.latitude,
-      centerLng: target.longitude,
-      zoom: Math.max(currentViewport.zoom, 16),
-    };
-  }, [activeOrder, stops, currentViewport.zoom]);
-
-  const viewport: MapViewportState = useMemo(() => {
-    if (activeFocusedViewport) {
-      return activeFocusedViewport;
-    }
-    return currentViewport;
-  }, [activeFocusedViewport, currentViewport]);
-
   const commitViewport = useCallback(
     (next: MapViewportState, isSettled = false) => {
       setCurrentViewport({
@@ -488,6 +470,29 @@ export function CourseRouteMap({
     },
     [],
   );
+
+  const lastActiveOrderRef = useRef<number | null>(activeOrder);
+
+  useEffect(() => {
+    if (activeOrder !== null && activeOrder !== lastActiveOrderRef.current) {
+      lastActiveOrderRef.current = activeOrder;
+      const target = stops.find((s) => s.order === activeOrder);
+      if (target) {
+        commitViewport(
+          {
+            centerLat: target.latitude,
+            centerLng: target.longitude,
+            zoom: Math.max(currentViewport.zoom, 16),
+          },
+          true,
+        );
+      }
+    } else if (activeOrder === null) {
+      lastActiveOrderRef.current = null;
+    }
+  }, [activeOrder, stops, currentViewport.zoom, commitViewport]);
+
+  const viewport: MapViewportState = currentViewport;
 
   // Google Maps JS API state
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -1121,13 +1126,13 @@ export function CourseRouteMap({
 
   const projectedPolylines = useMemo(() => {
     if (!connectRoute) return [];
-    // Only connect stops that the user has explicitly drafted into the course
+    // Only connect stops that the user has explicitly drafted into the course,
+    // or fall back to connecting all stops in sequence if no draft flags exist (e.g. course maker/viewer)
     const draftedStops = projectedStops.filter((p) => p.stop.isDraft);
     const candidateToConnect =
       draftedStops.length >= 2
         ? draftedStops
-        : projectedStops.every((p) => p.stop.isDraft) &&
-            projectedStops.length >= 2
+        : projectedStops.length >= 2
           ? projectedStops
           : [];
 
@@ -1408,113 +1413,102 @@ export function CourseRouteMap({
         </div>
       </div>
 
-      {/* 2. Nearby Subway Quick Chips & Surrounding Layer Toggles */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-subtle/55 px-4 py-2.5 sm:px-5 text-xs">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <span className="inline-flex shrink-0 items-center gap-1.5 font-black text-muted">
-            <TrainFront className="h-4 w-4 text-primary" />
-            <span>주변 역</span>
-          </span>
-
-          {visibleClosestStations.length === 0 ? (
-            <span className="text-xs font-medium text-muted">
-              반경 내 지하철역 없음
-            </span>
-          ) : (
-            visibleClosestStations.map((st) => {
-              const walkBaseMinutes =
-                stops.length > 0 && !hasMovedFromSearchOrigin
-                  ? estimateWalkingRoute(
-                      st.latitude,
-                      st.longitude,
-                      stops[0].latitude,
-                      stops[0].longitude,
-                    ).walkingMinutes
-                  : Math.max(
-                      1,
-                      Math.round((st.distanceFromCenter * 1.25) / 67),
-                    );
-
-              const isSelected =
-                selectedContext?.type === "STATION" &&
-                selectedContext.station.id === st.id;
-
-              return (
-                <button
-                  key={st.id}
-                  type="button"
-                  onClick={() => handleFocusStation(st)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
-                    isSelected
-                      ? "border-surface-dark bg-surface-dark text-white"
-                      : "border-line bg-surface text-foreground hover:border-primary/50"
-                  }`}
-                >
-                  <span className="flex items-center gap-0.5">
-                    {st.lines.slice(0, 3).map((line) => (
-                      <span
-                        key={line.label}
-                        style={{ backgroundColor: line.color }}
-                        className="h-2.5 w-2.5 rounded-full"
-                        title={line.label}
-                      />
-                    ))}
-                  </span>
-                  <span>{st.name}</span>
-                  <span
-                    className={`text-xs font-semibold ${
-                      isSelected ? "text-amber-300" : "text-muted"
-                    }`}
-                  >
-                    도보 {walkBaseMinutes}분
-                  </span>
-                </button>
-              );
-            })
-          )}
-        </div>
-
-        {/* Surrounding Layer Toggles (All 3 active by default) */}
-        <div className="flex shrink-0 items-center gap-1.5">
+      {/* 2. Compact Single-Line Surrounding Layer Toggles & Closest Station Pill */}
+      <div className="flex items-center justify-between gap-2 border-b border-line bg-surface-subtle/55 px-3 py-1.5 sm:px-4 sm:py-2 text-xs">
+        {/* Layer Toggles Group */}
+        <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
           <button
             type="button"
             onClick={() => setShowSubwayLayer((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black transition-colors ${
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${
               showSubwayLayer
-                ? "bg-slate-800 text-white"
+                ? "bg-slate-800 text-white shadow-2xs"
                 : "border border-line bg-surface text-muted hover:text-foreground"
             }`}
           >
-            <TrainFront className="h-3.5 w-3.5" />
+            <TrainFront className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             <span>역</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowLandmarkLayer((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black transition-colors ${
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${
               showLandmarkLayer
-                ? "bg-emerald-700 text-white"
+                ? "bg-emerald-700 text-white shadow-2xs"
                 : "border border-line bg-surface text-muted hover:text-foreground"
             }`}
           >
-            <Trees className="h-3.5 w-3.5" />
+            <Trees className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             <span>명소·공원</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowParkingLayer((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black transition-colors ${
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${
               showParkingLayer
-                ? "bg-blue-600 text-white"
+                ? "bg-blue-600 text-white shadow-2xs"
                 : "border border-line bg-surface text-muted hover:text-foreground"
             }`}
           >
-            <SquareParking className="h-3.5 w-3.5" />
+            <SquareParking className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             <span>주차장</span>
           </button>
         </div>
+
+        {/* Closest Station Single Badge (Fits cleanly on one line) */}
+        {visibleClosestStations.length > 0 && (() => {
+          const st = visibleClosestStations[0];
+          const walkBaseMinutes =
+            stops.length > 0 && !hasMovedFromSearchOrigin
+              ? estimateWalkingRoute(
+                  st.latitude,
+                  st.longitude,
+                  stops[0].latitude,
+                  stops[0].longitude,
+                ).walkingMinutes
+              : Math.max(
+                  1,
+                  Math.round((st.distanceFromCenter * 1.25) / 67),
+                );
+
+          const isSelected =
+            selectedContext?.type === "STATION" &&
+            selectedContext.station.id === st.id;
+
+          return (
+            <button
+              type="button"
+              onClick={() => handleFocusStation(st)}
+              title={`${st.name} 기준 동선 확인 (클릭)`}
+              className={`inline-flex min-w-0 max-w-[210px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors truncate sm:text-xs ${
+                isSelected
+                  ? "border-surface-dark bg-surface-dark text-white"
+                  : "border-line bg-surface text-foreground hover:border-primary/50"
+              }`}
+            >
+              <span className="flex shrink-0 items-center gap-0.5">
+                {st.lines.slice(0, 2).map((line) => (
+                  <span
+                    key={line.label}
+                    style={{ backgroundColor: line.color }}
+                    className="h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5"
+                    title={line.label}
+                  />
+                ))}
+              </span>
+              <span className="truncate">{st.name}</span>
+              <span
+                className={`shrink-0 text-[10px] font-semibold sm:text-[11px] ${
+                  isSelected ? "text-amber-300" : "text-muted"
+                }`}
+              >
+                도보 {walkBaseMinutes}분
+              </span>
+            </button>
+          );
+        })()}
       </div>
 
       {/* 3. Interactive Map Canvas */}

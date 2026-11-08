@@ -169,6 +169,14 @@ const FOOD_MULTI_FILTERS: {
     activeBorder: "border-pink-600",
     activeBg: "bg-pink-600",
   },
+  {
+    category: "기타",
+    label: "그 외",
+    icon: Sparkles,
+    color: "#8B5CF6",
+    activeBorder: "border-purple-600",
+    activeBg: "bg-purple-600",
+  },
 ];
 
 const BUDGET_SLIDER_MIN = 10000;

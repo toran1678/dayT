@@ -31,18 +31,14 @@
 
 > _새로운 기능이나 단계(Phase) 구현에 착수할 때 에이전트가 아래 섹션을 현재 작업의 세부 설계(대상 파일, 구현 순서, 검증 방법)로 갱신합니다._
 
-- **현재 목표**: **헤더 타이틀 텍스트 색상 분리, 지도 높이 확대 복원, 드래그 중 도보 시간 실시간 떨림 완전 방지, 지도 주변 버튼·텍스트 크기 확대, 담은 코스 상시 화이트 카드 UI 개편 완료**
+- **현재 목표**: **차량 주행 거리 계산 원리 설명 준비, 코스 지도 주변역 & 레이어 토글 상단 바 슬림화(1줄 일체형 UI), AI 맞춤 코스 모달 1인 하루 총 예산 라벨 명확화 · 예산 무관 옵션 추가 · 어긋나는 하단 표시선 제거**
 - **세부 구현 내역**:
-  1. **헤더 타이틀 감성 컬러 강조 (`ExploreClientView.tsx`)**:
-     - `오늘은 어떤 하루를` 기본 진한 텍스트 + `<span className="text-primary font-black">함께 만들어 볼까요?</span>` 브랜드 컬러 강조 적용
-  2. **지도 높이 확대 복원 (`ExploreClientView.tsx`, `CourseRouteMap.tsx`)**:
-     - 직전에 너무 축소되었던 높이를 `h-[520px] lg:h-[600px] min-h-[460px]`로 상향 조정하여 데스크톱에서 시원한 뷰포트 확보
-  3. **지도 드래그 중 주변 역 도보 시간 떨림 완전 차단 (`CourseRouteMap.tsx`)**:
-     - `settledCenter` 상태를 도입하고 드래그 중(`isDragging === true`)에는 도보 시간 재계산을 정지, 마우스 업(`pointerup`/`idle`) 시에만 중심점을 고정 계산하도록 분리
-  4. **지도 주변 버튼·레이블·컨트롤 크기 확대 (`CourseRouteMap.tsx`)**:
-     - 상단 헤더(`text-sm font-black`), 테마 칩(`px-3 py-1 text-xs`), 주변 역 버튼(`px-3 py-1 text-xs font-bold`), 레이어 토글 칩(`px-3 py-1 text-xs font-black`), 줌 컨트롤(+/-: `h-9 w-9`), "이 지역에서 다시 탐색" 플로팅 버튼(`px-5 py-2.5 text-xs sm:text-sm font-black`) 확대
-  5. **담은 코스 패널 상시 노출 & 화이트 카드 개편 (`ExploreClientView.tsx`)**:
-     - 기존의 붉은 배경(`bg-primary-soft/40`) 제거 및 탐색창과 통일된 화이트 카드(`bg-surface border-line shadow-[0_10px_32px_rgba(24,24,27,0.03)]`) 적용
-     - 담은 장소가 0개일 때도 상시 노출하여 직관적인 안내 가이드 제공
-     - 담은 장소 칩에 카테고리 SVG 아이콘 + 장소명(클릭 시 모달 팝업) + 개별 삭제(`X`) 및 전체 취소 기능 제공
-  6. **검증**: `npm run typecheck`, `npm run lint` 통과 확인 (0 error / 0 warning) 및 `progress.md` 갱신
+  1. **코스 지도 상단 주변역 & 레이어 토글 UI 정돈 (`CourseRouteMap.tsx`)**:
+     - 좁은 너비에서 2줄로 꺾여 뚱뚱해지던 주변역 바를 슬림한 단일 라인(`flex items-center justify-between`)으로 개편
+     - 좌측: 레이어 토글 3종(`[ 🚇 역 ] [ 🌳 명소 ] [ 🅿️ 주차장 ]`) 단정하게 배치
+     - 우측: 가장 가까운 주요 지하철역 1곳(`[ 호선배지 역명 도보X분 ]`) 뱃지로 심플하게 연결하여 높이 팽창 방지
+  2. **AI 맞춤 코스 모달 예산 UI 개선 (`AiCourseRecommendModal.tsx`)**:
+     - 라벨을 `5. 1인 하루 총 예산 설정`으로 명확화
+     - `예산 무관` 옵션 칩/버튼 추가 (`budgetPerPerson = 0`, 백엔드/AI에 가격 제한 없는 최고 인기/분위기 스팟 추천 요청)
+     - 슬라이더 하단의 어긋나는 `1만원 3만원 5만원...` 표시선/눈금 완전 제거 (상단 뱃지에 선택 금액 또는 '예산 무관' 단일 직관 표기)
+  3. **검증**: `npm run typecheck`, Next.js 16 프로덕션 빌드 성공 확인 및 `progress.md` 갱신

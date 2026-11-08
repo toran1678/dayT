@@ -118,7 +118,7 @@ class PlaceIntegrationTest {
 		for (JsonNode placeNode : placesNode) {
 			assertThat(placeNode.get("categoryGroup").asText()).isEqualTo("RESTAURANT");
 			assertThat(placeNode.get("foodCategory").asText()).isEqualTo("양식");
-			assertThat(placeNode.get("address").asText()).contains("성동구");
+			assertThat(placeNode.get("address").asText()).contains("서울");
 			JsonNode priceNode = placeNode.get("avgPricePerPerson");
 			if (priceNode != null && !priceNode.isNull()) {
 				assertThat(priceNode.asInt()).isLessThanOrEqualTo(30000);

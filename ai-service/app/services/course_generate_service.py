@@ -63,11 +63,37 @@ def _estimate_walking_minutes(a: PlaceDetail, b: PlaceDetail) -> int:
 
 
 def _target_stop_count(slot: DateTimeSlot, candidate_count: int) -> int:
-    desired = 4 if slot == DateTimeSlot.ALL_DAY else 3
+    if slot == DateTimeSlot.ALL_DAY:
+        desired = 5 if candidate_count >= 5 else 4
+    elif slot == DateTimeSlot.HALF_DAY:
+        desired = 3
+    else:  # EVENING
+        desired = 3 if candidate_count >= 3 else 2
     return max(1, min(desired, candidate_count))
 
 
-def _default_stay_minutes(cat: PlaceCategoryGroup) -> int:
+def _default_stay_minutes(
+    cat: PlaceCategoryGroup, slot: DateTimeSlot = DateTimeSlot.HALF_DAY
+) -> int:
+    if slot == DateTimeSlot.ALL_DAY:
+        if cat == PlaceCategoryGroup.RESTAURANT:
+            return 90
+        if cat in {PlaceCategoryGroup.EXHIBITION, PlaceCategoryGroup.ACTIVITY}:
+            return 110
+        if cat == PlaceCategoryGroup.PARK:
+            return 70
+        if cat == PlaceCategoryGroup.CAFE:
+            return 75
+        return 60
+
+    if slot == DateTimeSlot.EVENING:
+        if cat == PlaceCategoryGroup.RESTAURANT:
+            return 80
+        if cat == PlaceCategoryGroup.CAFE:
+            return 70
+        return 60
+
+    # HALF_DAY
     if cat == PlaceCategoryGroup.RESTAURANT:
         return 70
     if cat in {PlaceCategoryGroup.EXHIBITION, PlaceCategoryGroup.ACTIVITY}:
@@ -202,7 +228,7 @@ def _build_greedy_fallback_selection(
         SelectedStopLlmItem(
             place_id=p.id,
             estimated_cost=_default_two_person_cost(p),
-            stay_minutes=_default_stay_minutes(p.category_group),
+            stay_minutes=_default_stay_minutes(p.category_group, cond.time_slot),
             memo=p.ai_summary[:55] if p.ai_summary else f"{p.name} 시그니처 코스 즐기기",
         )
         for p in ordered
@@ -268,6 +294,20 @@ def _assemble_preview(
             LatLngPoint(latitude=place.latitude, longitude=place.longitude)
         )
 
+    # Ensure total minutes match requested slot expectations (e.g. ALL_DAY: 6~8h, HALF_DAY: 3~4h)
+    min_target = (
+        360
+        if fallback_cond.time_slot == DateTimeSlot.ALL_DAY
+        else (180 if fallback_cond.time_slot == DateTimeSlot.HALF_DAY else 120)
+    )
+    if total_minutes < min_target and detail_items:
+        deficit = min_target - total_minutes
+        add_per_stop = math.ceil(deficit / len(detail_items))
+        total_minutes = 0
+        for item in detail_items:
+            item.stay_minutes += add_per_stop
+            total_minutes += item.stay_minutes + item.travel_minutes_to_next
+
     return CourseRecommendationPreview(
         suggested_title=selection.suggested_title.strip(),
         ai_reason=selection.ai_reason.strip(),
@@ -305,11 +345,13 @@ class CourseGenerateService:
 
         candidate_lines = []
         for p in candidates[:25]:
-            price_txt = (
-                f"1인 {p.avg_price_per_person:,}원"
-                if p.avg_price_per_person is not None
-                else "가격미상"
-            )
+            if p.avg_price_per_person is not None:
+                price_val = p.avg_price_per_person
+                price_txt = f"1인 {price_val:,}원"
+            else:
+                price_val = _default_two_person_cost(p) // 2
+                price_txt = f"1인 약 {price_val:,}원 (추정가)"
+
             indoor_txt = (
                 "실내"
                 if p.is_indoor is True
@@ -322,19 +364,39 @@ class CourseGenerateService:
                 f"{indoor_txt} | {price_txt} | 좌표=({p.latitude:.5f},{p.longitude:.5f}) | 태그=[{tags_txt}]"
             )
 
+        slot_guide = {
+            DateTimeSlot.ALL_DAY: "종일 코스 (목표 총 데이트 시간: 6~8시간 / 360~480분, 권장 경유지: 4~5곳, 장소별 체류 시간: 80~120분)",
+            DateTimeSlot.HALF_DAY: "반나절 코스 (목표 총 데이트 시간: 3~4시간 / 180~240분, 권장 경유지: 3곳, 장소별 체류 시간: 60~85분)",
+            DateTimeSlot.EVENING: "저녁 무드 (목표 총 데이트 시간: 2~3시간 / 120~180분, 권장 경유지: 2~3곳, 장소별 체류 시간: 70~90분)",
+        }.get(cond.time_slot, "맞춤 코스")
+
+        budget_guide = (
+            "예산 무관 (가격에 구애받지 않고 평점과 분위기 최고 핫플레이스 중심)"
+            if cond.budget_per_person == 0
+            else f"1인 하루 {cond.budget_per_person:,}원 (2인 하루 총 {cond.budget_per_person * 2:,}원 내외)"
+        )
+        food_req = (
+            f"반드시 {', '.join(f.value for f in cond.food_categories)} 식당을 포함할 것"
+            if cond.food_categories
+            else "음식 메뉴 무관"
+        )
+
         prompt = (
             f"[데이트 요청 조건]\n"
             f"- 희망 지역: {cond.region_keyword}\n"
             f"- 테마: {', '.join(t.value for t in cond.theme_tags)}\n"
-            f"- 선호 음식: {', '.join(f.value for f in cond.food_categories) or '무관'}\n"
-            f"- 1인 예산: {cond.budget_per_person:,}원 (2인 총 {cond.budget_per_person * 2:,}원 내외)\n"
-            f"- 시간대: {cond.time_slot.value} (권장 경유지 수: {target_count}곳)\n"
+            f"- 선호 음식: {food_req}\n"
+            f"- 1인 하루 총 데이트 예산: {budget_guide}\n"
+            f"- 시간대 및 목표 소요 시간 가이드: {slot_guide} (권장 경유지 수: {target_count}곳)\n"
             f"- 분위기 키워드: {', '.join(cond.mood_keywords) or '자연스러운 데이트'}\n\n"
             f"[검증된 실존 후보 장소 풀 (반드시 아래 id 중에서만 선택할 것)]\n"
             + "\n".join(candidate_lines)
             + "\n\n"
-            f"위 후보 장소 중 동선이 겹치거나 되돌아가지 않도록 {target_count}곳을 순서대로 골라 "
-            "최적의 데이트 코스를 설계해주세요. 목록에 없는 place_id는 절대 생성하지 마세요."
+            f"위 후보 장소 중 동선이 겹치거나 되돌아가지 않도록 {target_count}곳을 순서대로 골라주세요.\n"
+            f"1. 식당을 고를 때는 사용자의 선호 음식 조건({food_req})을 최우선으로 일치시키세요.\n"
+            f"2. 각 장소의 예상 비용(estimated_cost)은 제공된 1인 가격(또는 추정가)을 기준으로 2인 총 지출 금액으로 산출하고, "
+            f"전체 장소의 예상 비용 합계가 사용자의 예산({budget_guide})에 잘 맞아떨어지도록 메뉴/주문 수준을 고려해 합리적으로 작성하세요.\n"
+            f"3. 선택한 시간대 가이드({slot_guide})의 목표 총 소요 시간 범위에 정확히 부합하도록 각 장소의 권장 체류 시간(stay_minutes)을 넉넉하고 현실감 있게 배정하세요. 목록에 없는 place_id는 절대 생성하지 마세요."
         )
 
         try:

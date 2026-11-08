@@ -33,6 +33,7 @@ import com.dayt.domain.course.entity.DateTheme;
 import com.dayt.domain.course.entity.DateTimeSlot;
 import com.dayt.domain.course.repository.CourseRepository;
 import com.dayt.domain.place.dto.PlaceDetailResponse;
+import com.dayt.domain.place.entity.FoodCategory;
 import com.dayt.domain.place.entity.Place;
 import com.dayt.domain.place.entity.PlaceCategoryGroup;
 import com.dayt.domain.place.repository.PlaceRepository;
@@ -108,7 +109,34 @@ public class CourseService {
 		getRequiredUser(userId);
 
 		Boolean rainyFilter = isIndoorMoodRequested(request.moodKeywords()) ? Boolean.TRUE : null;
-		List<PlaceDetailResponse> candidates = placeService.searchPlaces(
+		List<PlaceDetailResponse> candidates = new ArrayList<>();
+		Set<Long> seenCandidateIds = new HashSet<>();
+
+		// 1. 사용자가 특정 음식 카테고리를 선택한 경우, 해당 카테고리의 실존 식당들을 최우선 수집하여 AI 후보군에 주입
+		if (request.foodCategories() != null && !request.foodCategories().isEmpty()) {
+			for (FoodCategory fc : request.foodCategories()) {
+				List<PlaceDetailResponse> matchedRestaurants = placeService.searchPlaces(
+						request.regionKeyword().trim(),
+						request.latitude(),
+						request.longitude(),
+						3500,
+						PlaceCategoryGroup.RESTAURANT,
+						fc,
+						null,
+						rainyFilter,
+						0,
+						10
+				).items();
+				for (PlaceDetailResponse r : matchedRestaurants) {
+					if (seenCandidateIds.add(r.id())) {
+						candidates.add(r);
+					}
+				}
+			}
+		}
+
+		// 2. 주변 일반 장소(카페, 문화, 산책, 기타 스팟) 보강
+		List<PlaceDetailResponse> generalPlaces = placeService.searchPlaces(
 				request.regionKeyword().trim(),
 				request.latitude(),
 				request.longitude(),
@@ -120,9 +148,14 @@ public class CourseService {
 				0,
 				24
 		).items();
+		for (PlaceDetailResponse p : generalPlaces) {
+			if (seenCandidateIds.add(p.id())) {
+				candidates.add(p);
+			}
+		}
 
 		if (candidates.size() < 2) {
-			candidates = placeService.searchPlaces(
+			List<PlaceDetailResponse> widePlaces = placeService.searchPlaces(
 					request.regionKeyword().trim(),
 					request.latitude(),
 					request.longitude(),
@@ -134,6 +167,11 @@ public class CourseService {
 					0,
 					24
 			).items();
+			for (PlaceDetailResponse p : widePlaces) {
+				if (seenCandidateIds.add(p.id())) {
+					candidates.add(p);
+				}
+			}
 		}
 
 		if (candidates.isEmpty()) {
@@ -432,7 +470,9 @@ public class CourseService {
 			CourseRecommendRequest req,
 			List<PlaceDetailResponse> candidates
 	) {
-		int desiredCount = (req.timeSlot() == DateTimeSlot.ALL_DAY) ? 4 : 3;
+		int desiredCount = (req.timeSlot() == DateTimeSlot.ALL_DAY)
+				? (candidates.size() >= 5 ? 5 : 4)
+				: (req.timeSlot() == DateTimeSlot.HALF_DAY ? 3 : (candidates.size() >= 3 ? 3 : 2));
 		int targetCount = Math.min(desiredCount, candidates.size());
 
 		List<PlaceDetailResponse> chosen = new ArrayList<>();
@@ -481,8 +521,16 @@ public class CourseService {
 			int cost = (p.avgPricePerPerson() != null)
 					? Math.max(0, p.avgPricePerPerson() * 2)
 					: (p.categoryGroup() == PlaceCategoryGroup.CAFE ? 18000 : 32000);
-			int stay = (p.categoryGroup() == PlaceCategoryGroup.RESTAURANT) ? 70
-					: (p.categoryGroup() == PlaceCategoryGroup.CAFE ? 60 : 80);
+			int stay;
+			if (req.timeSlot() == DateTimeSlot.ALL_DAY) {
+				stay = (p.categoryGroup() == PlaceCategoryGroup.RESTAURANT) ? 90
+						: (p.categoryGroup() == PlaceCategoryGroup.CAFE ? 75 : 105);
+			} else if (req.timeSlot() == DateTimeSlot.EVENING) {
+				stay = (p.categoryGroup() == PlaceCategoryGroup.RESTAURANT) ? 80 : 70;
+			} else {
+				stay = (p.categoryGroup() == PlaceCategoryGroup.RESTAURANT) ? 70
+						: (p.categoryGroup() == PlaceCategoryGroup.CAFE ? 60 : 85);
+			}
 			int travel = isLast ? 0 : estimateWalkingMinutesFromCoords(
 					p.latitude(),
 					p.longitude(),
@@ -499,6 +547,28 @@ public class CourseService {
 
 			items.add(new CoursePlaceDetailItem(i + 1, cost, stay, travel, memo, p));
 			polyline.add(new LatLngPoint(p.latitude(), p.longitude()));
+		}
+
+		int minTarget = (req.timeSlot() == DateTimeSlot.ALL_DAY) ? 360
+				: (req.timeSlot() == DateTimeSlot.HALF_DAY ? 180 : 120);
+		if (totalMinutes < minTarget && !items.isEmpty()) {
+			int deficit = minTarget - totalMinutes;
+			int addPerStop = (int) Math.ceil((double) deficit / items.size());
+			totalMinutes = 0;
+			List<CoursePlaceDetailItem> adjustedItems = new ArrayList<>(items.size());
+			for (CoursePlaceDetailItem it : items) {
+				int adjustedStay = it.stayMinutes() + addPerStop;
+				adjustedItems.add(new CoursePlaceDetailItem(
+						it.visitOrder(),
+						it.estimatedCost(),
+						adjustedStay,
+						it.travelMinutesToNext(),
+						it.memo(),
+						it.place()
+				));
+				totalMinutes += adjustedStay + it.travelMinutesToNext();
+			}
+			items = adjustedItems;
 		}
 
 		String themeLabel = req.themeTags().isEmpty() ? "맞춤 감성" : req.themeTags().getFirst().getLabel();

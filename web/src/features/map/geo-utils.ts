@@ -42,6 +42,22 @@ export function estimateWalkingRoute(
   return { walkingMeters, walkingMinutes };
 }
 
+export function estimateDrivingRoute(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): { drivingMeters: number; drivingMinutes: number } {
+  const straight = calculateStraightMeters(lat1, lng1, lat2, lng2);
+  if (straight < 50) {
+    return { drivingMeters: Math.round(straight), drivingMinutes: 1 };
+  }
+  const drivingMeters = Math.round(straight * 1.35);
+  // 도심 평균 속도 약 27km/h(분당 450m) + 기본 신호대기/정차 2분
+  const drivingMinutes = Math.max(2, Math.round(drivingMeters / 450) + 2);
+  return { drivingMeters, drivingMinutes };
+}
+
 export function formatDistanceKo(meters: number): string {
   if (meters < 1000) {
     return `약 ${Math.round(meters)}m`;
@@ -60,6 +76,29 @@ export function formatDurationKo(totalMinutes: number): string {
     return `${hours}시간`;
   }
   return `${hours}시간 ${mins}분`;
+}
+
+export function clockToMinutes(clock: string): number {
+  const [hStr, mStr] = clock.split(":");
+  const hours = Number(hStr);
+  const mins = Number(mStr);
+  return (
+    (Number.isFinite(hours) ? hours : 0) * 60 +
+    (Number.isFinite(mins) ? mins : 0)
+  );
+}
+
+export function diffMinutesBetweenClocks(
+  fromClock: string,
+  toClock: string,
+): number {
+  const from = clockToMinutes(fromClock);
+  const to = clockToMinutes(toClock);
+  let diff = to - from;
+  if (diff < 0) {
+    diff += 1440;
+  }
+  return diff;
 }
 
 export function addMinutesToClock(

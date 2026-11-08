@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  Car,
   Check,
   Clock,
   Compass,
@@ -27,6 +28,9 @@ import {
 } from "@/features/map/CourseRouteMap";
 import {
   addMinutesToClock,
+  clockToMinutes,
+  diffMinutesBetweenClocks,
+  estimateDrivingRoute,
   estimateWalkingRoute,
   formatDistanceKo,
   formatDurationKo,
@@ -63,7 +67,7 @@ export interface EditableCourseStop {
   stayMinutes: number;
   travelMinutesToNext: number;
   walkingMetersToNext: number;
-  isManualTravelTime: boolean;
+  transportToNext?: "WALK" | "CAR";
   memo: string;
 }
 
@@ -72,6 +76,17 @@ interface CourseBuilderClientViewProps {
   onSaved?: (saved: CourseDetail) => void;
   onCancelEdit?: () => void;
 }
+
+const STAY_PRESETS: { minutes: number; label: string }[] = [
+  { minutes: 30, label: "30분" },
+  { minutes: 45, label: "45분" },
+  { minutes: 60, label: "1시간" },
+  { minutes: 75, label: "1시간 15분" },
+  { minutes: 90, label: "1시간 30분" },
+  { minutes: 120, label: "2시간" },
+  { minutes: 150, label: "2시간 30분" },
+  { minutes: 180, label: "3시간" },
+];
 
 const ALL_THEMES: DateTheme[] = [
   "감성 카페",
@@ -128,6 +143,23 @@ function recalculateStopTransfers(
       };
     }
     const next = rawStops[idx + 1];
+    const mode = stop.transportToNext ?? "WALK";
+
+    if (mode === "CAR") {
+      const drive = estimateDrivingRoute(
+        stop.place.latitude,
+        stop.place.longitude,
+        next.place.latitude,
+        next.place.longitude,
+      );
+      return {
+        ...stop,
+        transportToNext: "CAR",
+        walkingMetersToNext: drive.drivingMeters,
+        travelMinutesToNext: drive.drivingMinutes,
+      };
+    }
+
     const walk = estimateWalkingRoute(
       stop.place.latitude,
       stop.place.longitude,
@@ -136,10 +168,9 @@ function recalculateStopTransfers(
     );
     return {
       ...stop,
+      transportToNext: "WALK",
       walkingMetersToNext: walk.walkingMeters,
-      travelMinutesToNext: stop.isManualTravelTime
-        ? Math.max(1, stop.travelMinutesToNext)
-        : walk.walkingMinutes,
+      travelMinutesToNext: walk.walkingMinutes,
     };
   });
 }
@@ -153,7 +184,6 @@ function mapPlacesToEditableStops(places: PlaceDetail[]): EditableCourseStop[] {
     stayMinutes: defaultStayMinutesForCategory(place.categoryGroup),
     travelMinutesToNext: 0,
     walkingMetersToNext: 0,
-    isManualTravelTime: false,
     memo: "",
   }));
   return recalculateStopTransfers(mapped);
@@ -171,7 +201,6 @@ function buildInitialStops(initialCourse?: CourseDetail): EditableCourseStop[] {
       stayMinutes: item.stayMinutes,
       travelMinutesToNext: item.travelMinutesToNext,
       walkingMetersToNext: 0,
-      isManualTravelTime: item.travelMinutesToNext > 0,
       memo: item.memo ?? "",
     }),
   );
@@ -383,7 +412,6 @@ export function CourseBuilderClientView({
         stayMinutes: defaultStayMinutesForCategory(place.categoryGroup),
         travelMinutesToNext: 0,
         walkingMetersToNext: 0,
-        isManualTravelTime: false,
         memo: "",
       },
     ]);
@@ -396,11 +424,8 @@ export function CourseBuilderClientView({
     syncStops((prev) => {
       const next = [...prev];
       const [moved] = next.splice(index, 1);
-      next.splice(target, 0, {
-        ...moved,
-        isManualTravelTime: false,
-      });
-      return next.map((item) => ({ ...item, isManualTravelTime: false }));
+      next.splice(target, 0, moved);
+      return next;
     });
     setFocusedOrder(target + 1);
   }
@@ -414,13 +439,43 @@ export function CourseBuilderClientView({
     patch: Partial<
       Pick<
         EditableCourseStop,
-        "estimatedCost" | "stayMinutes" | "travelMinutesToNext" | "isManualTravelTime" | "memo"
+        "estimatedCost" | "stayMinutes" | "memo" | "transportToNext"
       >
     >,
   ) {
     setStops((prev) =>
       recalculateStopTransfers(
         prev.map((s) => (s.uid === uid ? { ...s, ...patch } : s)),
+      ),
+    );
+  }
+
+  function handleUpdateStopArrivalClock(index: number, newClock: string) {
+    if (!newClock) return;
+    if (index === 0) {
+      setStartClock(newClock);
+      return;
+    }
+    const prevStop = stops[index - 1];
+    const prevTimeline = timelineWithClocks[index - 1];
+    if (!prevStop || !prevTimeline) return;
+
+    const diff = diffMinutesBetweenClocks(prevTimeline.arrivalClock, newClock);
+    const requiredStay = diff - prevStop.travelMinutesToNext;
+
+    if (requiredStay < 15) {
+      setErrorMessage(
+        `도착 시각(${newClock})은 이전 장소 도착(${prevTimeline.arrivalClock}) 및 도보 이동(약 ${prevStop.travelMinutesToNext}분)보다 최소 15분 이상 이후여야 합니다.`,
+      );
+      return;
+    }
+
+    setErrorMessage(null);
+    setStops((prev) =>
+      recalculateStopTransfers(
+        prev.map((s, idx) =>
+          idx === index - 1 ? { ...s, stayMinutes: requiredStay } : s,
+        ),
       ),
     );
   }
@@ -485,7 +540,6 @@ export function CourseBuilderClientView({
       stayMinutes: item.stayMinutes,
       travelMinutesToNext: item.travelMinutesToNext,
       walkingMetersToNext: 0,
-      isManualTravelTime: item.travelMinutesToNext > 0,
       memo: item.memo ?? "",
     }));
 
@@ -599,16 +653,19 @@ export function CourseBuilderClientView({
     const result: (EditableCourseStop & {
       order: number;
       arrivalClock: string;
+      departureClock: string;
     })[] = [];
     let elapsed = 0;
     for (let index = 0; index < stops.length; index++) {
       const stop = stops[index];
       const arrivalClock = addMinutesToClock(startClock, elapsed);
+      const departureClock = addMinutesToClock(arrivalClock, stop.stayMinutes);
       elapsed += stop.stayMinutes + stop.travelMinutesToNext;
       result.push({
         ...stop,
         order: index + 1,
         arrivalClock,
+        departureClock,
       });
     }
     return result;
@@ -670,6 +727,7 @@ export function CourseBuilderClientView({
         estimatedCost: item.estimatedCost,
         memo: item.memo || null,
         placeUrl: item.place.placeUrl,
+        isDraft: true,
       })),
     [timelineWithClocks],
   );
@@ -827,17 +885,6 @@ export function CourseBuilderClientView({
                 {slot.label}
               </button>
             ))}
-
-            <label className="inline-flex items-center gap-1.5 rounded-full border border-line bg-background px-3 py-1 text-xs font-bold text-foreground">
-              <Clock className="h-3 w-3 text-primary" />
-              <span>출발</span>
-              <input
-                type="time"
-                value={startClock}
-                onChange={(e) => setStartClock(e.target.value || "13:00")}
-                className="bg-transparent text-xs font-extrabold outline-none"
-              />
-            </label>
           </div>
         </div>
 
@@ -960,9 +1007,15 @@ export function CourseBuilderClientView({
                           }`}
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs font-extrabold text-primary">
-                                {step.arrivalClock}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
+                                <Clock className="h-3 w-3" />
+                                <span>
+                                  {step.arrivalClock} ~ {step.departureClock}
+                                </span>
+                                <span className="font-normal opacity-85">
+                                  ({formatDurationKo(step.stayMinutes)})
+                                </span>
                               </span>
                               <span className="rounded-md bg-surface px-2 py-0.5 text-[11px] font-bold text-muted">
                                 {CATEGORY_LABELS[step.place.categoryGroup]}
@@ -1009,56 +1062,125 @@ export function CourseBuilderClientView({
                             </div>
                           </div>
 
-                          <h3 className="mt-1.5 text-base font-extrabold text-foreground">
+                          <h3 className="mt-2 text-base font-extrabold text-foreground">
                             {step.place.name}
                           </h3>
                           <p className="text-xs text-muted">
                             {step.place.address}
                           </p>
 
-                          {/* Stay Duration & 2-Person Cost Controls */}
-                          <div className="mt-3.5 grid gap-2.5 sm:grid-cols-2">
-                            <div className="flex items-center justify-between rounded-xl border border-line bg-surface px-3 py-2">
-                              <span className="text-[11px] font-semibold text-muted">
-                                체류 시간
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleUpdateStopField(step.uid, {
-                                      stayMinutes: Math.max(
-                                        15,
-                                        step.stayMinutes - 15,
-                                      ),
-                                    });
-                                  }}
-                                  className="h-6 w-6 rounded-md bg-background text-xs font-extrabold text-foreground hover:bg-primary-soft hover:text-primary"
-                                >
-                                  -
-                                </button>
-                                <span className="min-w-12 text-center text-xs font-extrabold text-foreground">
-                                  {step.stayMinutes}분
+                          {/* Time & Stay Duration Controls */}
+                          <div className="mt-3.5 space-y-3 rounded-xl border border-line/70 bg-surface/60 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <label className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                                <Clock className="h-3.5 w-3.5 text-primary" />
+                                <span>
+                                  {idx === 0
+                                    ? "코스 시작 시각"
+                                    : "도착 예정 시각"}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleUpdateStopField(step.uid, {
-                                      stayMinutes: Math.min(
-                                        360,
-                                        step.stayMinutes + 15,
-                                      ),
-                                    });
-                                  }}
-                                  className="h-6 w-6 rounded-md bg-background text-xs font-extrabold text-foreground hover:bg-primary-soft hover:text-primary"
-                                >
-                                  +
-                                </button>
+                              </label>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="time"
+                                  value={step.arrivalClock}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) =>
+                                    handleUpdateStopArrivalClock(
+                                      idx,
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="rounded-lg border border-line bg-background px-2.5 py-1 font-mono text-xs font-extrabold text-foreground shadow-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                />
+                                <span className="text-[11px] text-muted">
+                                  출발:{" "}
+                                  <strong className="font-mono text-foreground">
+                                    {step.departureClock}
+                                  </strong>
+                                </span>
                               </div>
                             </div>
 
+                            {/* Stay Duration Picker */}
+                            <div className="space-y-2 border-t border-line/50 pt-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-muted">
+                                  체류 시간
+                                </span>
+                                <span className="text-xs font-extrabold text-primary">
+                                  {formatDurationKo(step.stayMinutes)}{" "}
+                                  <span className="text-[11px] font-normal text-muted">
+                                    ({step.stayMinutes}분)
+                                  </span>
+                                </span>
+                              </div>
+
+                              {/* Preset Chips */}
+                              <div
+                                className="flex flex-wrap gap-1.5"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {STAY_PRESETS.map((preset) => {
+                                  const isSelected =
+                                    step.stayMinutes === preset.minutes;
+                                  return (
+                                    <button
+                                      key={preset.minutes}
+                                      type="button"
+                                      onClick={() =>
+                                        handleUpdateStopField(step.uid, {
+                                          stayMinutes: preset.minutes,
+                                        })
+                                      }
+                                      className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                                        isSelected
+                                          ? "bg-primary text-white shadow-xs"
+                                          : "border border-line bg-background text-muted hover:border-primary/40 hover:text-foreground"
+                                      }`}
+                                    >
+                                      {preset.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Direct Custom Minute Input */}
+                              <div
+                                className="flex items-center justify-between rounded-xl border border-line/80 bg-background px-3 py-1.5"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <span className="text-[11px] font-semibold text-muted">
+                                  그 외 체류 시간 직접 입력
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="number"
+                                    min={5}
+                                    max={720}
+                                    step={5}
+                                    value={step.stayMinutes}
+                                    onChange={(e) => {
+                                      const val = Math.max(
+                                        5,
+                                        Math.min(720, Number(e.target.value) || 0),
+                                      );
+                                      handleUpdateStopField(step.uid, {
+                                        stayMinutes: val,
+                                      });
+                                    }}
+                                    className="w-16 rounded-md border border-line bg-surface px-2 py-0.5 text-right font-mono text-xs font-black text-foreground outline-none focus:border-primary"
+                                  />
+                                  <span className="text-xs font-bold text-muted">
+                                    분 머뭄
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 2-Person Cost & Memo Controls */}
+                          <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
                             <label className="flex items-center justify-between rounded-xl border border-line bg-surface px-3 py-2">
                               <span className="text-[11px] font-semibold text-muted">
                                 {step.place.avgPricePerPerson === null &&
@@ -1088,66 +1210,74 @@ export function CourseBuilderClientView({
                                 </span>
                               </div>
                             </label>
-                          </div>
 
-                          {/* Memo Input */}
-                          <input
-                            type="text"
-                            maxLength={255}
-                            value={step.memo}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) =>
-                              handleUpdateStopField(step.uid, {
-                                memo: e.target.value,
-                              })
-                            }
-                            placeholder="방문 팁·메모 (예: 오픈 직후 창가 좌석 선점, 시그니처 메뉴 주문)"
-                            className="mt-2.5 w-full rounded-xl border border-line/80 bg-surface px-3 py-2 text-xs text-foreground outline-none placeholder:text-muted/70 focus:border-primary"
-                          />
+                            <input
+                              type="text"
+                              maxLength={255}
+                              value={step.memo}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) =>
+                                handleUpdateStopField(step.uid, {
+                                  memo: e.target.value,
+                                })
+                              }
+                              placeholder="방문 팁·메모 (창가석 선점 등)"
+                              className="rounded-xl border border-line bg-surface px-3 py-2 text-xs text-foreground outline-none placeholder:text-muted/70 focus:border-primary"
+                            />
+                          </div>
                         </div>
                       </div>
 
-                      {/* Walking Transfer Connector */}
+                      {/* Transfer Connector (Walk vs Car Toggle) */}
                       {!isLast && (
-                        <div className="mb-3 ml-12 inline-flex flex-wrap items-center gap-2 rounded-full bg-surface-subtle px-3.5 py-1 text-[11px] font-semibold text-muted">
-                          <Footprints className="h-3 w-3 text-primary" />
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="mb-3 ml-10 inline-flex flex-wrap items-center gap-2.5 rounded-2xl border border-line/70 bg-surface px-3 py-1.5 text-[11px] font-semibold text-muted shadow-2xs"
+                        >
+                          {/* Segmented Mode Toggle */}
+                          <div className="inline-flex items-center rounded-lg border border-line bg-background p-0.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateStopField(step.uid, {
+                                  transportToNext: "WALK",
+                                })
+                              }
+                              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold transition-colors ${
+                                (step.transportToNext ?? "WALK") === "WALK"
+                                  ? "bg-primary text-white shadow-2xs"
+                                  : "text-muted hover:text-foreground"
+                              }`}
+                            >
+                              <Footprints className="h-3 w-3" />
+                              <span>도보</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateStopField(step.uid, {
+                                  transportToNext: "CAR",
+                                })
+                              }
+                              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold transition-colors ${
+                                step.transportToNext === "CAR"
+                                  ? "bg-surface-dark text-white shadow-2xs"
+                                  : "text-muted hover:text-foreground"
+                              }`}
+                            >
+                              <Car className="h-3 w-3" />
+                              <span>차량</span>
+                            </button>
+                          </div>
+
                           <span>
-                            다음 장소까지 도보{" "}
+                            다음 장소까지{" "}
+                            {step.transportToNext === "CAR" ? "차량" : "도보"} 약{" "}
                             <strong className="text-foreground">
                               {step.travelMinutesToNext}분
                             </strong>{" "}
                             ({formatDistanceKo(step.walkingMetersToNext)})
                           </span>
-                          <div className="inline-flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleUpdateStopField(step.uid, {
-                                  travelMinutesToNext: Math.max(
-                                    1,
-                                    step.travelMinutesToNext - 2,
-                                  ),
-                                  isManualTravelTime: true,
-                                })
-                              }
-                              className="rounded px-1 text-[10px] font-bold text-muted hover:bg-surface hover:text-foreground"
-                            >
-                              -2분
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleUpdateStopField(step.uid, {
-                                  travelMinutesToNext:
-                                    step.travelMinutesToNext + 2,
-                                  isManualTravelTime: true,
-                                })
-                              }
-                              className="rounded px-1 text-[10px] font-bold text-muted hover:bg-surface hover:text-foreground"
-                            >
-                              +2분
-                            </button>
-                          </div>
                         </div>
                       )}
                     </div>

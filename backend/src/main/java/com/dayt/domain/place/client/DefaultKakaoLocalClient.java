@@ -351,25 +351,39 @@ public class DefaultKakaoLocalClient implements KakaoLocalClient {
 
 	private static FoodCategory inferFoodCategory(String categoryName) {
 		if (categoryName == null) return FoodCategory.ETC;
-		if (categoryName.contains("일식") || categoryName.contains("돈까스") || categoryName.contains("초밥")) {
+		// 동남아/아시안/이색 퓨전은 ETC(그 외)로 최우선 분기하여 타 카테고리(일식/양식 등)로의 오분류 원천 차단
+		if (categoryName.contains("동남아") || categoryName.contains("베트남") || categoryName.contains("태국")
+				|| categoryName.contains("아시아") || categoryName.contains("인도") || categoryName.contains("쌀국수")
+				|| categoryName.contains("멕시칸") || categoryName.contains("터키") || categoryName.contains("퓨전")) {
+			return FoodCategory.ETC;
+		}
+		if (categoryName.contains("일식") || categoryName.contains("돈까스") || categoryName.contains("돈가스")
+				|| categoryName.contains("초밥") || categoryName.contains("스시") || categoryName.contains("라멘")
+				|| categoryName.contains("우동") || categoryName.contains("소바") || categoryName.contains("가츠")
+				|| categoryName.contains("텐동") || categoryName.contains("덮밥") || categoryName.contains("이자카야")) {
 			return FoodCategory.JAPANESE;
 		}
-		if (categoryName.contains("양식") || categoryName.contains("이탈리안") || categoryName.contains("파스타")) {
+		if (categoryName.contains("양식") || categoryName.contains("이탈리안") || categoryName.contains("파스타")
+				|| categoryName.contains("피자") || categoryName.contains("스테이크") || categoryName.contains("브런치")
+				|| categoryName.contains("버거")) {
 			return FoodCategory.WESTERN;
 		}
-		if (categoryName.contains("중식") || categoryName.contains("중국")) {
+		if (categoryName.contains("중식") || categoryName.contains("중국") || categoryName.contains("딤섬")
+				|| categoryName.contains("마라") || categoryName.contains("양꼬치")) {
 			return FoodCategory.CHINESE;
 		}
-		if (categoryName.contains("치킨")) {
+		if (categoryName.contains("치킨") || categoryName.contains("통닭")) {
 			return FoodCategory.CHICKEN;
 		}
-		if (categoryName.contains("육류") || categoryName.contains("고기") || categoryName.contains("삼겹살") || categoryName.contains("갈비")) {
+		if (categoryName.contains("육류") || categoryName.contains("고기") || categoryName.contains("삼겹살")
+				|| categoryName.contains("갈비") || categoryName.contains("곱창") || categoryName.contains("막창")) {
 			return FoodCategory.MEAT;
 		}
-		if (categoryName.contains("분식") || categoryName.contains("떡볶이")) {
+		if (categoryName.contains("분식") || categoryName.contains("떡볶이") || categoryName.contains("김밥")) {
 			return FoodCategory.SNACK;
 		}
-		if (categoryName.contains("한식") || categoryName.contains("국밥") || categoryName.contains("백반")) {
+		if (categoryName.contains("한식") || categoryName.contains("국밥") || categoryName.contains("백반")
+				|| categoryName.contains("찌개") || categoryName.contains("솥밥")) {
 			return FoodCategory.KOREAN;
 		}
 		return FoodCategory.ETC;
