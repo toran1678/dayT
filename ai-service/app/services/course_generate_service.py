@@ -103,11 +103,18 @@ def _default_stay_minutes(
     return 55
 
 
-def _default_two_person_cost(place: PlaceDetail) -> int:
-    if place.avg_price_per_person is not None:
+def _default_two_person_cost(place: PlaceDetail, budget_per_person: int = 0) -> int:
+    if place.avg_price_per_person is not None and place.avg_price_per_person > 0:
         return max(0, place.avg_price_per_person * 2)
     if place.category_group == PlaceCategoryGroup.PARK:
         return 0
+    target_two = budget_per_person * 2 if budget_per_person > 0 else 0
+    if target_two > 0:
+        if place.category_group == PlaceCategoryGroup.RESTAURANT:
+            return max(30000, round(target_two * 0.55 / 1000) * 1000)
+        if place.category_group == PlaceCategoryGroup.CAFE:
+            return max(16000, round(target_two * 0.22 / 1000) * 1000)
+        return max(20000, round(target_two * 0.23 / 1000) * 1000)
     if place.category_group == PlaceCategoryGroup.CAFE:
         return 18000
     return 36000
@@ -150,6 +157,10 @@ def _score_candidate(place: PlaceDetail, cond: CourseRecommendRequest) -> float:
         score += 14.0
     if DateTheme.WALK in themes and place.category_group == PlaceCategoryGroup.PARK:
         score += 14.0
+    if DateTheme.FESTIVAL in themes and (
+        place.event_start_date is not None or place.category_group == PlaceCategoryGroup.EXHIBITION
+    ):
+        score += 25.0
 
     if place.avg_price_per_person is not None and cond.budget_per_person > 0:
         if place.avg_price_per_person <= cond.budget_per_person:
@@ -189,7 +200,16 @@ def _build_greedy_fallback_selection(
         if len(chosen) >= target_n:
             break
         match = next(
-            (p for p in scored if p.id not in used_ids and p.category_group in bucket),
+            (
+                p for p in scored
+                if p.id not in used_ids
+                and p.category_group in bucket
+                and (
+                    p.category_group != PlaceCategoryGroup.RESTAURANT
+                    or not cond.food_categories
+                    or (p.food_category and p.food_category in cond.food_categories)
+                )
+            ),
             None,
         )
         if match:
@@ -199,9 +219,23 @@ def _build_greedy_fallback_selection(
     for candidate in scored:
         if len(chosen) >= target_n:
             break
+        # 사용자가 특정 음식 카테고리를 골랐다면, 일치하지 않는 다른 음식점은 절대 추가하지 않음
+        if (
+            cond.food_categories
+            and candidate.category_group == PlaceCategoryGroup.RESTAURANT
+            and (
+                candidate.food_category is None
+                or candidate.food_category not in cond.food_categories
+            )
+        ):
+            continue
         if candidate.id not in used_ids:
             chosen.append(candidate)
             used_ids.add(candidate.id)
+
+    # 만약 목표 개수를 채우지 못했더라도 일치하지 않는 식당은 절대 추가하지 않음
+    if not chosen:
+        chosen = scored[:target_n]
 
     # Nearest-neighbor spatial ordering from the first chosen anchor
     ordered: list[PlaceDetail] = [chosen[0]]
@@ -227,7 +261,7 @@ def _build_greedy_fallback_selection(
     stops = [
         SelectedStopLlmItem(
             place_id=p.id,
-            estimated_cost=_default_two_person_cost(p),
+            estimated_cost=_default_two_person_cost(p, cond.budget_per_person),
             stay_minutes=_default_stay_minutes(p.category_group, cond.time_slot),
             memo=p.ai_summary[:55] if p.ai_summary else f"{p.name} 시그니처 코스 즐기기",
         )
@@ -358,10 +392,13 @@ class CourseGenerateService:
                 else ("야외" if p.is_indoor is False else "실내외")
             )
             tags_txt = ", ".join(p.hashtags[:3])
+            event_txt = ""
+            if p.event_start_date and p.event_end_date:
+                event_txt = f" | [진행 중인 행사/축제 기간: {p.event_start_date} ~ {p.event_end_date}]"
             candidate_lines.append(
                 f"- id={p.id} | {p.name} | 분류={p.category_group.value}"
                 f"({p.food_category.value if p.food_category else p.sub_category or ''}) | "
-                f"{indoor_txt} | {price_txt} | 좌표=({p.latitude:.5f},{p.longitude:.5f}) | 태그=[{tags_txt}]"
+                f"{indoor_txt} | {price_txt}{event_txt} | 좌표=({p.latitude:.5f},{p.longitude:.5f}) | 태그=[{tags_txt}]"
             )
 
         slot_guide = {
@@ -380,10 +417,12 @@ class CourseGenerateService:
             if cond.food_categories
             else "음식 메뉴 무관"
         )
+        date_line = f"- 데이트 예정 일자: {cond.target_date}\n" if cond.target_date else ""
 
         prompt = (
             f"[데이트 요청 조건]\n"
             f"- 희망 지역: {cond.region_keyword}\n"
+            f"{date_line}"
             f"- 테마: {', '.join(t.value for t in cond.theme_tags)}\n"
             f"- 선호 음식: {food_req}\n"
             f"- 1인 하루 총 데이트 예산: {budget_guide}\n"
@@ -393,10 +432,11 @@ class CourseGenerateService:
             + "\n".join(candidate_lines)
             + "\n\n"
             f"위 후보 장소 중 동선이 겹치거나 되돌아가지 않도록 {target_count}곳을 순서대로 골라주세요.\n"
-            f"1. 식당을 고를 때는 사용자의 선호 음식 조건({food_req})을 최우선으로 일치시키세요.\n"
+            f"1. 식당을 고를 때는 사용자의 선호 음식 조건({food_req})을 최우선으로 엄격히 일치시키세요. 조건에 맞지 않는 다른 요리 종류(예: 동남아/양식/일식 등)의 식당을 식사 장소로 절대 선정하지 마세요.\n"
             f"2. 각 장소의 예상 비용(estimated_cost)은 제공된 1인 가격(또는 추정가)을 기준으로 2인 총 지출 금액으로 산출하고, "
-            f"전체 장소의 예상 비용 합계가 사용자의 예산({budget_guide})에 잘 맞아떨어지도록 메뉴/주문 수준을 고려해 합리적으로 작성하세요.\n"
-            f"3. 선택한 시간대 가이드({slot_guide})의 목표 총 소요 시간 범위에 정확히 부합하도록 각 장소의 권장 체류 시간(stay_minutes)을 넉넉하고 현실감 있게 배정하세요. 목록에 없는 place_id는 절대 생성하지 마세요."
+            f"전체 장소의 예상 비용 합계가 사용자의 예산({budget_guide})에 잘 맞아떨어지도록(2인 총 예산의 75%~100% 수준) 메뉴/주문 수준을 고려해 합리적으로 작성하세요. 터무니없이 적은 금액으로 과소책정하지 마세요.\n"
+            f"3. 선택한 시간대 가이드({slot_guide})의 목표 총 소요 시간 범위에 정확히 부합하도록 각 장소의 권장 체류 시간(stay_minutes)을 넉넉하고 현실감 있게 배정하세요.\n"
+            f"4. 데이트 테마에 '행사·축제'가 지정되었거나 축제/행사 스팟이 후보에 포함된 경우, 해당 행사 장소를 핵심 메인 이벤트로 선정하고 전후에 식사나 카페를 배치하는 동선으로 자연스럽게 설계하세요. 목록에 없는 place_id는 절대 생성하지 마세요."
         )
 
         try:

@@ -1,5 +1,6 @@
 package com.dayt.domain.course.dto;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import com.dayt.domain.course.entity.CourseSourceType;
@@ -22,6 +23,8 @@ public record CourseUpsertRequest(
 		List<DateTheme> themeTags,
 
 		DateTimeSlot timeSlot,
+
+		LocalDate datePlanDate,
 
 		@NotNull(message = "코스 생성 출처(sourceType)는 필수입니다.")
 		CourseSourceType sourceType,

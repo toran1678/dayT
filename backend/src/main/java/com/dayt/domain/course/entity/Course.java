@@ -1,5 +1,6 @@
 package com.dayt.domain.course.entity;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,6 +53,9 @@ public class Course extends BaseTimeEntity {
 	@Column(name = "time_slot", length = 20)
 	private DateTimeSlot timeSlot;
 
+	@Column(name = "date_plan_date")
+	private LocalDate datePlanDate;
+
 	@Column(name = "total_estimated_cost", nullable = false)
 	private Integer totalEstimatedCost;
 
@@ -80,6 +84,7 @@ public class Course extends BaseTimeEntity {
 			String description,
 			List<String> themeTags,
 			DateTimeSlot timeSlot,
+			LocalDate datePlanDate,
 			Integer totalEstimatedCost,
 			Integer totalDurationMinutes,
 			CourseSourceType sourceType,
@@ -92,6 +97,7 @@ public class Course extends BaseTimeEntity {
 		this.description = description;
 		this.themeTags = themeTags != null ? new ArrayList<>(themeTags) : new ArrayList<>();
 		this.timeSlot = timeSlot;
+		this.datePlanDate = datePlanDate;
 		this.totalEstimatedCost = totalEstimatedCost != null ? totalEstimatedCost : 0;
 		this.totalDurationMinutes = totalDurationMinutes != null ? totalDurationMinutes : 0;
 		this.sourceType = sourceType != null ? sourceType : CourseSourceType.CUSTOM;
@@ -115,6 +121,7 @@ public class Course extends BaseTimeEntity {
 			String description,
 			List<String> themeTags,
 			DateTimeSlot timeSlot,
+			LocalDate datePlanDate,
 			CourseSourceType sourceType
 	) {
 		this.coupleId = coupleId;
@@ -122,6 +129,7 @@ public class Course extends BaseTimeEntity {
 		this.description = description;
 		this.themeTags = themeTags != null ? new ArrayList<>(themeTags) : new ArrayList<>();
 		this.timeSlot = timeSlot;
+		this.datePlanDate = datePlanDate;
 		if (sourceType != null) {
 			this.sourceType = sourceType;
 		}

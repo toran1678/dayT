@@ -79,6 +79,8 @@ export interface RouteMapStop {
   memo?: string | null;
   placeUrl?: string | null;
   isDraft?: boolean;
+  eventStartDate?: string | null;
+  eventEndDate?: string | null;
 }
 
 export interface MapAreaSearchRequest {
@@ -1830,6 +1832,11 @@ export function CourseRouteMap({
                   </span>
                   {pin.showFullLabel && (
                     <span className="max-w-28 truncate">{pin.stop.name}</span>
+                  )}
+                  {pin.stop.eventStartDate && pin.stop.eventEndDate && (
+                    <span className="rounded bg-purple-600 px-1 py-0.2 text-[8px] font-black text-white shrink-0">
+                      축제
+                    </span>
                   )}
                   {pin.stop.isDraft && (
                     <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-black text-white -ml-0.5">

@@ -180,6 +180,7 @@ class CourseCollabWebSocketTest {
 					"2번째 스팟 추가 완료",
 					List.of(DateTheme.CAFE, DateTheme.FOOD_TOUR),
 					DateTimeSlot.EVENING,
+					java.time.LocalDate.of(2026, 11, 14),
 					CourseSourceType.CUSTOM,
 					false,
 					List.of(

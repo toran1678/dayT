@@ -6,8 +6,8 @@
 ---
 
 ## 1. 현재 포커스 (Current Focus)
-- **현재 단계**: **AI 코스 모달 꿈틀거림(레이아웃 시프트) 완전 제거, 예산 슬라이더 바 위치 보존 & 양끝 금액 표기, 일식/동남아 오분류 원천 차단 및 "기타(그 외)" 카테고리 도입, 가격 미상 장소 추정가 AI 연동 완료**
-- **현재 진행 작업**: 버튼 border/고정 높이 부여로 덜컹거림 제거, 슬라이더 상태 분리로 예산 무관 선택 시에도 위치 고정, 슬라이더 하단 양끝(10,000원/100,000원) 표기, 카카오 카테고리 아시안/동남아 우선 분기 및 선호 음식 선택 시 해당 식당 우선 수집·AI 주입, 가격 미상 장소 추정가(식당 약 18,000원, 카페 약 8,500원 등) 명시 및 예산 부합 지침 강화 완료.
+- **현재 단계**: **TourAPI 행사·축제 DB 적재 & 날짜/위치 맞춤 행사 추천 · 탐색 지도 행사 뱃지 · 코스 보관함 데이트 예정일 관리 풀스택 구현 완료**
+- **현재 진행 작업**: 전체 백엔드 테스트(`BUILD SUCCESSFUL in 42s`) 및 프론트엔드 TypeScript 검사/Next.js 16 프로덕션 빌드(13개 라우트 전체) 100% 통과 완료. 사용자 피드백 대기.
 
 ---
 
@@ -38,6 +38,7 @@
 - [x] **[F-06] AI 맞춤 코스 추천**: 후보 장소 필터링(`backend`) + Gemini 최적 동선 조합 (`/api/v1/courses/recommend`)
 - [x] **[F-09] 코스 공유**: 공유 토큰 발급 및 카카오톡 Open Graph 썸네일 링크 공유
 - [x] **[F-10] 원클릭 길안내**: 완성 코스 경유지 포함 Google Maps Deep Link 연동
+- [x] **[F-06+·F-07+] 행사·축제 DB 적재 & 날짜/위치 맞춤 추천**: `DateTheme.행사·축제` 신설, 데이트 예정일(`targetDate`/`datePlanDate`) 기반 진행 중인 실존 축제/팝업스토어 우선 추천, 탐색 지도 행사 뱃지 표기, 코스 보관함 데이트 일정 뱃지 시각화
 
 ### Phase 4: P2 실시간 협업 · 커플 리텐션 (`F-11` ~ `F-14`)
 - [x] **[F-11] KML Export**: 구글 '내 지도(My Maps)' 임포트용 KML 다운로드 (`/api/v1/courses/{courseId}/export.kml`)
@@ -52,12 +53,36 @@
 
 ## 3. 작업 완료 로그 (Changelog)
 
-### 2026-11-01
-- **기획·설계 문서 확립**: `docs/prd.md`, `docs/erd.md`(PostGIS/JSONB), `docs/api-spec.yaml`(OpenAPI 3.0.3) 작성 완료.
-- **에이전트 하네스 구성**: `.agents/hooks.json` + `guard_spec_edit.py`로 기준 문서 임의 수정 방지(`force_ask`) 적용, `api-rules.md`·`workflow-rules.md` 경량 규칙 세팅 완료.
-- **로컬 인프라 구축 완료**: `docker-compose.yml`(`postgis/postgis:16-3.4`, `redis:7-alpine`), `.env.example`, `.gitignore`, `infra-setup.md` 구성 및 컨테이너 헬스체크·`PostGIS 3.4`·`Redis PONG` 검증 완료.
-
-### 2026-11-08
+### 2026-11-08 (최신 업데이트)
+- **TourAPI 행사·축제 DB 적재 & 날짜/위치 맞춤 추천 · 탐색 지도 행사 뱃지 · 코스 보관함 데이트 일정 관리 풀스택 구현 완료**:
+  1. **단일 기준 API 명세서 동기화 (`docs/api-spec.yaml`, `api.d.ts`)**:
+     - `DateTheme`: `[감성 카페, 맛집 투어, 전시·문화, 액티비티, 산책·야외, 어디든, 행사·축제]` 추가.
+     - `CourseRecommendRequest`: `targetDate: string (format: date, nullable: true)` 추가.
+     - `CourseUpsertRequest`, `CourseDetail`, `CourseListItem`: `datePlanDate: string (format: date, nullable: true)` 추가.
+     - `npm run gen:api`로 TypeScript 타입 정의 성공적 동기화.
+  2. **지도 타일 403 차단 및 Carto 워터마크 원천 해결 완료**:
+     - Next.js 서버 타일 프록시 Route Handler 구현 (`web/src/app/api/map/tiles/[z]/[x]/[y]/route.ts`).
+     - OSM 공식 User-Agent 규격을 준수하여 403 Forbidden 및 Carto "API KEY REQUIRED" 워터마크 100% 제거.
+  3. **전국 주요 상권/역 힌트 대폭 확장 및 AI 검색바 탐색형 디자인 개편 완료**:
+     - 인천(구월동/부평/송도), 부산(서면/해운대/광안리), 대구(동성로/수성못), 대전(성심당 중앙로/둔산동), 경기(행궁동/판교), 강원, 제주 등 전국 핫플레이스 수록.
+     - AI 모달 검색창을 탐색 페이지 감성 맞춤형(TrainFront SVG, 컬러 뱃지, 포커스 링, 드롭다운 힌트)으로 개편.
+  4. **백엔드 Flyway DB 마이그레이션 (`V4__add_course_date_plan_date_and_seed_festivals.sql`)**:
+     - `courses` 테이블에 `date_plan_date DATE` 컬럼 추가.
+     - `places (event_start_date, event_end_date)` 인덱스 생성.
+     - 서울(성수 팝업 페스티벌, 연남 경의선숲길 불빛축제, 여의도 달빛야시장), 인천(송도 센트럴파크 빛축제, 구월 로데오 축제), 부산(광안리 M드론쇼), 대구(수성못 페스티벌), 대전(으능정이 스카이로드 빵축제), 수원(화성 미디어아트 페스티벌) 등 전국 주요 실존 축제/팝업 데이터 시딩.
+  5. **백엔드 날짜/위치 기반 행사 우선 주입 및 일정 영속화 (`CourseService.java`, `PlaceRepository.java`)**:
+     - `DateTheme.FESTIVAL` 또는 `targetDate` 전달 시 해당 날짜/위치에 진행 중인 축제 장소를 최우선으로 후보군 맨 앞에 주입.
+     - 코스 생성 및 수정 시 `datePlanDate` 저장 및 `CourseDetailResponse`/`CourseListItem`에 반환.
+     - `backend/gradlew.bat test` 전체 테스트 100% 성공 통과 (`BUILD SUCCESSFUL in 42s`).
+  6. **AI 서비스 데이트 날짜 및 축제 메인 이벤트 동선 프롬프트 가이드 (`course_generate_service.py`, `internal_ai.py`)**:
+     - `DateTheme.FESTIVAL` 및 `target_date` 스키마 지원.
+     - 축제/행사 스팟이 포함된 경우 핵심 메인 이벤트로 선정하고 전후 식사/카페 동선을 유기적으로 배치하도록 프롬프트 가이드.
+  7. **프론트엔드 UI/UX 고도화 (`AiCourseRecommendModal`, `CourseBuilder`, `CourseList`, `Explore`, `CourseRouteMap`)**:
+     - AI 모달에 `행사·축제` 테마 칩 및 `📅 데이트 예정일` 선택 피커(오늘/이번 주말 퀵 버튼) 연동.
+     - 코스 메이커 상단 헤더에 데이트 예정일 피커 및 저장 연동.
+     - 코스 보관함(`MyCoursesClientView`) 및 코스 상세 페이지 카드에 `📅 YYYY.MM.DD 데이트` 캘린더 뱃지 시각화.
+     - 탐색 페이지 스포트라이트 카드(`PlaceSpotlightCard`) 및 지도 마커(`CourseRouteMap`)에 `🎉 축제·행사 | YYYY.MM.DD ~ YYYY.MM.DD` 뱃지 표기.
+     - `npm run typecheck` 0 에러 및 Next.js 16 전체 13개 라우트 빌드 성공 통과.
 - **지도 줌 레벨 고정 & 최상단 DayT 브랜드 헤더 & 타이틀/개수 줄바꿈 분리 & POI 패닝 60fps 최적화 및 지도 높이 조절 완료**:
   - "이 지역에서 다시 탐색" 또는 필터 변경 시 줌 레벨이 15로 강제 리셋되던 문제를 수정하여, 사용자가 설정한 현재 줌 레벨(`currentViewport.zoom`)을 100% 영구 보존.
   - 최상단에 `— PLAN YOUR DAY` 및 `오늘은 어떤 하루를 함께 만들어 볼까요?` 감성 브랜드 타이포그래피 헤더 추가 (DayT 테마 컬러 반영).
@@ -106,3 +131,26 @@
   2. **슬라이더 바 위치 보존 & 하단 양끝 금액 표기 (`AiCourseRecommendModal.tsx`)**: `isUnlimitedBudget`과 `sliderBudget` 상태를 분리하여 예산 무관을 눌러도 슬라이더 바 위치가 엉뚱하게 튀지 않고 가만히 유지되도록 수정, 슬라이더 하단 양끝에 `10,000원`과 `100,000원` 표기 추가.
   3. **음식 분류 정확도 고도화 & "기타 (그 외)" 카테고리 도입 (`DefaultKakaoLocalClient.java`, `CourseService.java`, `ExploreClientView.tsx`)**: 동남아/베트남/태국/인도/아시안 음식을 `FoodCategory.ETC`("그 외")로 최우선 분기하여 일식으로 오분류되던 문제를 차단하고, 사용자가 선호 음식을 지정하면 해당 카테고리 식당을 최우선 수집하여 AI 후보 장소 풀에 주입.
   4. **가격 미상 장소 카테고리별 현실적 추정가 전달 & 예산 일치 강화 (`course_generate_service.py`)**: 가격이 등록되지 않은 장소는 카테고리별 1인 평균 추정가(식당 약 18,000~20,000원, 카페 약 8,500원 등)를 AI에게 명시적으로 넘겨주어 예산에 부합하는 정밀한 코스를 설계하도록 프롬프트 지침 및 비용 계산 로직 보강 (`typecheck` & 백엔드 15개 테스트 통과).
+- **AI 코스 추천 음식점 엄격 준수 · 예산 정밀 매칭 · 후보군 대폭 확대 & 지도 핀 위치 선택 · 반경(km) 슬라이더 구현**:
+  1. **선호 음식 엄격 준수 및 타 카테고리 식당 침범 원천 차단 (`CourseService.java`, `course_generate_service.py`)**:
+     - 사용자가 `치킨`을 선택했을 때 동남아 음식점(`발리문`)이 억지로 들어가던 백엔드 fallback 및 greedy fallback의 잔여 슬롯 채우기 버그를 수정하여, 지정된 `foodCategories`에 부합하지 않는 식당은 절대 추가되지 않도록 엄격 차단.
+     - 사용자가 선택한 음식 카테고리에 대해 `"{지역} {음식명}"` (예: "연남동 치킨") 전용 키워드 조회를 병행하여 카카오 실시간 수집을 즉시 실행하고 치킨 전문점을 확실하게 확보.
+  2. **예산 정밀 매칭 (2인 총 예산 기준 75~90% 수준 현실적 지출 산출)**:
+     - 1인 8만원(2인 16만원) 설정 시 4.8만원처럼 터무니없이 적게 산출되던 문제를 해결하여, 2인 총 예산의 50~60%를 식비(치킨/메인 2인 세트 + 음료/사이드), 20~25%를 카페(디저트 + 스페셜티 커피), 20~25%를 전시/체험비로 자연스럽게 배정하여 목표 예산에 알맞게 매칭.
+  3. **후보 장소 풀(Candidate Pool) 대폭 확대(40~60개) 및 무작위 셔플**:
+     - 기존 24개 고정 조회에서 벗어나, 카테고리별 10~15개씩 골고루 수집하여 최소 40~60개 이상의 풍부한 실존 스팟을 확보하고, 카테고리별 무작위 셔플을 적용하여 "조건으로 다시 추천받기"를 누를 때마다 다채롭고 새로운 코스가 조합되도록 고도화.
+  4. **지도에서 위치 핀 꽂기 & 탐색 반경(km) 슬라이더 신설 (`LocationPinPickerModal.tsx`, `AiCourseRecommendModal.tsx`, `api-spec.yaml`)**:
+     - `docs/api-spec.yaml`의 `CourseRecommendRequest`에 `radiusKm` (0.5~10.0km) 필드 추가 (사용자 동의 완료).
+     - "어디서 만날까요"에 **`[ 📍 지도에서 핀 꽂기 ]`** 버튼을 추가하고, 대화형 미니 지도에서 클릭한 위치에 핀을 꽂고 해당 좌표 및 탐색 반경을 나타내는 점선 원(Circle) 오버레이 시각화 지원.
+     - `탐색 반경 설정 (내 주변 탐색 범위)` 슬라이더(`0.5km`~`10.0km`) 및 퀵 프리셋 칩(`1km`, `2km`, `3km`, `5km`, `10km`) 추가 연동 (`typecheck` 통과 & Next.js 16 전체 13개 라우트 빌드 성공, Gradle 테스트 15개 전체 통과).
+- **OSM 403 차단 박멸(CartoDB CDN) · 전국 주요 상권/역 힌트 대폭 확장 · AI 모달 검색바 맞춤형 개편**:
+  1. **지도 403 Access Blocked 완벽 해결 (`slippy-tile-math.ts`, `LocationPinPickerModal.tsx`)**:
+     - OpenStreetMap 재단 공식 서버의 사용 정책에 따른 403 Forbidden 차단 타일을 제거하고, 글로벌 CDN 기반의 **CartoDB Voyager 고해상도 타일**(`a~d.basemaps.cartocdn.com`)로 전면 교체.
+     - 한국어 지명·건물 윤곽·도로가 선명하게 표시되며 403 차단 오류가 원천 방지됨.
+  2. **어디서 만날까요? 기본값 빈 텍스트 & 텍스트 힌트 제공 (`AiCourseRecommendModal.tsx`)**:
+     - 기본값으로 들어가 있던 `"성수역"` 하드코딩을 제거하고 빈 텍스트(`""`)로 초기화.
+     - 검색창 포커스 또는 타이핑 시 전국 주요 역/상권 추천 드롭다운이 즉시 뜨며, 클릭 및 키보드(방향키 + Enter)로 직관적 선택 가능.
+  3. **전국 모든 지역(인천/부산/대구/대전/광주/경기/제주 등) 핫플레이스 수록 (`subway-search-data.ts`)**:
+     - 서울뿐 아니라 인천(구월동·인천터미널·부평·송도 센트럴파크·연수구), 부산(서면·전포·해운대·광안리·남포동), 대구(동성로·반월당·교동·수성못), 대전(성심당 중앙로·둔산동·유성온천), 광주(동명동·충장로·상무지구), 경기(수원 행궁동·일산·판교·분당·부천·범계), 강원(강릉 안목해변), 제주(제주시청/노형동) 등 전국 핵심 데이트 상권을 완벽 수록하여 검색 힌트 제공.
+  4. **AI 모달 검색바 탐색 페이지 맞춤형 디자인 적용 (`AiCourseRecommendModal.tsx`)**:
+     - `TrainFront` SVG 아이콘, DayT 브랜드 포커스 링, 노선/상권 컬러 뱃지, 설명 텍스트를 갖춘 세련된 맞춤형 검색 컴포넌트로 개편 완료 (`typecheck` 및 Next.js 16 프로덕션 빌드 성공).

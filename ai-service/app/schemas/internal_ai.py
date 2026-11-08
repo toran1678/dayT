@@ -41,6 +41,7 @@ class DateTheme(str, Enum):
     EXHIBITION = "전시·문화"
     WALK = "산책·야외"
     ANYWHERE = "어디든"
+    FESTIVAL = "행사·축제"
 
 
 class DateTimeSlot(str, Enum):
@@ -81,6 +82,8 @@ class CourseRecommendRequest(CamelModel):
     region_keyword: str
     latitude: float | None = None
     longitude: float | None = None
+    radius_km: float | None = None
+    target_date: date | None = None
     theme_tags: list[DateTheme]
     food_categories: list[FoodCategory] = Field(default_factory=list)
     budget_per_person: int

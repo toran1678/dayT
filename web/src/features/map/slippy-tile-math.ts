@@ -74,6 +74,23 @@ export function latLngToContainerPx(
   };
 }
 
+export function containerPxToLatLng(
+  containerX: number,
+  containerY: number,
+  viewport: MapViewportState,
+  width: number,
+  height: number,
+): { lat: number; lng: number } {
+  const centerWorld = latLngToWorldPx(
+    viewport.centerLat,
+    viewport.centerLng,
+    viewport.zoom,
+  );
+  const clickWorldX = centerWorld.x + (containerX - width / 2);
+  const clickWorldY = centerWorld.y + (containerY - height / 2);
+  return worldPxToLatLng(clickWorldX, clickWorldY, viewport.zoom);
+}
+
 export function panViewportByPixels(
   viewport: MapViewportState,
   deltaX: number,
@@ -202,9 +219,10 @@ export function getVisibleOsmTiles(
     if (ty < 0 || ty >= maxTileIndex) continue;
     for (let tx = startTileX; tx <= endTileX; tx++) {
       const wrappedX = ((tx % maxTileIndex) + maxTileIndex) % maxTileIndex;
+      // Next.js 전용 타일 프록시: OSM 사용 정책(User-Agent) 준수 & 워터마크 원천 차단
       tiles.push({
         key: `${z}-${wrappedX}-${ty}-${tx}`,
-        url: `https://tile.openstreetmap.org/${z}/${wrappedX}/${ty}.png`,
+        url: `/api/map/tiles/${z}/${wrappedX}/${ty}.png`,
         left: Math.round(tx * TILE_SIZE - topLeftX),
         top: Math.round(ty * TILE_SIZE - topLeftY),
       });

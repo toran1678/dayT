@@ -31,14 +31,19 @@
 
 > _새로운 기능이나 단계(Phase) 구현에 착수할 때 에이전트가 아래 섹션을 현재 작업의 세부 설계(대상 파일, 구현 순서, 검증 방법)로 갱신합니다._
 
-- **현재 목표**: **차량 주행 거리 계산 원리 설명 준비, 코스 지도 주변역 & 레이어 토글 상단 바 슬림화(1줄 일체형 UI), AI 맞춤 코스 모달 1인 하루 총 예산 라벨 명확화 · 예산 무관 옵션 추가 · 어긋나는 하단 표시선 제거**
+- **현재 목표**: **TourAPI 행사·축제 DB 적재 & 날짜/위치 맞춤 행사 추천 · 탐색 지도 행사 뱃지 · 코스 데이트 예정일 관리 풀스택 구현**
 - **세부 구현 내역**:
-  1. **코스 지도 상단 주변역 & 레이어 토글 UI 정돈 (`CourseRouteMap.tsx`)**:
-     - 좁은 너비에서 2줄로 꺾여 뚱뚱해지던 주변역 바를 슬림한 단일 라인(`flex items-center justify-between`)으로 개편
-     - 좌측: 레이어 토글 3종(`[ 🚇 역 ] [ 🌳 명소 ] [ 🅿️ 주차장 ]`) 단정하게 배치
-     - 우측: 가장 가까운 주요 지하철역 1곳(`[ 호선배지 역명 도보X분 ]`) 뱃지로 심플하게 연결하여 높이 팽창 방지
-  2. **AI 맞춤 코스 모달 예산 UI 개선 (`AiCourseRecommendModal.tsx`)**:
-     - 라벨을 `5. 1인 하루 총 예산 설정`으로 명확화
-     - `예산 무관` 옵션 칩/버튼 추가 (`budgetPerPerson = 0`, 백엔드/AI에 가격 제한 없는 최고 인기/분위기 스팟 추천 요청)
-     - 슬라이더 하단의 어긋나는 `1만원 3만원 5만원...` 표시선/눈금 완전 제거 (상단 뱃지에 선택 금액 또는 '예산 무관' 단일 직관 표기)
-  3. **검증**: `npm run typecheck`, Next.js 16 프로덕션 빌드 성공 확인 및 `progress.md` 갱신
+  1. **API 명세서 (`docs/api-spec.yaml`) & TypeScript 타입 동기화**:
+     - `DateTheme` enum에 `행사·축제` 추가
+     - `CourseRecommendRequest`에 `targetDate` (LocalDate) 추가
+     - `CourseUpsertRequest`, `CourseDetail`, `CourseListItem`에 `datePlanDate` (LocalDate) 추가
+  2. **백엔드 DB 마이그레이션 & 엔티티 (`backend/`)**:
+     - Flyway `V3__add_course_date_plan_date_and_seed_festivals.sql`: `courses` 테이블에 `date_plan_date DATE` 추가 및 전국 주요 축제·행사(`event_start_date`, `event_end_date`) 시딩
+     - `Course.java`, `CourseService.java`: `datePlanDate` 저장 및 `DateTheme.FESTIVAL` 선택 시 날짜/위치 매칭 행사 최우선 추천 로직 구현
+  3. **AI 서비스 (`ai-service/`)**:
+     - `DateTheme.FESTIVAL` 및 `target_date` 지원, 행사 스팟을 하이라이트로 배치하는 프롬프트 보강
+  4. **프론트엔드 (`web/`)**:
+     - `AiCourseRecommendModal.tsx`: `행사·축제` 테마 칩 및 `데이트 예정일(targetDate)` 날짜 피커 추가
+     - `CourseBuilderClientView.tsx` & `CourseListClientView.tsx`: 코스 보관함 및 빌더에서 데이트 날짜 뱃지 표기 및 편집 지원
+     - `ExploreClientView.tsx` & `CourseRouteMap.tsx`: 지도 및 스팟 카드에 행사·축제 기간(`YYYY.MM.DD ~ YYYY.MM.DD`) 뱃지 표기
+  5. **검증**: `npm run typecheck`, Next.js 16 빌드 및 `./gradlew.bat test` 전체 통과 확인

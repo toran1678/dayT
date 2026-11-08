@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  Calendar,
   Car,
   Check,
   Clock,
@@ -95,6 +96,7 @@ const ALL_THEMES: DateTheme[] = [
   "액티비티",
   "산책·야외",
   "어디든",
+  "행사·축제",
 ];
 
 const TIME_SLOTS: { code: DateTimeSlot; label: string; defaultClock: string }[] =
@@ -232,6 +234,9 @@ export function CourseBuilderClientView({
   );
   const [timeSlot, setTimeSlot] = useState<DateTimeSlot>(
     () => initialCourse?.timeSlot ?? "HALF_DAY",
+  );
+  const [planDate, setPlanDate] = useState<string>(
+    () => initialCourse?.datePlanDate ?? "",
   );
   const [sourceType, setSourceType] = useState<CourseSourceType>(
     () => initialCourse?.sourceType ?? "CUSTOM",
@@ -519,7 +524,11 @@ export function CourseBuilderClientView({
 
   function handleApplyAiRecommendation(
     preview: CourseRecommendationPreview,
-    meta: { themes: DateTheme[]; timeSlot: DateTimeSlot },
+    meta: {
+      themes: DateTheme[];
+      timeSlot: DateTimeSlot;
+      datePlanDate?: string | null;
+    },
   ) {
     setTitle(preview.suggestedTitle);
     setDescription(preview.aiReason);
@@ -527,6 +536,9 @@ export function CourseBuilderClientView({
       setSelectedThemes(meta.themes);
     }
     setTimeSlot(meta.timeSlot);
+    if (meta.datePlanDate) {
+      setPlanDate(meta.datePlanDate);
+    }
     const matchingSlot = TIME_SLOTS.find((s) => s.code === meta.timeSlot);
     if (matchingSlot) {
       setStartClock(matchingSlot.defaultClock);
@@ -555,13 +567,18 @@ export function CourseBuilderClientView({
 
   async function handleSaveAiDirectly(
     preview: CourseRecommendationPreview,
-    meta: { themes: DateTheme[]; timeSlot: DateTimeSlot },
+    meta: {
+      themes: DateTheme[];
+      timeSlot: DateTimeSlot;
+      datePlanDate?: string | null;
+    },
   ) {
     const payload: CourseUpsertRequest = {
       title: preview.suggestedTitle.trim() || "AI 맞춤 추천 데이트 코스",
       description: preview.aiReason.trim() || null,
       themeTags: meta.themes.length > 0 ? meta.themes : selectedThemes,
       timeSlot: meta.timeSlot,
+      datePlanDate: meta.datePlanDate || null,
       sourceType: "AI_RECOMMENDED",
       shareWithCouple,
       places: preview.places.map((item, idx) => ({
@@ -608,6 +625,7 @@ export function CourseBuilderClientView({
       description: description.trim() || null,
       themeTags: selectedThemes,
       timeSlot,
+      datePlanDate: planDate || null,
       sourceType,
       shareWithCouple,
       places: stops.map((stop, idx) => ({
@@ -885,6 +903,53 @@ export function CourseBuilderClientView({
                 {slot.label}
               </button>
             ))}
+          </div>
+
+          {/* 데이트 예정일 (언제 만날까요?) */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-line/60">
+            <span className="flex items-center gap-1.5 text-xs font-extrabold text-foreground">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <span>데이트 예정일:</span>
+            </span>
+            <input
+              type="date"
+              value={planDate}
+              onChange={(e) => setPlanDate(e.target.value)}
+              className="rounded-xl border border-line bg-surface px-2.5 py-1 text-xs font-bold text-foreground outline-none transition-all focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+            />
+            <button
+              type="button"
+              onClick={() => setPlanDate(new Date().toISOString().split("T")[0])}
+              className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
+                planDate === new Date().toISOString().split("T")[0]
+                  ? "bg-primary text-white"
+                  : "border border-line bg-surface text-muted hover:text-foreground"
+              }`}
+            >
+              오늘
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                const day = now.getDay();
+                const diff = (6 - day + 7) % 7 || 7;
+                const sat = new Date(now.getTime() + diff * 86400000);
+                setPlanDate(sat.toISOString().split("T")[0]);
+              }}
+              className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-[11px] font-bold text-muted hover:text-foreground transition-colors"
+            >
+              이번 주말
+            </button>
+            {planDate && (
+              <button
+                type="button"
+                onClick={() => setPlanDate("")}
+                className="text-[11px] font-bold text-muted hover:text-primary transition-colors ml-1"
+              >
+                지우기
+              </button>
+            )}
           </div>
         </div>
 

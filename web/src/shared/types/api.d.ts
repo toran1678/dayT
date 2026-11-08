@@ -1147,7 +1147,7 @@ export interface components {
         /** @enum {string} */
         FoodCategory: "한식" | "중식" | "일식" | "양식" | "치킨" | "고기" | "분식" | "기타";
         /** @enum {string} */
-        DateTheme: "감성 카페" | "맛집 투어" | "액티비티" | "전시·문화" | "산책·야외" | "어디든";
+        DateTheme: "감성 카페" | "맛집 투어" | "액티비티" | "전시·문화" | "산책·야외" | "어디든" | "행사·축제";
         /** @enum {string} */
         DateTimeSlot: "HALF_DAY" | "ALL_DAY" | "EVENING";
         /** @enum {string} */
@@ -1266,6 +1266,12 @@ export interface components {
             sourceType: components["schemas"]["CourseSourceType"];
             /** @default false */
             shareWithCouple: boolean;
+            /**
+             * Format: date
+             * @description 데이트 예정일
+             * @example 2026-11-14
+             */
+            datePlanDate?: string | null;
             places: components["schemas"]["CoursePlaceRequestItem"][];
         };
         CoursePlaceDetailItem: {
@@ -1286,6 +1292,11 @@ export interface components {
             totalDurationMinutes: number;
             placeCount: number;
             thumbnailUrl: string | null;
+            /**
+             * Format: date
+             * @example 2026-11-14
+             */
+            datePlanDate?: string | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -1298,6 +1309,11 @@ export interface components {
             coupleId: number | null;
             title: string;
             description: string | null;
+            /**
+             * Format: date
+             * @example 2026-11-14
+             */
+            datePlanDate?: string | null;
             themeTags: components["schemas"]["DateTheme"][];
             timeSlot: components["schemas"]["DateTimeSlot"] | null;
             totalEstimatedCost: number;
@@ -1326,6 +1342,18 @@ export interface components {
             latitude?: number | null;
             /** Format: double */
             longitude?: number | null;
+            /**
+             * Format: double
+             * @description 사용자 설정 탐색 반경 (km 단위, 0.5 ~ 10.0km)
+             * @example 3
+             */
+            radiusKm?: number | null;
+            /**
+             * Format: date
+             * @description 데이트 희망 날짜 (행사·축제 테마 선택 시 해당 날짜에 열리는 축제/팝업 우선 매칭)
+             * @example 2026-11-14
+             */
+            targetDate?: string | null;
             themeTags: components["schemas"]["DateTheme"][];
             foodCategories?: components["schemas"]["FoodCategory"][];
             /** @example 50000 */

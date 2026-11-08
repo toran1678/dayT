@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   BookmarkPlus,
+  Calendar,
   Check,
   Clock,
   Download,
@@ -495,6 +496,12 @@ export function CourseDetailClientView({
             {course.timeSlot && (
               <span className="rounded-full bg-surface-subtle px-2.5 py-0.5 text-[11px] font-bold text-muted">
                 {TIME_SLOT_CLOCK[course.timeSlot].label}
+              </span>
+            )}
+            {course.datePlanDate && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-700">
+                <Calendar className="h-3 w-3" />
+                <span>{course.datePlanDate} 데이트</span>
               </span>
             )}
             {course.themeTags.map((theme) => (

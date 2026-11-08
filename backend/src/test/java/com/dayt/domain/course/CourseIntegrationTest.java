@@ -77,6 +77,7 @@ class CourseIntegrationTest {
 				  "description": "식사 후 전시와 드립커피로 이어지는 깔끔한 도보 코스",
 				  "themeTags": ["감성 카페", "전시·문화"],
 				  "timeSlot": "HALF_DAY",
+				  "datePlanDate": "2026-11-14",
 				  "sourceType": "CUSTOM",
 				  "shareWithCouple": false,
 				  "places": [
@@ -114,6 +115,7 @@ class CourseIntegrationTest {
 						.content(createBody))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.title").value("성수동 오후 전시 & 로스터리 루트"))
+				.andExpect(jsonPath("$.datePlanDate").value("2026-11-14"))
 				.andExpect(jsonPath("$.totalEstimatedCost").value(90000))
 				.andExpect(jsonPath("$.places.length()").value(3))
 				.andExpect(jsonPath("$.routePolyline.length()").value(3))

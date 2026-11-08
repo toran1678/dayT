@@ -34,7 +34,7 @@ public class PlaceQueryRepository {
 
 	@SuppressWarnings("unchecked")
 	public List<Place> searchPlaces(SearchCriteria criteria) {
-		StringBuilder sql = new StringBuilder("SELECT p.* FROM places p WHERE 1=1");
+		StringBuilder sql = new StringBuilder("SELECT p.* FROM places p WHERE 1=1 ");
 		Map<String, Object> params = new HashMap<>();
 
 		boolean hasCoordinates = criteria.latitude() != null && criteria.longitude() != null;
@@ -45,13 +45,12 @@ public class PlaceQueryRepository {
 			params.put("radiusMeters", criteria.radiusMeters());
 		}
 		else if (criteria.keyword() != null && !criteria.keyword().isBlank()) {
-			sql.append("""
-					 AND (
-					     p.region_keyword ILIKE :kw
-					     OR p.address ILIKE :kw
-					     OR p.name ILIKE :kw
-					     OR p.sub_category ILIKE :kw
-					 )""");
+			sql.append(" AND (\n")
+					.append("     p.region_keyword ILIKE :kw\n")
+					.append("     OR p.address ILIKE :kw\n")
+					.append("     OR p.name ILIKE :kw\n")
+					.append("     OR p.sub_category ILIKE :kw\n")
+					.append(" )");
 			params.put("kw", "%" + stripStationSuffix(criteria.keyword().trim()) + "%");
 		}
 

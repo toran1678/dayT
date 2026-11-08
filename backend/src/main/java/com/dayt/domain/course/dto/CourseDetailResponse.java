@@ -1,6 +1,7 @@
 package com.dayt.domain.course.dto;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -21,6 +22,7 @@ public record CourseDetailResponse(
 		String description,
 		List<DateTheme> themeTags,
 		DateTimeSlot timeSlot,
+		LocalDate datePlanDate,
 		Integer totalEstimatedCost,
 		Integer totalDurationMinutes,
 		CourseSourceType sourceType,
@@ -67,6 +69,7 @@ public record CourseDetailResponse(
 				course.getDescription(),
 				themes,
 				course.getTimeSlot(),
+				course.getDatePlanDate(),
 				course.getTotalEstimatedCost(),
 				course.getTotalDurationMinutes(),
 				course.getSourceType(),

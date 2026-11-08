@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   ArrowRight,
+  Calendar,
   Clock,
   Compass,
   Loader2,
@@ -217,6 +218,12 @@ export function MyCoursesClientView() {
                       <Sparkles className="h-3 w-3" />
                       <span>경유지 {course.placeCount}곳</span>
                     </span>
+                    {course.datePlanDate && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200/60 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700">
+                        <Calendar className="h-3 w-3" />
+                        <span>{course.datePlanDate} 데이트</span>
+                      </span>
+                    )}
                     {course.timeSlot && (
                       <span className="rounded-full bg-surface-subtle px-2.5 py-1 text-[11px] font-bold text-muted">
                         {TIME_SLOT_LABELS[course.timeSlot]}

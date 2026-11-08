@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
+  Calendar,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -240,6 +241,11 @@ export function PlaceSpotlightCard({
               {CATEGORY_KO_LABELS[place.categoryGroup]}
               {place.foodCategory ? ` · ${place.foodCategory}` : ""}
             </span>
+            {place.eventStartDate && place.eventEndDate && (
+              <span className="rounded-full bg-purple-600 px-2.5 py-0.5 text-[10px] font-black text-white shadow-xs backdrop-blur-xs">
+                🎉 축제·행사
+              </span>
+            )}
             {place.isIndoor !== null && (
               <span className="rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-xs">
                 {place.isIndoor ? "실내" : "야외"}
@@ -333,6 +339,12 @@ export function PlaceSpotlightCard({
 
         {/* Address & Price Meta */}
         <div className="space-y-1.5 rounded-2xl bg-surface-subtle/60 p-3.5 text-xs">
+          {place.eventStartDate && place.eventEndDate && (
+            <div className="flex items-center gap-1.5 rounded-xl bg-purple-50/90 border border-purple-200/80 px-2.5 py-1.5 text-xs font-bold text-purple-700">
+              <Calendar className="h-3.5 w-3.5 shrink-0 text-purple-600" />
+              <span>축제·행사 기간: {place.eventStartDate} ~ {place.eventEndDate}</span>
+            </div>
+          )}
           <div className="flex items-start gap-2">
             <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
             <span className="font-medium text-foreground">{place.address}</span>

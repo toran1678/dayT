@@ -504,6 +504,8 @@ export function ExploreClientView() {
           : undefined,
       placeUrl: place.placeUrl,
       isDraft: true,
+      eventStartDate: place.eventStartDate,
+      eventEndDate: place.eventEndDate,
     }));
 
     if (isShowingDraftRoute) {
@@ -531,6 +533,8 @@ export function ExploreClientView() {
             : undefined,
         placeUrl: place.placeUrl,
         isDraft: false,
+        eventStartDate: place.eventStartDate,
+        eventEndDate: place.eventEndDate,
       }));
 
     return [...draftStops, ...candidateStops];
@@ -668,7 +672,7 @@ export function ExploreClientView() {
               {isSearchHintOpen && searchHints.length > 0 && (
                 <div className="absolute left-0 right-0 top-full z-40 mt-1.5 overflow-hidden rounded-2xl border border-primary/20 bg-surface/98 p-1.5 shadow-[0_12px_36px_rgba(24,24,27,0.12)] backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-150">
                   <div className="px-2.5 py-1 text-[10px] font-extrabold text-muted flex items-center justify-between border-b border-line/60 mb-1">
-                    <span>지하철역 추천 검색</span>
+                    <span>전국 주요 역 및 데이트 상권 추천 검색</span>
                     <span className="text-[9px] font-normal text-muted/80">
                       방향키 이동 · Enter 선택
                     </span>
@@ -696,7 +700,11 @@ export function ExploreClientView() {
                               }}
                               className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white shadow-2xs"
                             >
-                              <TrainFront className="h-3 w-3" />
+                              {hint.kind === "area" ? (
+                                <MapPin className="h-3 w-3" />
+                              ) : (
+                                <TrainFront className="h-3 w-3" />
+                              )}
                             </span>
                             <span className="text-xs font-extrabold truncate">
                               {hint.name}

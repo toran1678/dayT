@@ -19,7 +19,8 @@ public enum DateTheme {
 	ACTIVITY("액티비티"),
 	EXHIBITION("전시·문화"),
 	WALK_OUTDOOR("산책·야외"),
-	ANYWHERE("어디든");
+	ANYWHERE("어디든"),
+	FESTIVAL("행사·축제");
 
 	private final String label;
 

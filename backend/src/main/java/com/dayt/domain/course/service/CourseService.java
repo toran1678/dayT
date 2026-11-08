@@ -4,6 +4,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -32,6 +33,7 @@ import com.dayt.domain.course.entity.CoursePlace;
 import com.dayt.domain.course.entity.DateTheme;
 import com.dayt.domain.course.entity.DateTimeSlot;
 import com.dayt.domain.course.repository.CourseRepository;
+import com.dayt.domain.place.client.KakaoLocalClient;
 import com.dayt.domain.place.dto.PlaceDetailResponse;
 import com.dayt.domain.place.entity.FoodCategory;
 import com.dayt.domain.place.entity.Place;
@@ -59,6 +61,7 @@ public class CourseService {
 	private final CourseRepository courseRepository;
 	private final PlaceRepository placeRepository;
 	private final PlaceService placeService;
+	private final KakaoLocalClient kakaoLocalClient;
 	private final AiServiceClient aiServiceClient;
 	private final UserRepository userRepository;
 	private final ObjectProvider<SimpMessagingTemplate> messagingTemplateProvider;
@@ -87,6 +90,7 @@ public class CourseService {
 				.description(trimOrNull(request.description()))
 				.themeTags(themeLabels)
 				.timeSlot(request.timeSlot())
+				.datePlanDate(request.datePlanDate())
 				.totalEstimatedCost(prepared.totalEstimatedCost())
 				.totalDurationMinutes(prepared.totalDurationMinutes())
 				.sourceType(request.sourceType())
@@ -108,25 +112,84 @@ public class CourseService {
 	public CourseRecommendationPreviewResponse recommendCourse(Long userId, CourseRecommendRequest request) {
 		getRequiredUser(userId);
 
+		// 위경도가 없을 경우 지역 키워드로 Kakao 중심 좌표 자동 조회
+		Double centerLat = request.latitude();
+		Double centerLng = request.longitude();
+		if ((centerLat == null || centerLng == null) && kakaoLocalClient.isConfigured()) {
+			Optional<KakaoLocalClient.GeoPoint> geoOpt = kakaoLocalClient.resolveLocationByKeyword(request.regionKeyword().trim());
+			if (geoOpt.isPresent()) {
+				centerLat = geoOpt.get().latitude();
+				centerLng = geoOpt.get().longitude();
+			}
+		}
+
+		// 탐색 반경 결정 (기본값 2.5km, 최소 500m ~ 최대 10,000m)
+		int searchRadius = (request.radiusKm() != null && request.radiusKm() > 0)
+				? (int) Math.min(10000, Math.max(500, request.radiusKm() * 1000))
+				: 2500;
+
 		Boolean rainyFilter = isIndoorMoodRequested(request.moodKeywords()) ? Boolean.TRUE : null;
 		List<PlaceDetailResponse> candidates = new ArrayList<>();
 		Set<Long> seenCandidateIds = new HashSet<>();
 
-		// 1. 사용자가 특정 음식 카테고리를 선택한 경우, 해당 카테고리의 실존 식당들을 최우선 수집하여 AI 후보군에 주입
+		// 0. 데이트 테마에 '행사·축제'가 있거나 데이트 예정 날짜(targetDate)가 전달된 경우, 해당 날짜/위치 기준 진행 중인 축제·행사 스팟 최우선 수집
+		boolean isFestivalThemeRequested = request.themeTags() != null && request.themeTags().contains(DateTheme.FESTIVAL);
+		if (isFestivalThemeRequested || request.targetDate() != null) {
+			List<Place> activeFestivals = placeRepository.findActiveFestivalsNear(
+					centerLat,
+					centerLng,
+					Math.max(searchRadius * 1.5, 6000),
+					request.targetDate(),
+					5
+			);
+			for (Place f : activeFestivals) {
+				if (seenCandidateIds.add(f.getId())) {
+					candidates.add(PlaceDetailResponse.from(f));
+				}
+			}
+		}
+
+		// 1. 음식 카테고리를 선택한 경우, 전용 키워드(예: "연남동 치킨") 및 카테고리 필터로 실존 식당들을 집중 수집
 		if (request.foodCategories() != null && !request.foodCategories().isEmpty()) {
 			for (FoodCategory fc : request.foodCategories()) {
-				List<PlaceDetailResponse> matchedRestaurants = placeService.searchPlaces(
-						request.regionKeyword().trim(),
-						request.latitude(),
-						request.longitude(),
-						3500,
+				List<PlaceDetailResponse> matchedRestaurants = new ArrayList<>();
+
+				// 1-1. 전용 키워드 검색 ("{지역} {음식명}", 예: "연남동 치킨")
+				String foodQuery = request.regionKeyword().trim() + " " + fc.getLabel();
+				matchedRestaurants.addAll(placeService.searchPlaces(
+						foodQuery,
+						centerLat,
+						centerLng,
+						Math.min(searchRadius + 1000, 10000),
 						PlaceCategoryGroup.RESTAURANT,
 						fc,
 						null,
 						rainyFilter,
 						0,
-						10
+						15
+				).items());
+
+				// 1-2. 지역명 + 카테고리 필터 검색
+				List<PlaceDetailResponse> byCategory = placeService.searchPlaces(
+						request.regionKeyword().trim(),
+						centerLat,
+						centerLng,
+						searchRadius,
+						PlaceCategoryGroup.RESTAURANT,
+						fc,
+						null,
+						rainyFilter,
+						0,
+						15
 				).items();
+				for (PlaceDetailResponse r : byCategory) {
+					if (matchedRestaurants.stream().noneMatch(existing -> existing.id().equals(r.id()))) {
+						matchedRestaurants.add(r);
+					}
+				}
+
+				// 다양성을 위한 셔플 후 후보군에 추가
+				Collections.shuffle(matchedRestaurants);
 				for (PlaceDetailResponse r : matchedRestaurants) {
 					if (seenCandidateIds.add(r.id())) {
 						candidates.add(r);
@@ -135,19 +198,92 @@ public class CourseService {
 			}
 		}
 
-		// 2. 주변 일반 장소(카페, 문화, 산책, 기타 스팟) 보강
-		List<PlaceDetailResponse> generalPlaces = placeService.searchPlaces(
+		// 2. 카페 수집 (15개) & 셔플
+		List<PlaceDetailResponse> cafes = new ArrayList<>(placeService.searchPlaces(
 				request.regionKeyword().trim(),
-				request.latitude(),
-				request.longitude(),
-				2500,
+				centerLat,
+				centerLng,
+				searchRadius,
+				PlaceCategoryGroup.CAFE,
+				null,
+				null,
+				rainyFilter,
+				0,
+				15
+		).items());
+		Collections.shuffle(cafes);
+		for (PlaceDetailResponse c : cafes) {
+			if (seenCandidateIds.add(c.id())) {
+				candidates.add(c);
+			}
+		}
+
+		// 3. 문화/전시/액티비티 수집 (20개) & 셔플
+		List<PlaceDetailResponse> activities = new ArrayList<>(placeService.searchPlaces(
+				request.regionKeyword().trim(),
+				centerLat,
+				centerLng,
+				Math.min(searchRadius + 1000, 10000),
+				PlaceCategoryGroup.EXHIBITION,
+				null,
+				null,
+				rainyFilter,
+				0,
+				10
+		).items());
+		activities.addAll(placeService.searchPlaces(
+				request.regionKeyword().trim(),
+				centerLat,
+				centerLng,
+				Math.min(searchRadius + 1000, 10000),
+				PlaceCategoryGroup.ACTIVITY,
+				null,
+				null,
+				rainyFilter,
+				0,
+				10
+		).items());
+		Collections.shuffle(activities);
+		for (PlaceDetailResponse a : activities) {
+			if (seenCandidateIds.add(a.id())) {
+				candidates.add(a);
+			}
+		}
+
+		// 4. 산책/공원 수집 (10개) & 셔플
+		List<PlaceDetailResponse> parks = new ArrayList<>(placeService.searchPlaces(
+				request.regionKeyword().trim(),
+				centerLat,
+				centerLng,
+				searchRadius,
+				PlaceCategoryGroup.PARK,
+				null,
+				null,
+				rainyFilter,
+				0,
+				10
+		).items());
+		Collections.shuffle(parks);
+		for (PlaceDetailResponse p : parks) {
+			if (seenCandidateIds.add(p.id())) {
+				candidates.add(p);
+			}
+		}
+
+		// 5. 일반 주변 장소 보강
+		List<PlaceDetailResponse> generalPlaces = new ArrayList<>(placeService.searchPlaces(
+				request.regionKeyword().trim(),
+				centerLat,
+				centerLng,
+				searchRadius,
 				null,
 				null,
 				null,
 				rainyFilter,
 				0,
-				24
-		).items();
+				15
+		).items());
+		Collections.shuffle(generalPlaces);
 		for (PlaceDetailResponse p : generalPlaces) {
 			if (seenCandidateIds.add(p.id())) {
 				candidates.add(p);
@@ -157,15 +293,15 @@ public class CourseService {
 		if (candidates.size() < 2) {
 			List<PlaceDetailResponse> widePlaces = placeService.searchPlaces(
 					request.regionKeyword().trim(),
-					request.latitude(),
-					request.longitude(),
+					centerLat,
+					centerLng,
 					6000,
 					null,
 					null,
 					null,
 					null,
 					0,
-					24
+					30
 			).items();
 			for (PlaceDetailResponse p : widePlaces) {
 				if (seenCandidateIds.add(p.id())) {
@@ -176,7 +312,7 @@ public class CourseService {
 
 		if (candidates.isEmpty()) {
 			candidates = placeRepository.findAll().stream()
-					.limit(20)
+					.limit(30)
 					.map(PlaceDetailResponse::from)
 					.toList();
 		}
@@ -185,14 +321,28 @@ public class CourseService {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "추천할 수 있는 주변 후보 장소가 아직 없습니다.");
 		}
 
+		// 좌표 및 반경이 보정된 요청 객체로 AI 서비스 호출
+		CourseRecommendRequest enrichedRequest = new CourseRecommendRequest(
+				request.regionKeyword(),
+				centerLat,
+				centerLng,
+				request.radiusKm() != null ? request.radiusKm() : (double) searchRadius / 1000.0,
+				request.targetDate(),
+				request.themeTags(),
+				request.foodCategories(),
+				request.budgetPerPerson(),
+				request.timeSlot(),
+				request.moodKeywords()
+		);
+
 		Optional<CourseRecommendationPreviewResponse> aiResult = aiServiceClient.generateCourse(
-				new InternalAiCourseGenerateRequest(request, candidates)
+				new InternalAiCourseGenerateRequest(enrichedRequest, candidates)
 		);
 		if (aiResult.isPresent()) {
 			return aiResult.get();
 		}
 
-		return buildBackendFallbackPreview(request, candidates);
+		return buildBackendFallbackPreview(enrichedRequest, candidates);
 	}
 
 	@Transactional(readOnly = true)
@@ -307,6 +457,7 @@ public class CourseService {
 				trimOrNull(request.description()),
 				extractThemeLabels(request.themeTags()),
 				request.timeSlot(),
+				request.datePlanDate(),
 				request.sourceType()
 		);
 
@@ -504,6 +655,12 @@ public class CourseService {
 			if (chosen.size() >= targetCount) {
 				break;
 			}
+			// 선호 음식 카테고리가 지정된 경우, 일치하지 않는 일반 식당(동남아/양식 등)은 절대로 억지로 끼워넣지 않음
+			if (req.foodCategories() != null && !req.foodCategories().isEmpty()
+					&& candidate.categoryGroup() == PlaceCategoryGroup.RESTAURANT
+					&& (candidate.foodCategory() == null || !req.foodCategories().contains(candidate.foodCategory()))) {
+				continue;
+			}
 			if (!usedIds.contains(candidate.id())) {
 				chosen.add(candidate);
 				usedIds.add(candidate.id());
@@ -515,12 +672,31 @@ public class CourseService {
 		int totalCost = 0;
 		int totalMinutes = 0;
 
+		int targetTwoPersonBudget = (req.budgetPerPerson() != null && req.budgetPerPerson() > 0)
+				? req.budgetPerPerson() * 2
+				: 0;
+
 		for (int i = 0; i < chosen.size(); i++) {
 			PlaceDetailResponse p = chosen.get(i);
 			boolean isLast = (i == chosen.size() - 1);
-			int cost = (p.avgPricePerPerson() != null)
-					? Math.max(0, p.avgPricePerPerson() * 2)
-					: (p.categoryGroup() == PlaceCategoryGroup.CAFE ? 18000 : 32000);
+			int cost;
+			if (p.avgPricePerPerson() != null && p.avgPricePerPerson() > 0) {
+				cost = Math.max(0, p.avgPricePerPerson() * 2);
+			} else if (targetTwoPersonBudget > 0) {
+				// 예산 설정 시 현실적인 메뉴/세트/디저트 지출 수준을 반영하여 총 예산에 부합하도록 산출
+				if (p.categoryGroup() == PlaceCategoryGroup.RESTAURANT) {
+					cost = Math.max(30000, (int) Math.round(targetTwoPersonBudget * 0.55 / 1000) * 1000);
+				} else if (p.categoryGroup() == PlaceCategoryGroup.CAFE) {
+					cost = Math.max(16000, (int) Math.round(targetTwoPersonBudget * 0.22 / 1000) * 1000);
+				} else if (p.categoryGroup() == PlaceCategoryGroup.PARK) {
+					cost = 0;
+				} else {
+					cost = Math.max(20000, (int) Math.round(targetTwoPersonBudget * 0.23 / 1000) * 1000);
+				}
+			} else {
+				cost = (p.categoryGroup() == PlaceCategoryGroup.CAFE ? 18000
+						: (p.categoryGroup() == PlaceCategoryGroup.PARK ? 0 : 32000));
+			}
 			int stay;
 			if (req.timeSlot() == DateTimeSlot.ALL_DAY) {
 				stay = (p.categoryGroup() == PlaceCategoryGroup.RESTAURANT) ? 90
