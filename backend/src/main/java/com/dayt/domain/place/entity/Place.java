@@ -181,6 +181,39 @@ public class Place extends BaseTimeEntity {
 		}
 	}
 
+	public void updateFestivalInfo(
+			String name,
+			String address,
+			String regionKeyword,
+			Double latitude,
+			Double longitude,
+			String phone,
+			String placeUrl,
+			String thumbnailUrl,
+			LocalDate eventStartDate,
+			LocalDate eventEndDate
+	) {
+		this.name = name;
+		this.address = address;
+		if (regionKeyword != null && !regionKeyword.isBlank()) {
+			this.regionKeyword = regionKeyword;
+		}
+		this.latitude = latitude;
+		this.longitude = longitude;
+		this.location = createWgs84Point(longitude, latitude);
+		if (phone != null && !phone.isBlank()) {
+			this.phone = phone;
+		}
+		if (placeUrl != null && !placeUrl.isBlank()) {
+			this.placeUrl = placeUrl;
+		}
+		if (thumbnailUrl != null && !thumbnailUrl.isBlank()) {
+			this.thumbnailUrl = thumbnailUrl;
+		}
+		this.eventStartDate = eventStartDate;
+		this.eventEndDate = eventEndDate;
+	}
+
 	public void applyAiEnrichment(
 			List<String> hashtags,
 			List<String> recommendedMenus,

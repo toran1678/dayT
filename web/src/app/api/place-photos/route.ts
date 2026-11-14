@@ -4,7 +4,7 @@ import { readServerSecret } from "@/shared/server/root-env";
 export interface PlacePhotoItem {
   url: string;
   thumbnailUrl: string;
-  source: "KAKAO" | "CURATED";
+  source: "KAKAO" | "CURATED" | "TOUR_API";
   caption?: string;
 }
 

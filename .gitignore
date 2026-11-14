@@ -74,3 +74,6 @@ yarn-error.*
 *.p12
 *.key
 *.mobileprovision
+
+
+.agents/taste

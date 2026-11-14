@@ -448,6 +448,22 @@ public class PlaceService {
 		return budgetPhrase + "분위기와 맛을 모두 챙기기 좋은 " + category.getLabel() + " '" + subMenu + "' 식당들을 골랐어요.";
 	}
 
+	@Transactional(readOnly = true)
+	public List<PlaceDetailResponse> getActiveFestivals(
+			Double minLat,
+			Double maxLat,
+			Double minLng,
+			Double maxLng,
+			int limit
+	) {
+		List<Place> festivals = placeQueryRepository.findActiveFestivalsInBounds(
+				minLat, maxLat, minLng, maxLng, limit
+		);
+		return festivals.stream()
+				.map(PlaceDetailResponse::from)
+				.toList();
+	}
+
 	private static String buildSearchCacheKey(
 			String keyword,
 			Double latitude,

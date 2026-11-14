@@ -38,6 +38,7 @@ import com.dayt.domain.place.dto.PlaceDetailResponse;
 import com.dayt.domain.place.entity.FoodCategory;
 import com.dayt.domain.place.entity.Place;
 import com.dayt.domain.place.entity.PlaceCategoryGroup;
+import com.dayt.domain.place.repository.PlaceQueryRepository;
 import com.dayt.domain.place.repository.PlaceRepository;
 import com.dayt.domain.place.service.PlaceService;
 import com.dayt.domain.user.entity.User;
@@ -60,6 +61,7 @@ public class CourseService {
 
 	private final CourseRepository courseRepository;
 	private final PlaceRepository placeRepository;
+	private final PlaceQueryRepository placeQueryRepository;
 	private final PlaceService placeService;
 	private final KakaoLocalClient kakaoLocalClient;
 	private final AiServiceClient aiServiceClient;
@@ -135,7 +137,7 @@ public class CourseService {
 		// 0. 데이트 테마에 '행사·축제'가 있거나 데이트 예정 날짜(targetDate)가 전달된 경우, 해당 날짜/위치 기준 진행 중인 축제·행사 스팟 최우선 수집
 		boolean isFestivalThemeRequested = request.themeTags() != null && request.themeTags().contains(DateTheme.FESTIVAL);
 		if (isFestivalThemeRequested || request.targetDate() != null) {
-			List<Place> activeFestivals = placeRepository.findActiveFestivalsNear(
+			List<Place> activeFestivals = placeQueryRepository.findActiveFestivalsNear(
 					centerLat,
 					centerLng,
 					Math.max(searchRadius * 1.5, 6000),

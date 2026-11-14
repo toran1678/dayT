@@ -20,6 +20,7 @@ import {
   Minimize2,
   Minus,
   Palette,
+  PartyPopper,
   Plus,
   RotateCw,
   SquareParking,
@@ -102,17 +103,23 @@ interface CourseRouteMapProps {
   headerTitle?: string;
   heightClassName?: string;
   footerNode?: ReactNode;
+  onAddPlaceToCourse?: (place: RouteMapStop) => void;
+  initialShowFestivals?: boolean;
 }
 
 type SelectedContextTarget =
   | { type: "STATION"; station: SubwayStationPoi }
   | { type: "POI"; poi: SurroundingPoi }
+  | { type: "FESTIVAL"; stop: RouteMapStop }
   | null;
 
 export function getStopCategoryVisual(
   categoryGroup?: PlaceCategoryGroup,
   categoryLabel = "",
 ) {
+  if (categoryLabel.includes("축제") || categoryLabel.includes("행사")) {
+    return { icon: PartyPopper, color: "#DB2777", bg: "bg-pink-600" };
+  }
   if (categoryGroup === "CAFE" || categoryLabel.includes("카페")) {
     return { icon: Coffee, color: "#B45309", bg: "bg-amber-600" };
   }
@@ -149,7 +156,9 @@ function buildCategoryMarkerSvgUrl(
   const ring = isActive ? "#FBBF24" : "#FFFFFF";
 
   let iconPath = "";
-  if (categoryGroup === "CAFE" || categoryLabel.includes("카페")) {
+  if (categoryLabel.includes("축제") || categoryLabel.includes("행사")) {
+    iconPath = `<path d="M11 20L18 13L20 15L13 22L11 20ZM17 9L18 6L21 7L20 10L17 9ZM10 14L9 11L6 12L7 15L10 14ZM9 17L6 20L7 21L10 18L9 17Z" fill="#FFFFFF"/><circle cx="21" cy="9" r="1.3" fill="#FFFFFF"/><circle cx="15" cy="6" r="1.3" fill="#FFFFFF"/><circle cx="22" cy="17" r="1.3" fill="#FFFFFF"/>`;
+  } else if (categoryGroup === "CAFE" || categoryLabel.includes("카페")) {
     iconPath = `<path d="M12 11V18C12 19.1 12.9 20 14 20H18C19.1 20 20 19.1 20 18V11H12ZM20 13H22C22.6 13 23 13.4 23 14V16C23 16.6 22.6 17 22 17H20V13ZM11 22H21V23H11V22Z" fill="#FFFFFF"/>`;
   } else if (categoryGroup === "RESTAURANT" || categoryLabel.includes("식당")) {
     iconPath = `<path d="M13 10V14C13 14.8 13.5 15.4 14.2 15.8V22H15.8V15.8C16.5 15.4 17 14.8 17 14V10H16V13H15V10H14V13H13V10ZM19 10C18.2 10 17.6 10.9 17.6 12.2V15H18.8V22H20.2V10H19Z" fill="#FFFFFF"/>`;
@@ -209,6 +218,18 @@ function buildPoiMarkerSvgUrl(kind: SurroundingPoi["kind"]): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26">
     <circle cx="13" cy="13" r="11" fill="#0D9488" stroke="#FFFFFF" stroke-width="2"/>
     <path d="M13 7.2L7.8 10.2V11.5H18.2V10.2L13 7.2ZM9.4 12.5V16.8H11V12.5H9.4ZM12.2 12.5V16.8H13.8V12.5H12.2ZM15 12.5V16.8H16.6V12.5H15ZM8 17.8V19.2H18V17.8H8Z" fill="#FFFFFF"/>
+  </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function buildFestivalMarkerSvgUrl(): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+    <circle cx="14" cy="14" r="12" fill="#DB2777" stroke="#FFFFFF" stroke-width="2"/>
+    <path d="M7 21l3.5-10.5 7 7L7 21z" fill="#FCE7F3" stroke="#FFFFFF" stroke-width="1.2"/>
+    <path d="M17.5 17.5l-7-7" stroke="#DB2777" stroke-width="1.5"/>
+    <circle cx="19" cy="8" r="1.5" fill="#FDE047"/>
+    <circle cx="21" cy="14" r="1.2" fill="#FFFFFF"/>
+    <circle cx="13" cy="6" r="1.2" fill="#FFFFFF"/>
   </svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
@@ -307,6 +328,8 @@ export function CourseRouteMap({
   headerTitle = "데이트 동선 맵",
   heightClassName = "h-80 lg:h-[440px]",
   footerNode,
+  onAddPlaceToCourse,
+  initialShowFestivals = true,
 }: CourseRouteMapProps) {
   const apiKey = getConfiguredGoogleMapsApiKey();
   const [mapMode, setMapMode] = useState<"google" | "tile">(() =>
@@ -316,10 +339,20 @@ export function CourseRouteMap({
   const activeTheme = DAYT_MAP_THEMES[themeId];
 
   const [isExpanded, setIsExpanded] = useState(false);
-  // Default layer visibility set to false per user requirement (subway, landmarks, parking start OFF)
+  // Default layer visibility: subway, landmarks, parking start OFF, festivals toggleable
   const [showSubwayLayer, setShowSubwayLayer] = useState(false);
   const [showLandmarkLayer, setShowLandmarkLayer] = useState(false);
   const [showParkingLayer, setShowParkingLayer] = useState(false);
+  const [showFestivalLayer, setShowFestivalLayer] = useState(initialShowFestivals);
+
+  const [festivalStops, setFestivalStops] = useState<RouteMapStop[]>([]);
+  const festivalMarkersRef = useRef<GoogleMarkerInstance[]>([]);
+  const [currentBounds, setCurrentBounds] = useState<{
+    minLat: number;
+    maxLat: number;
+    minLng: number;
+    maxLng: number;
+  } | null>(null);
 
   const [internalSelectedStopId, setInternalSelectedStopId] = useState<number | null>(null);
   const selectedStopId = externalSelectedStopId ?? internalSelectedStopId;
@@ -334,10 +367,10 @@ export function CourseRouteMap({
     if (stops.length === 0) {
       return searchAnchor
         ? {
-            lat: searchAnchor.latitude,
-            lng: searchAnchor.longitude,
-            radius: 2000,
-          }
+          lat: searchAnchor.latitude,
+          lng: searchAnchor.longitude,
+          radius: 2000,
+        }
         : { lat: 37.54458, lng: 127.05597, radius: 2000 };
     }
     const sumLat = stops.reduce((acc, s) => acc + s.latitude, 0);
@@ -596,6 +629,87 @@ export function CourseRouteMap({
     isDragging,
   ]);
 
+  // Viewport bounds-based festival synchronization (fetches 100% of festivals inside map bounds)
+  useEffect(() => {
+    if (!showFestivalLayer) {
+      setFestivalStops([]);
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        let b = currentBounds;
+        if (!b) {
+          const cLat = activeCenter.lat;
+          const cLng = activeCenter.lng;
+          const zoomLevel = Math.max(7, Math.min(activeCenter.zoom, 18));
+          const latSpan = 180 / Math.pow(2, zoomLevel - 1);
+          const lngSpan = 360 / Math.pow(2, zoomLevel - 1);
+          b = {
+            minLat: cLat - latSpan * 0.85,
+            maxLat: cLat + latSpan * 0.85,
+            minLng: cLng - lngSpan * 0.85,
+            maxLng: cLng + lngSpan * 0.85,
+          };
+        }
+
+        const params = new URLSearchParams({
+          minLat: String(b.minLat),
+          maxLat: String(b.maxLat),
+          minLng: String(b.minLng),
+          maxLng: String(b.maxLng),
+          limit: "500",
+        });
+
+        const res = await fetch(`/api/v1/places/festivals?${params.toString()}`);
+        if (!active || !res.ok) return;
+        const data = (await res.json()) as {
+          id: number;
+          name: string;
+          address: string;
+          subCategory?: string | null;
+          categoryGroup?: PlaceCategoryGroup;
+          latitude: number;
+          longitude: number;
+          placeUrl?: string | null;
+          eventStartDate?: string | null;
+          eventEndDate?: string | null;
+        }[];
+
+        if (active && Array.isArray(data)) {
+          const mapped: RouteMapStop[] = data.map((item, idx) => ({
+            id: item.id,
+            order: idx + 1,
+            name: item.name,
+            address: item.address,
+            categoryLabel: item.subCategory || "축제·행사",
+            categoryGroup: item.categoryGroup,
+            latitude: item.latitude,
+            longitude: item.longitude,
+            placeUrl: item.placeUrl,
+            eventStartDate: item.eventStartDate,
+            eventEndDate: item.eventEndDate,
+          }));
+          setFestivalStops(mapped);
+        }
+      } catch {
+        // non-blocking
+      }
+    }, 320);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [
+    showFestivalLayer,
+    currentBounds,
+    activeCenter.lat,
+    activeCenter.lng,
+    activeCenter.zoom,
+  ]);
+
   // Closest stations sorted relative to settled map center (no recalculation jitter while dragging)
   // Showing at most 2 stations as per user request
   const visibleClosestStations = useMemo(() => {
@@ -763,6 +877,17 @@ export function CourseRouteMap({
                 zoom: typeof z === "number" ? z : prev.zoom,
               }));
               setSettledCenter(nextCenter);
+            }
+            const bounds = mapInst.getBounds?.();
+            if (bounds) {
+              const sw = bounds.getSouthWest();
+              const ne = bounds.getNorthEast();
+              setCurrentBounds({
+                minLat: sw.lat(),
+                maxLat: ne.lat(),
+                minLng: sw.lng(),
+                maxLng: ne.lng(),
+              });
             }
           });
           mapInstanceRef.current = mapInst;
@@ -993,6 +1118,32 @@ export function CourseRouteMap({
         contextMarkersRef.current.push(pkMarker);
       });
     }
+
+    festivalMarkersRef.current.forEach((m) => m.setMap(null));
+    festivalMarkersRef.current = [];
+
+    if (showFestivalLayer) {
+      festivalStops.forEach((fest) => {
+        // Prevent duplicate pin if already in main course stops
+        if (stops.some((s) => s.id === fest.id)) return;
+
+        const fMarker = new gmaps.Marker({
+          position: { lat: fest.latitude, lng: fest.longitude },
+          map,
+          title: `[행사·축제] ${fest.name}`,
+          zIndex: 7,
+          icon: {
+            url: buildFestivalMarkerSvgUrl(),
+            scaledSize: new gmaps.Size(26, 26),
+            anchor: new gmaps.Point(13, 13),
+          },
+        });
+        fMarker.addListener("click", () => {
+          setSelectedContext({ type: "FESTIVAL", stop: fest });
+        });
+        festivalMarkersRef.current.push(fMarker);
+      });
+    }
   }, [
     apiKey,
     mapMode,
@@ -1000,6 +1151,9 @@ export function CourseRouteMap({
     showSubwayLayer,
     showLandmarkLayer,
     showParkingLayer,
+    showFestivalLayer,
+    festivalStops,
+    stops,
   ]);
 
   // Detect whether map was panned away from the searched reference center (> 220m)
@@ -1224,6 +1378,29 @@ export function CourseRouteMap({
     containerSize.height,
   ]);
 
+  const projectedFestivals = useMemo(() => {
+    if (!showFestivalLayer) return [];
+    return festivalStops
+      .filter((fest) => !stops.some((s) => s.id === fest.id))
+      .map((fest) => {
+        const px = latLngToContainerPx(
+          fest.latitude,
+          fest.longitude,
+          viewport,
+          containerSize.width,
+          containerSize.height,
+        );
+        return { fest, x: px.x, y: px.y };
+      });
+  }, [
+    showFestivalLayer,
+    festivalStops,
+    stops,
+    viewport,
+    containerSize.width,
+    containerSize.height,
+  ]);
+
   const stationToFirstStopGuide = useMemo(() => {
     if (selectedContext?.type !== "STATION" || stops.length === 0) return null;
     const st = selectedContext.station;
@@ -1401,13 +1578,52 @@ export function CourseRouteMap({
                   key={key}
                   type="button"
                   onClick={() => setThemeId(key)}
-                  className={`rounded-full px-3 py-1 text-xs font-extrabold transition-colors ${
-                    selected
+                  className={`rounded-full px-3 py-1 text-xs font-extrabold transition-colors ${selected
                       ? "bg-surface-dark text-white"
                       : "text-muted hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   {spec.label}
+                </button>
+              );
+            })}
+
+            {/* Surrounding Festivals Pins (Pure SVG Icon) */}
+            {projectedFestivals.map(({ fest, x, y }) => {
+              if (
+                x < -70 ||
+                x > containerSize.width + 70 ||
+                y < -40 ||
+                y > containerSize.height + 40
+              ) {
+                return null;
+              }
+              const isSelected =
+                selectedContext?.type === "FESTIVAL" &&
+                selectedContext.stop.id === fest.id;
+
+              return (
+                <button
+                  key={`fest-${fest.id}`}
+                  type="button"
+                  suppressHydrationWarning
+                  onClick={() =>
+                    setSelectedContext(
+                      isSelected ? null : { type: "FESTIVAL", stop: fest },
+                    )
+                  }
+                  style={{
+                    left: `${Math.round(x)}px`,
+                    top: `${Math.round(y)}px`,
+                  }}
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 z-[15] ${isSelected
+                      ? "border-pink-500 bg-pink-600 text-white ring-2 ring-pink-300"
+                      : "border-pink-300 bg-surface/95 text-pink-700 hover:border-pink-500"
+                    }`}
+                  aria-label={`${fest.name} 축제 보기`}
+                >
+                  <PartyPopper className="h-3 w-3 shrink-0 text-pink-600" />
+                  <span className="max-w-[100px] truncate">{fest.name}</span>
                 </button>
               );
             })}
@@ -1422,11 +1638,10 @@ export function CourseRouteMap({
           <button
             type="button"
             onClick={() => setShowSubwayLayer((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${
-              showSubwayLayer
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${showSubwayLayer
                 ? "bg-slate-800 text-white shadow-2xs"
                 : "border border-line bg-surface text-muted hover:text-foreground"
-            }`}
+              }`}
           >
             <TrainFront className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             <span>역</span>
@@ -1435,11 +1650,10 @@ export function CourseRouteMap({
           <button
             type="button"
             onClick={() => setShowLandmarkLayer((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${
-              showLandmarkLayer
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${showLandmarkLayer
                 ? "bg-emerald-700 text-white shadow-2xs"
                 : "border border-line bg-surface text-muted hover:text-foreground"
-            }`}
+              }`}
           >
             <Trees className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             <span>명소·공원</span>
@@ -1448,14 +1662,25 @@ export function CourseRouteMap({
           <button
             type="button"
             onClick={() => setShowParkingLayer((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${
-              showParkingLayer
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${showParkingLayer
                 ? "bg-blue-600 text-white shadow-2xs"
                 : "border border-line bg-surface text-muted hover:text-foreground"
-            }`}
+              }`}
           >
             <SquareParking className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             <span>주차장</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowFestivalLayer((v) => !v)}
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${showFestivalLayer
+                ? "bg-pink-600 text-white shadow-2xs"
+                : "border border-line bg-surface text-muted hover:text-foreground"
+              }`}
+          >
+            <PartyPopper className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <span>행사·축제</span>
           </button>
         </div>
 
@@ -1465,15 +1690,15 @@ export function CourseRouteMap({
           const walkBaseMinutes =
             stops.length > 0 && !hasMovedFromSearchOrigin
               ? estimateWalkingRoute(
-                  st.latitude,
-                  st.longitude,
-                  stops[0].latitude,
-                  stops[0].longitude,
-                ).walkingMinutes
+                st.latitude,
+                st.longitude,
+                stops[0].latitude,
+                stops[0].longitude,
+              ).walkingMinutes
               : Math.max(
-                  1,
-                  Math.round((st.distanceFromCenter * 1.25) / 67),
-                );
+                1,
+                Math.round((st.distanceFromCenter * 1.25) / 67),
+              );
 
           const isSelected =
             selectedContext?.type === "STATION" &&
@@ -1484,11 +1709,10 @@ export function CourseRouteMap({
               type="button"
               onClick={() => handleFocusStation(st)}
               title={`${st.name} 기준 동선 확인 (클릭)`}
-              className={`inline-flex min-w-0 max-w-[210px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors truncate sm:text-xs ${
-                isSelected
+              className={`inline-flex min-w-0 max-w-[210px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors truncate sm:text-xs ${isSelected
                   ? "border-surface-dark bg-surface-dark text-white"
                   : "border-line bg-surface text-foreground hover:border-primary/50"
-              }`}
+                }`}
             >
               <span className="flex shrink-0 items-center gap-0.5">
                 {st.lines.slice(0, 2).map((line) => (
@@ -1502,9 +1726,8 @@ export function CourseRouteMap({
               </span>
               <span className="truncate">{st.name}</span>
               <span
-                className={`shrink-0 text-[10px] font-semibold sm:text-[11px] ${
-                  isSelected ? "text-amber-300" : "text-muted"
-                }`}
+                className={`shrink-0 text-[10px] font-semibold sm:text-[11px] ${isSelected ? "text-amber-300" : "text-muted"
+                  }`}
               >
                 도보 {walkBaseMinutes}분
               </span>
@@ -1532,9 +1755,8 @@ export function CourseRouteMap({
               if ((e.target as HTMLElement).closest("button, a")) return;
               handleZoomDelta(1);
             }}
-            className={`relative h-full w-full touch-none overflow-hidden ${
-              isDragging ? "cursor-grabbing" : "cursor-grab"
-            }`}
+            className={`relative h-full w-full touch-none overflow-hidden ${isDragging ? "cursor-grabbing" : "cursor-grab"
+              }`}
           >
             {/* Real Korean Street & Transit Raster Tiles */}
             <div
@@ -1689,24 +1911,22 @@ export function CourseRouteMap({
                     left: `${Math.round(x)}px`,
                     top: `${Math.round(y)}px`,
                   }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold whitespace-nowrap shadow-xs transition-transform hover:scale-105 ${
-                    isSelected
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold whitespace-nowrap shadow-xs transition-transform hover:scale-105 ${isSelected
                       ? "z-30 border-amber-300 bg-surface-dark text-white"
                       : isParking
                         ? "z-[12] border-blue-200 bg-blue-50/95 text-blue-700"
                         : isPark
                           ? "z-[12] border-emerald-200 bg-emerald-50/95 text-emerald-800"
                           : "z-[12] border-teal-200 bg-teal-50/95 text-teal-800"
-                  }`}
+                    }`}
                 >
                   <span
-                    className={`flex h-4 w-4 items-center justify-center rounded-full text-white ${
-                      isParking
+                    className={`flex h-4 w-4 items-center justify-center rounded-full text-white ${isParking
                         ? "bg-blue-600"
                         : isPark
                           ? "bg-emerald-600"
                           : "bg-teal-600"
-                    }`}
+                      }`}
                   >
                     {isParking ? (
                       <SquareParking className="h-2.5 w-2.5" />
@@ -1717,6 +1937,46 @@ export function CourseRouteMap({
                     )}
                   </span>
                   <span className="max-w-24 truncate">{poi.name}</span>
+                </button>
+              );
+            })}
+
+            {/* Surrounding Festivals Pins (Pure SVG Icon) */}
+            {projectedFestivals.map(({ fest, x, y }) => {
+              if (
+                x < -70 ||
+                x > containerSize.width + 70 ||
+                y < -40 ||
+                y > containerSize.height + 40
+              ) {
+                return null;
+              }
+              const isSelected =
+                selectedContext?.type === "FESTIVAL" &&
+                selectedContext.stop.id === fest.id;
+
+              return (
+                <button
+                  key={`fest-${fest.id}`}
+                  type="button"
+                  suppressHydrationWarning
+                  onClick={() =>
+                    setSelectedContext(
+                      isSelected ? null : { type: "FESTIVAL", stop: fest },
+                    )
+                  }
+                  style={{
+                    left: `${Math.round(x)}px`,
+                    top: `${Math.round(y)}px`,
+                  }}
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 z-[15] ${isSelected
+                      ? "border-pink-500 bg-pink-600 text-white ring-2 ring-pink-300"
+                      : "border-pink-300 bg-surface/95 text-pink-700 hover:border-pink-500"
+                    }`}
+                  aria-label={`${fest.name} 축제 보기`}
+                >
+                  <PartyPopper className="h-3 w-3 shrink-0 text-pink-600" />
+                  <span className="max-w-[100px] truncate">{fest.name}</span>
                 </button>
               );
             })}
@@ -1746,11 +2006,10 @@ export function CourseRouteMap({
                     left: `${Math.round(x)}px`,
                     top: `${Math.round(y)}px`,
                   }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 ${
-                    isSelected
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 ${isSelected
                       ? "z-30 border-amber-300 bg-slate-900 text-white ring-2 ring-amber-300"
                       : "z-[15] border-slate-700/80 bg-slate-900/92 text-white"
-                  }`}
+                    }`}
                 >
                   <span
                     style={{ backgroundColor: primaryLineColor }}
@@ -1764,6 +2023,46 @@ export function CourseRouteMap({
                       {station.lines[0].label}
                     </span>
                   )}
+                </button>
+              );
+            })}
+
+            {/* Surrounding Festivals Pins (Pure SVG Icon) */}
+            {projectedFestivals.map(({ fest, x, y }) => {
+              if (
+                x < -70 ||
+                x > containerSize.width + 70 ||
+                y < -40 ||
+                y > containerSize.height + 40
+              ) {
+                return null;
+              }
+              const isSelected =
+                selectedContext?.type === "FESTIVAL" &&
+                selectedContext.stop.id === fest.id;
+
+              return (
+                <button
+                  key={`fest-${fest.id}`}
+                  type="button"
+                  suppressHydrationWarning
+                  onClick={() =>
+                    setSelectedContext(
+                      isSelected ? null : { type: "FESTIVAL", stop: fest },
+                    )
+                  }
+                  style={{
+                    left: `${Math.round(x)}px`,
+                    top: `${Math.round(y)}px`,
+                  }}
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 z-[15] ${isSelected
+                      ? "border-pink-500 bg-pink-600 text-white ring-2 ring-pink-300"
+                      : "border-pink-300 bg-surface/95 text-pink-700 hover:border-pink-500"
+                    }`}
+                  aria-label={`${fest.name} 축제 보기`}
+                >
+                  <PartyPopper className="h-3 w-3 shrink-0 text-pink-600" />
+                  <span className="max-w-[100px] truncate">{fest.name}</span>
                 </button>
               );
             })}
@@ -1806,23 +2105,20 @@ export function CourseRouteMap({
                     left: `${Math.round(pin.x)}px`,
                     top: `${Math.round(pin.y)}px`,
                   }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center rounded-full font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 ${
-                    pin.showFullLabel
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center rounded-full font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 ${pin.showFullLabel
                       ? "gap-1.5 px-2.5 py-1 text-[11px]"
                       : "p-0.5 text-[11px]"
-                  } ${
-                    pin.isFocused
+                    } ${pin.isFocused
                       ? "z-30 bg-surface-dark text-white ring-2 ring-amber-300"
                       : pin.stop.isDraft
                         ? "z-25 bg-surface text-foreground ring-2 ring-primary shadow-primary/30"
                         : "z-20 bg-surface text-foreground ring-1.5 ring-line"
-                  }`}
+                    }`}
                 >
                   <span
                     style={{ backgroundColor: visual.color }}
-                    className={`flex items-center justify-center rounded-full text-white shadow-2xs ${
-                      pin.showFullLabel ? "h-4.5 w-4.5" : "h-6 w-6"
-                    }`}
+                    className={`flex items-center justify-center rounded-full text-white shadow-2xs ${pin.showFullLabel ? "h-4.5 w-4.5" : "h-6 w-6"
+                      }`}
                   >
                     <CategoryIcon
                       className={
@@ -1843,6 +2139,46 @@ export function CourseRouteMap({
                       {pin.stop.order}
                     </span>
                   )}
+                </button>
+              );
+            })}
+
+            {/* Surrounding Festivals Pins (Pure SVG Icon) */}
+            {projectedFestivals.map(({ fest, x, y }) => {
+              if (
+                x < -70 ||
+                x > containerSize.width + 70 ||
+                y < -40 ||
+                y > containerSize.height + 40
+              ) {
+                return null;
+              }
+              const isSelected =
+                selectedContext?.type === "FESTIVAL" &&
+                selectedContext.stop.id === fest.id;
+
+              return (
+                <button
+                  key={`fest-${fest.id}`}
+                  type="button"
+                  suppressHydrationWarning
+                  onClick={() =>
+                    setSelectedContext(
+                      isSelected ? null : { type: "FESTIVAL", stop: fest },
+                    )
+                  }
+                  style={{
+                    left: `${Math.round(x)}px`,
+                    top: `${Math.round(y)}px`,
+                  }}
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 z-[15] ${isSelected
+                      ? "border-pink-500 bg-pink-600 text-white ring-2 ring-pink-300"
+                      : "border-pink-300 bg-surface/95 text-pink-700 hover:border-pink-500"
+                    }`}
+                  aria-label={`${fest.name} 축제 보기`}
+                >
+                  <PartyPopper className="h-3 w-3 shrink-0 text-pink-600" />
+                  <span className="max-w-[100px] truncate">{fest.name}</span>
                 </button>
               );
             })}
@@ -1958,9 +2294,8 @@ export function CourseRouteMap({
         {/* 6. Selected Subway Station / Landmark / Parking Context Info Card (Pure SVG Icons) */}
         {selectedContext && (
           <div
-            className={`absolute inset-x-4 z-30 flex items-center justify-between gap-3 rounded-2xl border border-slate-700/20 bg-slate-900/95 px-4 py-2.5 text-white shadow-lg backdrop-blur-md ${
-              footerNode ? "bottom-18" : "bottom-4"
-            }`}
+            className={`absolute inset-x-4 z-30 flex items-center justify-between gap-3 rounded-2xl border border-slate-700/20 bg-slate-900/95 px-4 py-2.5 text-white shadow-lg backdrop-blur-md ${footerNode ? "bottom-18" : "bottom-4"
+              }`}
           >
             {selectedContext.type === "STATION" ? (
               <div className="min-w-0">
@@ -1985,14 +2320,31 @@ export function CourseRouteMap({
                     : `현 지도 중심에서 약 ${selectedContext.station.distanceMeters}m`}
                 </p>
               </div>
+            ) : selectedContext.type === "FESTIVAL" ? (
+              <div className="min-w-0">
+                <p className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-pink-300">
+                  <PartyPopper className="h-3.5 w-3.5 shrink-0" />
+                  <span>행사·축제 안내</span>
+                  {selectedContext.stop.eventStartDate && selectedContext.stop.eventEndDate && (
+                    <span className="text-[10px] font-medium text-pink-200">
+                      ({selectedContext.stop.eventStartDate} ~ {selectedContext.stop.eventEndDate})
+                    </span>
+                  )}
+                </p>
+                <p className="mt-0.5 truncate text-xs font-extrabold text-white">
+                  {selectedContext.stop.name}
+                </p>
+                <p className="truncate text-[11px] text-slate-300">
+                  {selectedContext.stop.address}
+                </p>
+              </div>
             ) : (
               <div className="min-w-0">
                 <p
-                  className={`inline-flex items-center gap-1.5 text-[11px] font-extrabold ${
-                    selectedContext.poi.kind === "PARKING"
+                  className={`inline-flex items-center gap-1.5 text-[11px] font-extrabold ${selectedContext.poi.kind === "PARKING"
                       ? "text-sky-300"
                       : "text-emerald-300"
-                  }`}
+                    }`}
                 >
                   {selectedContext.poi.kind === "PARKING" ? (
                     <SquareParking className="h-3.5 w-3.5 shrink-0" />
@@ -2014,23 +2366,40 @@ export function CourseRouteMap({
             )}
 
             <div className="flex shrink-0 items-center gap-1.5">
+              {selectedContext.type === "FESTIVAL" && onAddPlaceToCourse && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onAddPlaceToCourse(selectedContext.stop);
+                    setSelectedContext(null);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full bg-pink-600 px-3 py-1.5 text-[11px] font-black text-white hover:bg-pink-500 shadow-sm"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>코스로 지정</span>
+                </button>
+              )}
               {(selectedContext.type === "STATION"
                 ? selectedContext.station.placeUrl
-                : selectedContext.poi.placeUrl) && (
-                <a
-                  href={
-                    (selectedContext.type === "STATION"
-                      ? selectedContext.station.placeUrl
-                      : selectedContext.poi.placeUrl) ?? "#"
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/25"
-                >
-                  <span>지도</span>
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
+                : selectedContext.type === "FESTIVAL"
+                  ? selectedContext.stop.placeUrl
+                  : selectedContext.poi.placeUrl) && (
+                  <a
+                    href={
+                      (selectedContext.type === "STATION"
+                        ? selectedContext.station.placeUrl
+                        : selectedContext.type === "FESTIVAL"
+                          ? selectedContext.stop.placeUrl
+                          : selectedContext.poi.placeUrl) ?? "#"
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/25"
+                  >
+                    <span>지도</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
               <button
                 type="button"
                 onClick={() => setSelectedContext(null)}

@@ -72,4 +72,6 @@ dayt:
   google-places:
     api-key: ${GOOGLE_PLACES_API_KEY:}
     enabled: ${GOOGLE_PLACES_ENABLED:true}
+  tour-api:
+    service-key: ${TOUR_API_SERVICE_KEY:}
 

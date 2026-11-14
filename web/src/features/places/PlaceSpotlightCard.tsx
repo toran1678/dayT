@@ -11,6 +11,7 @@ import {
   ImageIcon,
   Loader2,
   MapPin,
+  PartyPopper,
   Phone,
   Plus,
   Sparkles,
@@ -28,6 +29,34 @@ const CATEGORY_KO_LABELS: Record<PlaceCategoryGroup, string> = {
   PARK: "공원 · 산책",
   ETC: "스팟",
 };
+
+function formatFestivalStatus(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+
+  if (end < today) {
+    return { status: "ended", label: "종료된 행사", badgeBg: "bg-zinc-200 text-zinc-600" };
+  }
+  if (start <= today && end >= today) {
+    const diffDays = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      status: "active",
+      label: diffDays === 0 ? "오늘 종료!" : `진행 중 (D-${diffDays})`,
+      badgeBg: "bg-pink-500 text-white",
+    };
+  }
+  const diffDays = Math.ceil((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return {
+    status: "upcoming",
+    label: `D-${diffDays} 개최 예정`,
+    badgeBg: "bg-purple-600 text-white",
+  };
+}
 
 const FALLBACK_CATEGORY_PHOTOS: Record<string, string> = {
   RESTAURANT:
@@ -69,6 +98,11 @@ export function PlaceSpotlightCard({
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
   const [failedUrls, setFailedUrls] = useState<Record<string, boolean>>({});
 
+  const festivalStatus = useMemo(
+    () => formatFestivalStatus(place.eventStartDate, place.eventEndDate),
+    [place.eventStartDate, place.eventEndDate],
+  );
+
   useEffect(() => {
     let active = true;
 
@@ -77,6 +111,15 @@ export function PlaceSpotlightCard({
       setSelectedPhotoIdx(0);
       setFailedUrls({});
       try {
+        const initialPhotos: PlacePhotoItem[] = [];
+        if (place.thumbnailUrl) {
+          initialPhotos.push({
+            url: place.thumbnailUrl,
+            thumbnailUrl: place.thumbnailUrl,
+            source: "TOUR_API",
+          });
+        }
+
         const params = new URLSearchParams({
           name: place.name,
           address: place.address,
@@ -93,9 +136,13 @@ export function PlaceSpotlightCard({
         if (res.ok) {
           const data = (await res.json()) as { photos?: PlacePhotoItem[] };
           if (active && Array.isArray(data.photos) && data.photos.length > 0) {
-            setPhotos(data.photos);
+            setPhotos([...initialPhotos, ...data.photos]);
             return;
           }
+        }
+        if (initialPhotos.length > 0) {
+          setPhotos(initialPhotos);
+          return;
         }
       } catch {
         // Fallback handled below
@@ -232,18 +279,14 @@ export function PlaceSpotlightCard({
         {/* Top Floating Badges */}
         <div className="absolute top-3 inset-x-3 z-10 flex items-center justify-between">
           <div className="flex flex-wrap items-center gap-1.5">
-            {typeof orderNumber === "number" && (
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-black text-white shadow-sm">
-                {orderNumber}
-              </span>
-            )}
             <span className="rounded-full bg-surface/90 px-2.5 py-0.5 text-[11px] font-bold text-foreground shadow-xs backdrop-blur-xs">
               {CATEGORY_KO_LABELS[place.categoryGroup]}
               {place.foodCategory ? ` · ${place.foodCategory}` : ""}
             </span>
-            {place.eventStartDate && place.eventEndDate && (
-              <span className="rounded-full bg-purple-600 px-2.5 py-0.5 text-[10px] font-black text-white shadow-xs backdrop-blur-xs">
-                🎉 축제·행사
+            {festivalStatus && (
+              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-black shadow-xs backdrop-blur-xs flex items-center gap-1 ${festivalStatus.badgeBg}`}>
+                <PartyPopper className="h-3 w-3" />
+                <span>{festivalStatus.label}</span>
               </span>
             )}
             {place.isIndoor !== null && (
@@ -337,14 +380,27 @@ export function PlaceSpotlightCard({
           </button>
         </div>
 
+        {/* Festival Schedule Highlight Box */}
+        {festivalStatus && (
+          <div className="rounded-2xl border border-pink-200/90 bg-gradient-to-r from-pink-50/80 to-purple-50/80 p-3.5 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 font-black text-pink-700">
+                <PartyPopper className="h-4 w-4 text-pink-600" />
+                <span>행사·축제 안내</span>
+              </span>
+              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-black ${festivalStatus.badgeBg}`}>
+                {festivalStatus.label}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-foreground font-extrabold">
+              <Calendar className="h-3.5 w-3.5 shrink-0 text-pink-600" />
+              <span>행사 일정: {place.eventStartDate} ~ {place.eventEndDate}</span>
+            </div>
+          </div>
+        )}
+
         {/* Address & Price Meta */}
         <div className="space-y-1.5 rounded-2xl bg-surface-subtle/60 p-3.5 text-xs">
-          {place.eventStartDate && place.eventEndDate && (
-            <div className="flex items-center gap-1.5 rounded-xl bg-purple-50/90 border border-purple-200/80 px-2.5 py-1.5 text-xs font-bold text-purple-700">
-              <Calendar className="h-3.5 w-3.5 shrink-0 text-purple-600" />
-              <span>축제·행사 기간: {place.eventStartDate} ~ {place.eventEndDate}</span>
-            </div>
-          )}
           <div className="flex items-start gap-2">
             <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
             <span className="font-medium text-foreground">{place.address}</span>

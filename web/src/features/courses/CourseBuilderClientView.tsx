@@ -1374,6 +1374,31 @@ export function CourseBuilderClientView({
               connectRoute={true}
               activeOrder={focusedOrder}
               onSelectStop={(stop) => setFocusedOrder(stop.order)}
+              onAddPlaceToCourse={(stop) => {
+                const target: PlaceDetail = {
+                  id: stop.id,
+                  externalProvider: "TOUR_API",
+                  externalPlaceId: `tour_${stop.id}`,
+                  name: stop.name,
+                  categoryGroup: stop.categoryGroup ?? "EXHIBITION",
+                  foodCategory: null,
+                  subCategory: stop.categoryLabel,
+                  address: stop.address,
+                  latitude: stop.latitude,
+                  longitude: stop.longitude,
+                  placeUrl: stop.placeUrl ?? null,
+                  eventStartDate: stop.eventStartDate ?? null,
+                  eventEndDate: stop.eventEndDate ?? null,
+                  hashtags: ["#전국축제", "#데이트"],
+                  avgPricePerPerson: 0,
+                  isIndoor: false,
+                  phone: null,
+                  thumbnailUrl: null,
+                  recommendedMenus: [],
+                  aiSummary: `${stop.name} (${stop.categoryLabel})`,
+                };
+                handleAddPlace(target);
+              }}
               headerTitle={`코스 동선 프리뷰 (${stops.length}곳)`}
               heightClassName="h-72 lg:h-80"
             />

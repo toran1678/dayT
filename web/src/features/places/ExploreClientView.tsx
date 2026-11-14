@@ -11,6 +11,8 @@ import {
 } from "react";
 import {
   ArrowRight,
+  Calendar,
+  ChefHat,
   CloudRain,
   Coffee,
   Compass,
@@ -19,6 +21,7 @@ import {
   Flame,
   MapPin,
   Palette,
+  PartyPopper,
   Pizza,
   RotateCcw,
   Sandwich,
@@ -54,55 +57,65 @@ import {
 } from "./subway-search-data";
 
 // Multi-selectable date spot categories with dedicated Lucide SVG icons and fixed 1px border geometry
+export type ExploreCategoryCode = PlaceCategoryGroup | "FESTIVAL";
+
 const CATEGORY_MULTI_FILTERS: {
-  code: PlaceCategoryGroup;
+  code: ExploreCategoryCode;
   label: string;
   icon: typeof Coffee;
   color: string;
   activeBorder: string;
   activeBg: string;
 }[] = [
-  {
-    code: "CAFE",
-    label: "감성 카페",
-    icon: Coffee,
-    color: "#B45309",
-    activeBorder: "border-amber-600",
-    activeBg: "bg-amber-600",
-  },
-  {
-    code: "RESTAURANT",
-    label: "맛집 투어",
-    icon: UtensilsCrossed,
-    color: "#E11D48",
-    activeBorder: "border-rose-600",
-    activeBg: "bg-rose-600",
-  },
-  {
-    code: "ACTIVITY",
-    label: "액티비티",
-    icon: Ticket,
-    color: "#4F46E5",
-    activeBorder: "border-indigo-600",
-    activeBg: "bg-indigo-600",
-  },
-  {
-    code: "EXHIBITION",
-    label: "전시·문화",
-    icon: Palette,
-    color: "#9333EA",
-    activeBorder: "border-purple-600",
-    activeBg: "bg-purple-600",
-  },
-  {
-    code: "PARK",
-    label: "산책·야외",
-    icon: Trees,
-    color: "#059669",
-    activeBorder: "border-emerald-600",
-    activeBg: "bg-emerald-600",
-  },
-];
+    {
+      code: "CAFE",
+      label: "감성 카페",
+      icon: Coffee,
+      color: "#B45309",
+      activeBorder: "border-amber-600",
+      activeBg: "bg-amber-600",
+    },
+    {
+      code: "RESTAURANT",
+      label: "맛집 투어",
+      icon: UtensilsCrossed,
+      color: "#E11D48",
+      activeBorder: "border-rose-600",
+      activeBg: "bg-rose-600",
+    },
+    {
+      code: "ACTIVITY",
+      label: "액티비티",
+      icon: Ticket,
+      color: "#4F46E5",
+      activeBorder: "border-indigo-600",
+      activeBg: "bg-indigo-600",
+    },
+    {
+      code: "EXHIBITION",
+      label: "전시·문화",
+      icon: Palette,
+      color: "#9333EA",
+      activeBorder: "border-purple-600",
+      activeBg: "bg-purple-600",
+    },
+    {
+      code: "PARK",
+      label: "산책·야외",
+      icon: Trees,
+      color: "#059669",
+      activeBorder: "border-emerald-600",
+      activeBg: "bg-emerald-600",
+    },
+    {
+      code: "FESTIVAL",
+      label: "행사·축제",
+      icon: PartyPopper,
+      color: "#DB2777",
+      activeBorder: "border-pink-600",
+      activeBg: "bg-pink-600",
+    },
+  ];
 
 // Multi-selectable food categories styled identically to main categories with matching Lucide SVG icons
 const FOOD_MULTI_FILTERS: {
@@ -113,71 +126,71 @@ const FOOD_MULTI_FILTERS: {
   activeBorder: string;
   activeBg: string;
 }[] = [
-  {
-    category: "일식",
-    label: "일식",
-    icon: Fish,
-    color: "#0284C7",
-    activeBorder: "border-sky-600",
-    activeBg: "bg-sky-600",
-  },
-  {
-    category: "양식",
-    label: "양식",
-    icon: Pizza,
-    color: "#D97706",
-    activeBorder: "border-amber-600",
-    activeBg: "bg-amber-600",
-  },
-  {
-    category: "한식",
-    label: "한식",
-    icon: Soup,
-    color: "#DC2626",
-    activeBorder: "border-red-600",
-    activeBg: "bg-red-600",
-  },
-  {
-    category: "고기",
-    label: "고기",
-    icon: Flame,
-    color: "#EA580C",
-    activeBorder: "border-orange-600",
-    activeBg: "bg-orange-600",
-  },
-  {
-    category: "중식",
-    label: "중식",
-    icon: UtensilsCrossed,
-    color: "#B91C1C",
-    activeBorder: "border-red-700",
-    activeBg: "bg-red-700",
-  },
-  {
-    category: "치킨",
-    label: "치킨",
-    icon: Drumstick,
-    color: "#CA8A04",
-    activeBorder: "border-yellow-600",
-    activeBg: "bg-yellow-600",
-  },
-  {
-    category: "분식",
-    label: "분식",
-    icon: Sandwich,
-    color: "#DB2777",
-    activeBorder: "border-pink-600",
-    activeBg: "bg-pink-600",
-  },
-  {
-    category: "기타",
-    label: "그 외",
-    icon: Sparkles,
-    color: "#8B5CF6",
-    activeBorder: "border-purple-600",
-    activeBg: "bg-purple-600",
-  },
-];
+    {
+      category: "일식",
+      label: "일식",
+      icon: Fish,
+      color: "#0284C7",
+      activeBorder: "border-sky-600",
+      activeBg: "bg-sky-600",
+    },
+    {
+      category: "양식",
+      label: "양식",
+      icon: Pizza,
+      color: "#D97706",
+      activeBorder: "border-amber-600",
+      activeBg: "bg-amber-600",
+    },
+    {
+      category: "한식",
+      label: "한식",
+      icon: Soup,
+      color: "#DC2626",
+      activeBorder: "border-red-600",
+      activeBg: "bg-red-600",
+    },
+    {
+      category: "고기",
+      label: "고기",
+      icon: Flame,
+      color: "#EA580C",
+      activeBorder: "border-orange-600",
+      activeBg: "bg-orange-600",
+    },
+    {
+      category: "중식",
+      label: "중식",
+      icon: UtensilsCrossed,
+      color: "#B91C1C",
+      activeBorder: "border-red-700",
+      activeBg: "bg-red-700",
+    },
+    {
+      category: "치킨",
+      label: "치킨",
+      icon: Drumstick,
+      color: "#CA8A04",
+      activeBorder: "border-yellow-600",
+      activeBg: "bg-yellow-600",
+    },
+    {
+      category: "분식",
+      label: "분식",
+      icon: Sandwich,
+      color: "#DB2777",
+      activeBorder: "border-pink-600",
+      activeBg: "bg-pink-600",
+    },
+    {
+      category: "기타",
+      label: "기타",
+      icon: ChefHat,
+      color: "#8B5CF6",
+      activeBorder: "border-purple-600",
+      activeBg: "bg-purple-600",
+    },
+  ];
 
 const BUDGET_SLIDER_MIN = 10000;
 const BUDGET_SLIDER_UNLIMITED = 110000;
@@ -232,7 +245,7 @@ export function ExploreClientView() {
 
   // Multi-category selection state (empty array = all categories)
   const [selectedCategories, setSelectedCategories] = useState<
-    PlaceCategoryGroup[]
+    ExploreCategoryCode[]
   >([]);
 
   // Multi-food-category selection state for restaurants (empty array = all food types)
@@ -254,6 +267,7 @@ export function ExploreClientView() {
   const [indoorOnly, setIndoorOnly] = useState(false);
 
   const [places, setPlaces] = useState<PlaceDetail[]>([]);
+  const [allFestivals, setAllFestivals] = useState<PlaceDetail[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(true);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -290,6 +304,27 @@ export function ExploreClientView() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Load active festivals nationwide so they are always visible in list & details
+  useEffect(() => {
+    let active = true;
+    async function loadAllFestivals() {
+      try {
+        const res = await fetch("/api/v1/places/festivals?limit=500");
+        if (!res.ok) return;
+        const items = (await res.json()) as PlaceDetail[];
+        if (active && Array.isArray(items)) {
+          setAllFestivals(items);
+        }
+      } catch {
+        // Non-blocking fallback
+      }
+    }
+    void loadAllFestivals();
+    return () => {
+      active = false;
+    };
+  }, [reloadTick]);
+
   // Search Places API Effect with consistent candidate pool (size: 40)
   useEffect(() => {
     let active = true;
@@ -297,15 +332,21 @@ export function ExploreClientView() {
     async function loadPlaces() {
       try {
         const backendCategory =
-          selectedCategories.length === 1 ? selectedCategories[0] : undefined;
+          selectedCategories.length === 1 && selectedCategories[0] !== "FESTIVAL"
+            ? (selectedCategories[0] as PlaceCategoryGroup)
+            : undefined;
         // Consistent pool of 40 candidates to avoid sudden list-size jumps when selecting food types
         const backendSize = 40;
+
+        const effectiveRadiusMeters = selectedCategories.includes("FESTIVAL")
+          ? Math.max(radiusMeters, 10000)
+          : radiusMeters;
 
         const res = await searchPlacesApi({
           keyword: appliedCoords ? undefined : appliedKeyword,
           latitude: appliedCoords?.latitude,
           longitude: appliedCoords?.longitude,
-          radiusMeters,
+          radiusMeters: effectiveRadiusMeters,
           categoryGroup: backendCategory,
           maxPricePerPerson: maxPrice,
           isIndoor: indoorOnly ? true : undefined,
@@ -315,12 +356,39 @@ export function ExploreClientView() {
 
         if (active) {
           let filtered = res.items;
+          const todayStr = new Date().toISOString().slice(0, 10);
 
-          // 1. Filter by major categories if multiple selected
-          if (selectedCategories.length > 1) {
-            filtered = filtered.filter((p) =>
-              selectedCategories.includes(p.categoryGroup),
+          // 0. Exclude past events (endDate < today)
+          filtered = filtered.filter(
+            (p) => !p.eventEndDate || p.eventEndDate >= todayStr,
+          );
+
+          // 1. Filter by major categories / festival
+          if (selectedCategories.length > 0) {
+            const hasFestival = selectedCategories.includes("FESTIVAL");
+            const standardCats = selectedCategories.filter(
+              (c): c is PlaceCategoryGroup => c !== "FESTIVAL",
             );
+
+            filtered = filtered.filter((p) => {
+              const isFestivalSpot = Boolean(
+                p.eventStartDate && p.eventEndDate && p.eventEndDate >= todayStr,
+              );
+              const matchFestival = hasFestival && isFestivalSpot;
+              const matchStandard =
+                standardCats.length > 0 &&
+                standardCats.includes(p.categoryGroup);
+              return matchFestival || matchStandard;
+            });
+
+            // When festival is selected, merge active festivals so the list view is fully populated
+            if (hasFestival && allFestivals.length > 0) {
+              const existingIds = new Set(filtered.map((p) => p.id));
+              const extraFests = allFestivals.filter(
+                (f) => !existingIds.has(f.id),
+              );
+              filtered = [...filtered, ...extraFests];
+            }
           }
 
           // 2. Filter by food categories if specified (narrows down restaurants from the 40 places)
@@ -435,7 +503,7 @@ export function ExploreClientView() {
   }
 
   // Category Multi-toggle Handlers
-  function handleToggleCategory(code: PlaceCategoryGroup) {
+  function handleToggleCategory(code: ExploreCategoryCode) {
     setIsLoadingPlaces(true);
     setSelectedCategories((prev) => {
       if (prev.includes(code)) {
@@ -475,6 +543,16 @@ export function ExploreClientView() {
     }
   }
 
+  function handleAddDraft(place: PlaceDetail) {
+    if (!draftPlaces.some((p) => p.id === place.id)) {
+      const next = [...draftPlaces, place];
+      writeDraftPlaces(next);
+      if (next.length >= 2) {
+        setMapPreviewMode("draft");
+      }
+    }
+  }
+
   const draftIdSet = useMemo(
     () => new Set(draftPlaces.map((p) => p.id)),
     [draftPlaces],
@@ -494,7 +572,10 @@ export function ExploreClientView() {
       order: index + 1,
       name: place.name,
       address: place.address,
-      categoryLabel: CATEGORY_BADGE_LABELS[place.categoryGroup],
+      categoryLabel:
+        place.eventStartDate && place.eventEndDate
+          ? "행사·축제"
+          : CATEGORY_BADGE_LABELS[place.categoryGroup],
       categoryGroup: place.categoryGroup,
       latitude: place.latitude,
       longitude: place.longitude,
@@ -523,7 +604,10 @@ export function ExploreClientView() {
         order: draftStops.length + index + 1,
         name: place.name,
         address: place.address,
-        categoryLabel: CATEGORY_BADGE_LABELS[place.categoryGroup],
+        categoryLabel:
+          place.eventStartDate && place.eventEndDate
+            ? "행사·축제"
+            : CATEGORY_BADGE_LABELS[place.categoryGroup],
         categoryGroup: place.categoryGroup,
         latitude: place.latitude,
         longitude: place.longitude,
@@ -537,8 +621,34 @@ export function ExploreClientView() {
         eventEndDate: place.eventEndDate,
       }));
 
-    return [...draftStops, ...candidateStops];
-  }, [places, draftPlaces, isShowingDraftRoute]);
+    // 3. All active festivals nationwide so that ANY festival inside visible map is ALWAYS rendered as a pin
+    const pinnedIds = new Set([
+      ...draftPlaces.map((p) => p.id),
+      ...candidatePlaces.map((p) => p.id),
+    ]);
+    const extraFestivals = allFestivals.filter((f) => !pinnedIds.has(f.id));
+
+    const festivalStops: RouteMapStop[] = extraFestivals.map((fest, idx) => ({
+      id: fest.id,
+      order: draftStops.length + candidateStops.length + idx + 1,
+      name: fest.name,
+      address: fest.address,
+      categoryLabel: "행사·축제",
+      categoryGroup: fest.categoryGroup,
+      latitude: fest.latitude,
+      longitude: fest.longitude,
+      estimatedCost:
+        fest.avgPricePerPerson !== null
+          ? fest.avgPricePerPerson * 2
+          : undefined,
+      placeUrl: fest.placeUrl,
+      isDraft: false,
+      eventStartDate: fest.eventStartDate,
+      eventEndDate: fest.eventEndDate,
+    }));
+
+    return [...draftStops, ...candidateStops, ...festivalStops];
+  }, [places, draftPlaces, allFestivals, isShowingDraftRoute]);
 
   const totalDraftCostForTwo = useMemo(
     () =>
@@ -551,11 +661,12 @@ export function ExploreClientView() {
     if (selectedPlaceId !== null) {
       const found =
         places.find((p) => p.id === selectedPlaceId) ??
-        draftPlaces.find((p) => p.id === selectedPlaceId);
+        draftPlaces.find((p) => p.id === selectedPlaceId) ??
+        allFestivals.find((p) => p.id === selectedPlaceId);
       if (found) return found;
     }
-    return places[0] ?? draftPlaces[0] ?? null;
-  }, [selectedPlaceId, places, draftPlaces]);
+    return places[0] ?? draftPlaces[0] ?? allFestivals[0] ?? null;
+  }, [selectedPlaceId, places, draftPlaces, allFestivals]);
 
   const activeSpotlightOrder = useMemo(() => {
     if (!activeSpotlightPlace) return undefined;
@@ -604,15 +715,15 @@ export function ExploreClientView() {
 
               {(selectedCategories.length > 0 ||
                 selectedFoodCategories.length > 0) && (
-                <button
-                  type="button"
-                  onClick={handleSelectAllCategories}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-surface-subtle px-2.5 py-1 text-[11px] font-bold text-muted hover:text-foreground transition-colors mt-1"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  <span>필터 초기화</span>
-                </button>
-              )}
+                  <button
+                    type="button"
+                    onClick={handleSelectAllCategories}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-surface-subtle px-2.5 py-1 text-[11px] font-bold text-muted hover:text-foreground transition-colors mt-1"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    <span>필터 초기화</span>
+                  </button>
+                )}
             </div>
 
             {/* Keyword Search Form with Empty Input Default and Subway Station Hints Dropdown */}
@@ -686,11 +797,10 @@ export function ExploreClientView() {
                           type="button"
                           onMouseEnter={() => setActiveHintIdx(idx)}
                           onClick={() => handleSelectHint(hint)}
-                          className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
-                            isFocused
+                          className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${isFocused
                               ? "bg-primary-soft text-primary font-black"
                               : "text-foreground hover:bg-surface-subtle"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <span
@@ -840,27 +950,23 @@ export function ExploreClientView() {
                     setIsLoadingPlaces(true);
                     setIndoorOnly((prev) => !prev);
                   }}
-                  className={`inline-flex items-center gap-2 rounded-full border border-solid px-2.5 py-1 text-xs font-bold transition-all shadow-2xs ${
-                    indoorOnly
+                  className={`inline-flex items-center gap-2 rounded-full border border-solid px-2.5 py-1 text-xs font-bold transition-all shadow-2xs ${indoorOnly
                       ? "border-primary bg-primary-soft text-primary"
                       : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   <CloudRain
-                    className={`h-3.5 w-3.5 ${
-                      indoorOnly ? "text-primary" : "text-muted"
-                    }`}
+                    className={`h-3.5 w-3.5 ${indoorOnly ? "text-primary" : "text-muted"
+                      }`}
                   />
                   <span>실내 전용</span>
                   <span
-                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
-                      indoorOnly ? "bg-primary" : "bg-line"
-                    }`}
+                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${indoorOnly ? "bg-primary" : "bg-line"
+                      }`}
                   >
                     <span
-                      className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out mt-0.5 ${
-                        indoorOnly ? "translate-x-3.5" : "translate-x-0.5"
-                      }`}
+                      className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out mt-0.5 ${indoorOnly ? "translate-x-3.5" : "translate-x-0.5"
+                        }`}
                     />
                   </span>
                 </button>
@@ -872,11 +978,10 @@ export function ExploreClientView() {
                 <button
                   type="button"
                   onClick={handleSelectAllCategories}
-                  className={`shrink-0 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${
-                    selectedCategories.length === 0
+                  className={`shrink-0 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${selectedCategories.length === 0
                       ? "border-surface-dark bg-surface-dark text-white"
                       : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   전체
                 </button>
@@ -890,11 +995,10 @@ export function ExploreClientView() {
                       key={cat.code}
                       type="button"
                       onClick={() => handleToggleCategory(cat.code)}
-                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${
-                        isSelected
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${isSelected
                           ? `${cat.activeBorder} ${cat.activeBg} text-white`
                           : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
-                      }`}
+                        }`}
                     >
                       <Icon
                         className="h-3.5 w-3.5 shrink-0"
@@ -924,11 +1028,10 @@ export function ExploreClientView() {
                   <button
                     type="button"
                     onClick={() => setSelectedFoodCategories([])}
-                    className={`shrink-0 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${
-                      selectedFoodCategories.length === 0
+                    className={`shrink-0 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${selectedFoodCategories.length === 0
                         ? "border-surface-dark bg-surface-dark text-white"
                         : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
-                    }`}
+                      }`}
                   >
                     음식 전체
                   </button>
@@ -942,11 +1045,10 @@ export function ExploreClientView() {
                         key={food.category}
                         type="button"
                         onClick={() => handleToggleFoodCategory(food.category)}
-                        className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${
-                          isFoodSelected
+                        className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border border-solid px-3 py-1.5 text-xs font-extrabold transition-colors duration-150 shadow-2xs ${isFoodSelected
                             ? `${food.activeBorder} ${food.activeBg} text-white`
                             : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
-                        }`}
+                          }`}
                       >
                         <FoodIcon
                           className="h-3.5 w-3.5 shrink-0"
@@ -1098,9 +1200,9 @@ export function ExploreClientView() {
             searchAnchor={
               appliedCoords
                 ? {
-                    latitude: appliedCoords.latitude,
-                    longitude: appliedCoords.longitude,
-                  }
+                  latitude: appliedCoords.latitude,
+                  longitude: appliedCoords.longitude,
+                }
                 : null
             }
             onSearchInArea={handleSearchInMapArea}
@@ -1114,6 +1216,31 @@ export function ExploreClientView() {
             onSelectStop={(stop) => {
               setSelectedPlaceId(stop.id);
               setIsSpotlightModalOpen(true);
+            }}
+            onAddPlaceToCourse={(stop) => {
+              const target: PlaceDetail = allFestivals.find((f) => f.id === stop.id) ?? {
+                id: stop.id,
+                externalProvider: "TOUR_API",
+                externalPlaceId: `tour_${stop.id}`,
+                name: stop.name,
+                categoryGroup: stop.categoryGroup ?? "EXHIBITION",
+                foodCategory: null,
+                subCategory: stop.categoryLabel,
+                address: stop.address,
+                latitude: stop.latitude,
+                longitude: stop.longitude,
+                placeUrl: stop.placeUrl ?? null,
+                eventStartDate: stop.eventStartDate ?? null,
+                eventEndDate: stop.eventEndDate ?? null,
+                hashtags: ["#전국축제", "#데이트"],
+                avgPricePerPerson: 0,
+                isIndoor: false,
+                phone: null,
+                thumbnailUrl: null,
+                recommendedMenus: [],
+                aiSummary: `${stop.name} (${stop.categoryLabel})`,
+              };
+              handleAddDraft(target);
             }}
             footerNode={
               draftPlaces.length > 0 ? (
@@ -1162,11 +1289,11 @@ export function ExploreClientView() {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
           onClick={() => setIsSpotlightModalOpen(false)}
         >
           <div
-            className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl"
+            className="relative max-h-[88vh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl bg-surface shadow-2xl [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.2)_transparent] dark:[scrollbar-color:rgba(255,255,255,0.2)_transparent]"
             onClick={(e) => e.stopPropagation()}
           >
             <PlaceSpotlightCard

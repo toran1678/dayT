@@ -16,6 +16,12 @@ export interface GoogleLatLngBoundsInstance {
 export interface GoogleMapInstance {
   setCenter: (center: GoogleLatLngLiteral) => void;
   getCenter?: () => { lat: () => number; lng: () => number } | undefined;
+  getBounds?: () =>
+    | {
+        getSouthWest: () => { lat: () => number; lng: () => number };
+        getNorthEast: () => { lat: () => number; lng: () => number };
+      }
+    | undefined;
   setZoom: (zoom: number) => void;
   getZoom: () => number | undefined;
   panTo: (center: GoogleLatLngLiteral) => void;

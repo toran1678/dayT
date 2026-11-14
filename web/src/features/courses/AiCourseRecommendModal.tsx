@@ -552,7 +552,7 @@ export function AiCourseRecommendModal({
               />
             </div>
             <p className="mt-1.5 text-[11px] font-medium text-muted">
-              💡 날짜를 지정하고 테마에서 &apos;행사·축제&apos;를 선택하시면 해당 일자에 열리는 실존 축제·야시장·팝업스토어를 최우선으로 코스에 반영해 드립니다!
+              💡 날짜를 지정하고 테마에서 &apos;행사·축제&apos;를 선택하시면 해당 일자에 열리는 축제·야시장·팝업스토어를 최우선으로 코스에 반영해 드립니다!
             </p>
           </div>
 
@@ -731,7 +731,7 @@ export function AiCourseRecommendModal({
             {isGenerating ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>실존 핫플 후보를 분석해 최적 동선을 조합 중...</span>
+                <span>주변 장소를 분석해 최적 동선을 조합 중...</span>
               </>
             ) : (
               <>

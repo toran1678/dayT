@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlaceController {
 
 	private final PlaceService placeService;
+	private final com.dayt.domain.place.service.TourApiFestivalSyncService tourApiFestivalSyncService;
 
 	@Operation(summary = "지역·카테고리·예산 기반 장소 탐색")
 	@GetMapping("/search")
@@ -36,8 +37,7 @@ public class PlaceController {
 			@RequestParam(name = "maxPricePerPerson", required = false) Integer maxPricePerPerson,
 			@RequestParam(name = "isIndoor", required = false) Boolean isIndoor,
 			@RequestParam(name = "page", defaultValue = "0") int page,
-			@RequestParam(name = "size", defaultValue = "20") int size
-	) {
+			@RequestParam(name = "size", defaultValue = "20") int size) {
 		return ResponseEntity.ok(placeService.searchPlaces(
 				keyword,
 				latitude,
@@ -48,8 +48,7 @@ public class PlaceController {
 				maxPricePerPerson,
 				isIndoor,
 				page,
-				size
-		));
+				size));
 	}
 
 	@Operation(summary = "취향·예산 기반 음식 메뉴 및 주변 식당 추천")
@@ -58,14 +57,12 @@ public class PlaceController {
 			@RequestParam(name = "foodCategory", required = false) FoodCategory foodCategory,
 			@RequestParam(name = "latitude", required = false) Double latitude,
 			@RequestParam(name = "longitude", required = false) Double longitude,
-			@RequestParam(name = "budgetPerPerson", required = false) Integer budgetPerPerson
-	) {
+			@RequestParam(name = "budgetPerPerson", required = false) Integer budgetPerPerson) {
 		return ResponseEntity.ok(placeService.recommendFoods(
 				foodCategory,
 				latitude,
 				longitude,
-				budgetPerPerson
-		));
+				budgetPerPerson));
 	}
 
 	@Operation(summary = "장소 상세 정보 및 AI 해시태그 요약 조회")
@@ -73,5 +70,26 @@ public class PlaceController {
 	public ResponseEntity<PlaceDetailResponse> getPlaceDetail(@PathVariable("placeId") Long placeId) {
 		return ResponseEntity.ok(placeService.getPlaceDetail(placeId));
 	}
-}
 
+	@Operation(summary = "진행 중/예정된 행사·축제 지도 바운드/전국 조회")
+	@GetMapping("/festivals")
+	public ResponseEntity<java.util.List<PlaceDetailResponse>> getActiveFestivals(
+			@RequestParam(name = "minLat", required = false) Double minLat,
+			@RequestParam(name = "maxLat", required = false) Double maxLat,
+			@RequestParam(name = "minLng", required = false) Double minLng,
+			@RequestParam(name = "maxLng", required = false) Double maxLng,
+			@RequestParam(name = "limit", defaultValue = "500") int limit) {
+		return ResponseEntity.ok(placeService.getActiveFestivals(minLat, maxLat, minLng, maxLng, limit));
+	}
+
+	@Operation(summary = "한국관광공사 TourAPI 최신 전국 축제 데이터 수집 동기화")
+	@org.springframework.web.bind.annotation.PostMapping("/festivals/sync")
+	public ResponseEntity<java.util.Map<String, Object>> syncFestivals(
+			@RequestParam(name = "year", defaultValue = "2026") int year) {
+		int count = tourApiFestivalSyncService.syncAllFestivals(year);
+		return ResponseEntity.ok(java.util.Map.of(
+				"status", "SUCCESS",
+				"syncedCount", count,
+				"message", count + "개의 전국 축제 데이터를 성공적으로 동기화했습니다."));
+	}
+}

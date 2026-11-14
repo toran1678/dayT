@@ -68,6 +68,29 @@ export function LocationPinPickerModal({
     return () => ro.disconnect();
   }, []);
 
+  // Mouse wheel zoom inside map container
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    let lastWheelAt = 0;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastWheelAt < 100) return;
+      lastWheelAt = now;
+
+      const delta = e.deltaY < 0 ? 1 : -1;
+      setViewport((prev) => ({
+        ...prev,
+        zoom: clampZoom(prev.zoom + delta),
+      }));
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     dragStartRef.current = { x: e.clientX, y: e.clientY };
@@ -254,28 +277,41 @@ export function LocationPinPickerModal({
           )}
 
           {/* Map Controls Floating on Top */}
-          <div className="absolute right-3 top-3 flex flex-col gap-1.5 shadow-md">
+          <div
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute right-3 top-3 z-30 flex flex-col gap-1.5 shadow-md"
+          >
             <button
               type="button"
-              onClick={() => handleZoom(1)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleZoom(1);
+              }}
               aria-label="확대"
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface/90 text-foreground backdrop-blur-xs hover:bg-surface"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface/95 text-foreground shadow-xs backdrop-blur-xs transition hover:bg-surface active:scale-95"
             >
               <Plus className="h-4 w-4" />
             </button>
             <button
               type="button"
-              onClick={() => handleZoom(-1)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleZoom(-1);
+              }}
               aria-label="축소"
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface/90 text-foreground backdrop-blur-xs hover:bg-surface"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface/95 text-foreground shadow-xs backdrop-blur-xs transition hover:bg-surface active:scale-95"
             >
               <Minus className="h-4 w-4" />
             </button>
             <button
               type="button"
-              onClick={handleResetToCurrentCenter}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleResetToCurrentCenter();
+              }}
               title="지도 현재 중심에 핀 꽂기"
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface/90 text-foreground backdrop-blur-xs hover:bg-surface"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface/95 text-foreground shadow-xs backdrop-blur-xs transition hover:bg-surface active:scale-95"
             >
               <Crosshair className="h-4 w-4 text-primary" />
             </button>
