@@ -15,9 +15,7 @@ import {
   Loader2,
   Navigation,
   Pencil,
-  Radio,
   Share2,
-  Sparkles,
   Trash2,
   Users,
   Wallet,
@@ -457,55 +455,58 @@ export function CourseDetailClientView({
       </div>
 
       {course.isCollabOpen && !isSharedPublicView && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/85 px-4 py-2.5 text-xs font-bold text-emerald-800">
-          <div className="flex items-center gap-2">
-            <Radio className="h-3.5 w-3.5 text-emerald-600" />
-            <span>
-              {liveCollabState === "connected"
-                ? "실시간 공동 편집 채널 연결됨 (/ws/collab)"
-                : "실시간 공동 편집 모드 활성화됨"}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-xs shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-2.5 py-0.5 text-[11px] font-extrabold text-primary">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  liveCollabState === "connected"
+                    ? "bg-primary"
+                    : "bg-amber-400 animate-pulse"
+                }`}
+              />
+              <span>함께 편집 켜짐</span>
             </span>
-            {liveCollabToast && (
-              <span className="text-emerald-700/80">· {liveCollabToast}</span>
-            )}
+            <span className="font-semibold text-muted">
+              {liveCollabToast ?? "연인과 동시에 코스를 보고 수정할 수 있어요"}
+            </span>
           </div>
           {canModify && (
             <button
               type="button"
               onClick={() => setIsEditing(true)}
-              className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-extrabold text-white hover:bg-emerald-700"
+              className="rounded-full bg-primary px-3.5 py-1.5 text-xs font-extrabold text-white transition-colors hover:bg-primary-hover"
             >
-              동시 편집 참여하기 →
+              함께 편집하기 →
             </button>
           )}
         </div>
       )}
 
       {/* Course Header */}
-      <header className="flex flex-col justify-between gap-4 rounded-3xl border border-line bg-surface p-6 shadow-[0_8px_28px_rgba(24,24,27,0.03)] sm:flex-row sm:items-center sm:p-7">
+      <header className="flex flex-col justify-between gap-4 rounded-2xl border border-line bg-surface p-6 shadow-xs sm:flex-row sm:items-center sm:p-7">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-3 py-0.5 text-[11px] font-extrabold text-primary">
-              <Sparkles className="h-3 w-3" />
+            <span className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-subtle px-2.5 py-0.5 text-[11px] font-bold text-foreground">
               <span>
                 {course.sourceType === "AI_RECOMMENDED"
-                  ? "AI 추천 코스"
-                  : "직접 설계 코스"}
+                  ? "추천 동선"
+                  : "커스텀 코스"}
               </span>
             </span>
             {course.timeSlot && (
-              <span className="rounded-full bg-surface-subtle px-2.5 py-0.5 text-[11px] font-bold text-muted">
+              <span className="rounded-full bg-surface-subtle border border-line/60 px-2.5 py-0.5 text-[11px] font-medium text-muted">
                 {TIME_SLOT_CLOCK[course.timeSlot].label}
               </span>
             )}
             {course.datePlanDate && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-700">
-                <Calendar className="h-3 w-3" />
-                <span>{course.datePlanDate} 데이트</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft border border-primary/25 px-2.5 py-0.5 text-[11px] font-bold text-primary">
+                <Calendar className="h-3 w-3 text-primary" />
+                <span>{course.datePlanDate}</span>
               </span>
             )}
             {course.themeTags.map((theme) => (
-              <span key={theme} className="text-xs font-semibold text-muted">
+              <span key={theme} className="text-xs font-medium text-muted">
                 #{theme}
               </span>
             ))}
@@ -525,14 +526,14 @@ export function CourseDetailClientView({
               type="button"
               disabled={isOpeningMaps}
               onClick={() => void handleOpenGoogleMaps()}
-              className="inline-flex items-center gap-1.5 rounded-full bg-surface-dark px-4 py-2.5 text-xs font-extrabold text-white hover:opacity-90 disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-full bg-surface-dark px-4 py-2 text-xs font-bold text-white shadow-2xs hover:bg-black disabled:opacity-60 transition-colors"
             >
               {isOpeningMaps ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-300" />
               ) : (
-                <Navigation className="h-3.5 w-3.5 text-amber-300" />
+                <Navigation className="h-3.5 w-3.5 text-primary" />
               )}
-              <span>구글맵 원클릭 길안내</span>
+              <span>구글맵 길안내</span>
             </button>
           )}
 
@@ -541,14 +542,14 @@ export function CourseDetailClientView({
               type="button"
               disabled={isDownloadingKml}
               onClick={() => void handleDownloadKml()}
-              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-background px-4 py-2.5 text-xs font-bold text-foreground hover:border-primary/40 disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-4 py-2 text-xs font-bold text-foreground hover:bg-surface-subtle disabled:opacity-60 transition-colors"
             >
               {isDownloadingKml ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
               ) : (
-                <Download className="h-3.5 w-3.5 text-primary" />
+                <Download className="h-3.5 w-3.5 text-muted" />
               )}
-              <span>구글 내 지도 KML</span>
+              <span>KML 내보내기</span>
             </button>
           )}
 
@@ -557,7 +558,7 @@ export function CourseDetailClientView({
               type="button"
               disabled={isCloningShared}
               onClick={() => void handleCloneSharedToMyVault()}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-xs font-extrabold text-white hover:bg-primary-hover disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary-hover disabled:opacity-60 transition-colors shadow-2xs"
             >
               {isCloningShared ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -575,7 +576,7 @@ export function CourseDetailClientView({
               onClick={() => void handleToggleCollaboration()}
               className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2.5 text-xs font-extrabold transition-colors disabled:opacity-60 ${
                 course.isCollabOpen
-                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                  ? "border-primary/30 bg-primary-soft text-primary"
                   : "border-line bg-background text-foreground hover:border-primary/40"
               }`}
             >
@@ -585,7 +586,7 @@ export function CourseDetailClientView({
                 <Users className="h-3.5 w-3.5" />
               )}
               <span>
-                {course.isCollabOpen ? "공동 편집 ON" : "공동 편집 열기"}
+                {course.isCollabOpen ? "함께 편집 켜짐" : "함께 편집 켜기"}
               </span>
             </button>
           )}

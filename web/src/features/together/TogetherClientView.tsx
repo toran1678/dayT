@@ -327,20 +327,23 @@ export function TogetherClientView() {
     return (
       <div className="space-y-6">
         <header>
-          <p className="text-xs font-bold tracking-widest text-primary">
-            COUPLE LOUNGE
-          </p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
-            만날수록 자라나는 우리 둘의 스페이스
+          <div className="flex items-center gap-2">
+            <span className="h-0.5 w-5 bg-primary" />
+            <p className="text-xs font-bold tracking-widest text-primary uppercase">
+              OUR SPACE
+            </p>
+          </div>
+          <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
+            우리 둘의 스페이스
           </h1>
           <p className="mt-1 text-sm text-muted">
-            로그인 후 6자리 초대 코드로 연인과 연결하면 코스와 펫, 데이트 일기장이 실시간으로 동기화됩니다.
+            로그인 후 초대 코드로 연인과 연결하면 코스와 펫, 데이트 일기장이 실시간으로 동기화됩니다.
           </p>
         </header>
 
-        <div className="rounded-[28px] border border-line bg-surface p-10 text-center shadow-xs">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary-soft">
-            <PetStageIcon className="h-12 w-12" />
+        <div className="rounded-2xl border border-line bg-surface p-10 text-center shadow-xs">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-subtle border border-line">
+            <PetStageIcon className="h-10 w-10" />
           </div>
           <h2 className="mt-4 text-lg font-black text-foreground">
             우리 커플만의 캐릭터를 함께 키워보세요
@@ -351,7 +354,7 @@ export function TogetherClientView() {
           <button
             type="button"
             onClick={openLoginModal}
-            className="mt-5 rounded-full bg-primary px-6 py-3 text-xs font-extrabold text-white hover:bg-primary-hover"
+            className="mt-5 rounded-full bg-surface-dark px-6 py-2.5 text-xs font-bold text-white hover:bg-black transition-colors"
           >
             로그인하고 커플 스페이스 시작하기
           </button>
@@ -364,19 +367,22 @@ export function TogetherClientView() {
     <div className="space-y-6">
       <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <p className="text-xs font-bold tracking-widest text-primary">
-            COUPLE LOUNGE
-          </p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
-            만날수록 자라나는 우리 둘의 스페이스
+          <div className="flex items-center gap-2">
+            <span className="h-0.5 w-5 bg-primary" />
+            <p className="text-xs font-bold tracking-widest text-primary uppercase">
+              OUR SPACE
+            </p>
+          </div>
+          <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
+            우리 둘의 스페이스
           </h1>
           <p className="mt-1 text-sm text-muted">
-            데이트 체크인과 작은 미션으로 커플 펫을 키우고 함께 쌓은 시간을 기록해요.
+            데이트 체크인과 미션으로 캐릭터를 키우고 함께 쌓은 시간을 기록해요.
           </p>
         </div>
 
-        <div className="inline-flex items-center gap-2 self-start rounded-full bg-primary-soft px-4 py-2 text-xs font-extrabold text-primary sm:self-auto">
-          <Flame className="h-4 w-4" />
+        <div className="inline-flex items-center gap-2 self-start rounded-full border border-line bg-surface px-3.5 py-1.5 text-xs font-bold text-foreground shadow-2xs sm:self-auto">
+          <Flame className="h-4 w-4 text-primary" />
           <span>
             {coupleStatus === "CONNECTED" ? "커플 연결됨 · " : "연결 대기 중 · "}
             누적 만남 {pet?.totalMeetDays ?? 0}회
@@ -386,7 +392,7 @@ export function TogetherClientView() {
 
       {feedbackMessage && (
         <div
-          className={`rounded-2xl border px-4 py-3 text-xs font-bold ${
+          className={`rounded-xl border px-4 py-3 text-xs font-bold ${
             feedbackMessage.type === "success"
               ? "border-emerald-200 bg-emerald-50 text-emerald-700"
               : "border-red-200 bg-red-50 text-red-600"
@@ -397,7 +403,7 @@ export function TogetherClientView() {
       )}
 
       {!hasLoaded ? (
-        <div className="flex min-h-72 flex-col items-center justify-center rounded-[28px] border border-line bg-surface p-10">
+        <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-line bg-surface p-10">
           <Loader2 className="h-7 w-7 animate-spin text-primary" />
           <p className="mt-3 text-xs font-bold text-muted">
             커플 스페이스와 펫 정보를 불러오고 있어요...
@@ -405,28 +411,30 @@ export function TogetherClientView() {
         </div>
       ) : (
         <section className="grid gap-6 lg:grid-cols-12">
-          {/* Pet Character Card */}
-          <div className="flex flex-col justify-between rounded-[28px] bg-surface-dark p-6 text-white shadow-lg sm:p-8 lg:col-span-6">
+          {/* Pet Character Card (Bright & warm in Light mode, sleek in Dark mode) */}
+          <div className="flex flex-col justify-between rounded-2xl border border-line bg-surface p-6 sm:p-8 text-foreground shadow-xs lg:col-span-6">
             <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-amber-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary-soft px-3 py-1 text-[11px] font-bold text-primary">
                 <Sparkles className="h-3.5 w-3.5" />
                 LEVEL {String(pet?.level ?? 1).padStart(2, "0")} ·{" "}
                 {pet?.name ?? stageMeta.stageLabel}
               </span>
-              <span className="text-xs font-semibold text-white/65">
+              <span className="text-xs font-semibold text-muted">
                 다음 진화까지 {remainingExp} XP
               </span>
             </div>
 
             <div className="my-8 flex flex-col items-center text-center">
-              <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-tr from-primary/30 via-white/10 to-amber-300/30 ring-1 ring-white/20">
+              <div className="relative flex h-36 w-36 items-center justify-center rounded-3xl border border-line/70 bg-gradient-to-b from-primary/10 via-amber-100/30 to-surface-subtle dark:from-primary/20 dark:via-white/5 dark:to-surface-subtle shadow-2xs">
                 <PetStageIcon
                   characterType={pet?.characterType}
-                  className="h-20 w-20"
+                  className="h-24 w-24 drop-shadow-sm"
                 />
               </div>
-              <h2 className="mt-4 text-xl font-black">{stageMeta.quote}</h2>
-              <p className="mt-1 max-w-sm text-xs text-white/70">
+              <h2 className="mt-4 text-xl font-black text-foreground tracking-tight">
+                {stageMeta.quote}
+              </h2>
+              <p className="mt-1.5 max-w-sm text-xs leading-relaxed text-muted">
                 {isAlreadyCheckedInToday
                   ? `오늘(${todayIso}) 만남 인증을 완료했어요! 미션을 달성하면 추가 경험치를 얻을 수 있어요.`
                   : "오늘 연인과 만났다면 만남 인증 버튼으로 경험치를 선물해 주세요."}
@@ -434,17 +442,17 @@ export function TogetherClientView() {
             </div>
 
             <div className="space-y-4">
-              <div className="rounded-2xl bg-white/10 p-4">
-                <div className="flex justify-between text-xs font-bold">
+              <div className="rounded-2xl border border-line bg-surface-subtle/80 p-4">
+                <div className="flex justify-between text-xs font-bold text-foreground">
                   <span>성장 경험치</span>
-                  <span className="text-amber-300">
+                  <span className="text-primary font-black">
                     {pet?.exp ?? 0} / {pet?.nextLevelExp ?? 100} XP
                   </span>
                 </div>
-                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/15">
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-line dark:bg-white/10">
                   <div
                     style={{ width: `${expPercent}%` }}
-                    className="h-full rounded-full bg-gradient-to-r from-primary to-amber-400 transition-all duration-500"
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-amber-500 transition-all duration-500"
                   />
                 </div>
               </div>
@@ -453,12 +461,12 @@ export function TogetherClientView() {
                 type="button"
                 disabled={isCheckingIn || isAlreadyCheckedInToday}
                 onClick={() => void handleCheckInToday()}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/60"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-sm font-extrabold text-white shadow-xs transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-surface-subtle disabled:text-muted disabled:border disabled:border-line"
               >
                 {isCheckingIn ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : isAlreadyCheckedInToday ? (
-                  <Check className="h-4 w-4 text-amber-300" />
+                  <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 ) : null}
                 <span>
                   {isAlreadyCheckedInToday
@@ -472,7 +480,7 @@ export function TogetherClientView() {
           {/* Right Stacked Bento Cards */}
           <div className="flex flex-col gap-6 lg:col-span-6">
             {/* Couple Invite & Connect Ticket */}
-            <article className="rounded-[28px] border border-line bg-surface p-6">
+            <article className="rounded-2xl border border-line bg-surface p-6 shadow-xs">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="inline-flex items-center gap-1.5 text-xs font-bold text-primary">
@@ -578,7 +586,7 @@ export function TogetherClientView() {
             </article>
 
             {/* Daily Date Missions */}
-            <article className="flex-1 rounded-[28px] border border-line bg-surface p-6">
+            <article className="flex-1 rounded-2xl border border-line bg-surface p-6 shadow-xs">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-extrabold text-foreground">

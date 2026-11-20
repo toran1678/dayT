@@ -4,15 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   Calendar,
-  Check,
   Clock,
+  Coffee,
+  Compass,
   Loader2,
   MapPin,
+  Palette,
+  PartyPopper,
   Save,
-  Sparkles,
+  Ticket,
   TrainFront,
+  Trees,
+  UtensilsCrossed,
   Wallet,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/AuthContext";
 import { formatDurationKo } from "@/features/map/geo-utils";
@@ -68,6 +74,16 @@ const THEMES: DateTheme[] = [
   "어디든",
   "행사·축제",
 ];
+
+const THEME_ICONS: Record<DateTheme, LucideIcon> = {
+  "감성 카페": Coffee,
+  "맛집 투어": UtensilsCrossed,
+  "전시·문화": Palette,
+  "액티비티": Ticket,
+  "산책·야외": Trees,
+  "어디든": Compass,
+  "행사·축제": PartyPopper,
+};
 
 const FOODS: FoodCategory[] = [
   "일식",
@@ -230,30 +246,25 @@ export function AiCourseRecommendModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl"
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-white">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="text-[11px] font-extrabold tracking-widest text-primary">
-                GEMINI AI CURATOR
-              </p>
-              <h2 className="text-base font-black text-foreground">
-                취향 · 예산 맞춤 AI 데이트 코스 자동 설계
-              </h2>
-            </div>
+          <div>
+            <h2 className="text-base font-black text-foreground">
+              맞춤 데이트 코스 설계
+            </h2>
+            <p className="mt-0.5 text-xs text-muted">
+              지역, 예산, 테마에 맞춰 최적의 동선을 구성합니다.
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="rounded-full p-2 text-muted hover:bg-surface-subtle hover:text-foreground"
+            className="rounded-full p-2 text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
@@ -262,7 +273,7 @@ export function AiCourseRecommendModal({
         {/* Scrollable Body */}
         <div className="flex-1 space-y-5 overflow-y-auto p-6">
           {/* 1. Region & Map Pin */}
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-extrabold text-foreground">
                 1. 어디서 만날까요?
@@ -270,22 +281,26 @@ export function AiCourseRecommendModal({
               <button
                 type="button"
                 onClick={() => setIsPinPickerOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1 text-xs font-black text-primary transition-colors hover:bg-primary hover:text-white"
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-subtle px-3 py-1 text-xs font-bold text-foreground transition-colors hover:border-foreground/40"
               >
-                <MapPin className="h-3.5 w-3.5" />
+                <MapPin className="h-3.5 w-3.5 text-primary" />
                 <span>지도에서 핀 꽂기</span>
               </button>
             </div>
 
             {selectedPoint && (
-              <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary-soft/40 px-3 py-2 text-xs">
-                <span className="font-extrabold text-primary">
-                  📍 지도 지정 핀: {regionKeyword} ({selectedPoint.lat.toFixed(4)}, {selectedPoint.lng.toFixed(4)})
+              <div className="flex items-center justify-between rounded-xl border border-line bg-surface-subtle/60 px-3 py-2 text-xs">
+                <span className="inline-flex items-center gap-1.5 font-extrabold text-foreground">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span>
+                    지도 지정 위치: {regionKeyword} ({selectedPoint.lat.toFixed(4)},{" "}
+                    {selectedPoint.lng.toFixed(4)})
+                  </span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setSelectedPoint(null)}
-                  className="rounded-full p-1 text-muted hover:bg-surface-subtle hover:text-foreground"
+                  className="rounded-full p-1 text-muted hover:bg-line/50 hover:text-foreground"
                   title="핀 지정 취소"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -295,7 +310,7 @@ export function AiCourseRecommendModal({
 
             {/* Input with Search Form Styling & Autocomplete Hints */}
             <div ref={searchContainerRef} className="relative">
-              <div className="flex items-center gap-2 rounded-2xl border border-line bg-background px-3.5 py-2.5 shadow-2xs focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+              <div className="flex items-center gap-2 rounded-xl border border-line bg-background px-3.5 py-2.5 transition-colors focus-within:border-foreground">
                 <TrainFront className="h-4 w-4 shrink-0 text-primary" />
                 <input
                   type="text"
@@ -433,12 +448,12 @@ export function AiCourseRecommendModal({
           </div>
 
           {/* 1-1. Search Radius (km) Slider */}
-          <div className="rounded-2xl border border-line bg-background p-4">
+          <div className="border-t border-line/70 pt-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-extrabold text-foreground">
                 탐색 반경 설정 (내 주변 탐색 범위)
               </span>
-              <span className="inline-flex h-7 items-center rounded-full bg-primary-soft px-3 text-xs font-extrabold text-primary">
+              <span className="inline-flex h-7 items-center rounded-full bg-surface-subtle px-3 text-xs font-extrabold text-foreground">
                 반경 {radiusKm.toFixed(1)}km (
                 {radiusKm <= 1.5
                   ? "도보 중심"
@@ -493,13 +508,13 @@ export function AiCourseRecommendModal({
           </div>
 
           {/* 1-2. Date Picker (언제 만날까요?) */}
-          <div className="rounded-2xl border border-line bg-background p-4">
+          <div className="border-t border-line/70 pt-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <label
                 htmlFor="ai-target-date"
                 className="flex items-center gap-1.5 text-xs font-extrabold text-foreground"
               >
-                <Calendar className="h-3.5 w-3.5 text-primary" />
+                <Calendar className="h-3.5 w-3.5 text-muted" />
                 <span>언제 만날까요? (데이트 예정일 선택)</span>
               </label>
               <div className="flex items-center gap-1">
@@ -533,7 +548,7 @@ export function AiCourseRecommendModal({
                   <button
                     type="button"
                     onClick={() => setTargetDate("")}
-                    className="text-[11px] font-bold text-muted hover:text-primary transition-colors ml-1"
+                    className="ml-1 text-[11px] font-bold text-muted transition-colors hover:text-foreground"
                     title="날짜 초기화"
                   >
                     초기화
@@ -548,16 +563,16 @@ export function AiCourseRecommendModal({
                 type="date"
                 value={targetDate}
                 onChange={(e) => setTargetDate(e.target.value)}
-                className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-bold text-foreground outline-none transition-all focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+                className="w-full rounded-xl border border-line bg-background px-3 py-2 text-xs font-bold text-foreground outline-none transition-colors focus:border-foreground"
               />
             </div>
             <p className="mt-1.5 text-[11px] font-medium text-muted">
-              💡 날짜를 지정하고 테마에서 &apos;행사·축제&apos;를 선택하시면 해당 일자에 열리는 축제·야시장·팝업스토어를 최우선으로 코스에 반영해 드립니다!
+              날짜를 지정하고 테마에서 &apos;행사·축제&apos;를 선택하면 해당 일자의 축제·야시장·팝업스토어를 우선 반영합니다.
             </p>
           </div>
 
           {/* 2. Themes & TimeSlot */}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 border-t border-line/70 pt-5 sm:grid-cols-2">
             <div className="space-y-2">
               <span className="block text-xs font-extrabold text-foreground">
                 2. 데이트 테마 (복수 선택)
@@ -565,18 +580,19 @@ export function AiCourseRecommendModal({
               <div className="flex flex-wrap gap-1.5">
                 {THEMES.map((theme) => {
                   const active = selectedThemes.includes(theme);
+                  const ThemeIcon = THEME_ICONS[theme];
                   return (
                     <button
                       key={theme}
                       type="button"
                       onClick={() => toggleTheme(theme)}
-                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold transition-colors ${
+                      className={`inline-flex items-center gap-1.5 rounded-full border border-solid px-3 py-1.5 text-xs font-bold transition-colors ${
                         active
-                          ? "border border-primary bg-primary text-white"
-                          : "border border-line bg-background text-muted hover:text-foreground"
+                          ? "border-primary bg-primary text-white"
+                          : "border-line bg-background text-muted hover:border-foreground/30 hover:text-foreground"
                       }`}
                     >
-                      {active && <Check className="h-3 w-3" />}
+                      <ThemeIcon className="h-3.5 w-3.5 shrink-0" />
                       <span>{theme}</span>
                     </button>
                   );
@@ -608,7 +624,7 @@ export function AiCourseRecommendModal({
           </div>
 
           {/* 3. Food Preferences */}
-          <div className="space-y-2">
+          <div className="space-y-2 border-t border-line/70 pt-5">
             <span className="block text-xs font-extrabold text-foreground">
               4. 선호하는 식사 메뉴 (선택)
             </span>
@@ -634,7 +650,7 @@ export function AiCourseRecommendModal({
           </div>
 
           {/* 4. 1인 하루 총 예산 설정 (예산 무관 옵션 포함 & 고정 높이 뱃지로 레이아웃 시프트 방지) */}
-          <div className="rounded-2xl border border-line bg-background p-4">
+          <div className="border-t border-line/70 pt-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <label
                 htmlFor="ai-budget-slider"
@@ -647,16 +663,16 @@ export function AiCourseRecommendModal({
                 <button
                   type="button"
                   onClick={() => setIsUnlimitedBudget((prev) => !prev)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors ${
+                  className={`inline-flex items-center rounded-lg border border-solid px-2.5 py-1 text-xs font-bold transition-colors ${
                     isUnlimitedBudget
-                      ? "border border-primary bg-primary text-white shadow-xs"
-                      : "border border-line bg-surface text-muted hover:text-foreground"
+                      ? "border-primary bg-primary text-white"
+                      : "border-line bg-surface text-muted hover:text-foreground"
                   }`}
                 >
-                  {isUnlimitedBudget ? "✓ 예산 무관" : "예산 무관"}
+                  <span>예산 무관</span>
                 </button>
 
-                <span className="inline-flex h-7 items-center rounded-full bg-primary-soft px-3 text-xs font-extrabold text-primary">
+                <span className="inline-flex h-7 items-center rounded-full bg-surface-subtle px-3 text-xs font-extrabold text-foreground">
                   {isUnlimitedBudget
                     ? "1인 예산 무관 (분위기·인기 중심)"
                     : `1인 하루 ${sliderBudget.toLocaleString()}원 (2인 ${(
@@ -690,7 +706,7 @@ export function AiCourseRecommendModal({
           </div>
 
           {/* 5. Mood Keywords */}
-          <div className="space-y-2">
+          <div className="space-y-2 border-t border-line/70 pt-5">
             <span className="block text-xs font-extrabold text-foreground">
               6. 오늘의 무드 · 날씨 조건
             </span>
@@ -704,7 +720,7 @@ export function AiCourseRecommendModal({
                     onClick={() => toggleMood(mood)}
                     className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${
                       active
-                        ? "border border-primary bg-primary-soft text-primary"
+                        ? "border border-foreground bg-surface-subtle text-foreground"
                         : "border border-line bg-background text-muted hover:text-foreground"
                     }`}
                   >
@@ -716,7 +732,7 @@ export function AiCourseRecommendModal({
           </div>
 
           {errorMessage && (
-            <div className="rounded-2xl border border-red-200 bg-red-50/80 px-4 py-3 text-xs font-bold text-red-600">
+            <div className="rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-xs font-bold text-red-600">
               {errorMessage}
             </div>
           )}
@@ -726,7 +742,7 @@ export function AiCourseRecommendModal({
             type="button"
             disabled={isGenerating}
             onClick={() => void handleGenerate()}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-sm font-extrabold text-white shadow-xs transition-colors hover:bg-primary-hover disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
             {isGenerating ? (
               <>
@@ -735,20 +751,20 @@ export function AiCourseRecommendModal({
               </>
             ) : (
               <>
-                <Sparkles className="h-4 w-4" />
-                <span>{preview ? "조건으로 다시 추천받기" : "AI 맞춤 코스 생성하기"}</span>
+                <span>{preview ? "조건으로 다시 추천받기" : "맞춤 코스 추천받기"}</span>
+                <ArrowRight className="h-4 w-4" />
               </>
             )}
           </button>
 
           {/* AI Preview Result Card */}
           {preview && (
-            <div className="space-y-4 rounded-3xl border border-primary/35 bg-primary-soft/35 p-5">
+            <div className="space-y-4 rounded-2xl border border-line bg-surface-subtle/50 p-5">
               <div>
-                <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-extrabold text-white">
-                  AI 추천 프리뷰
-                </span>
-                <h3 className="mt-2 text-base font-black text-foreground">
+                <p className="text-[11px] font-bold text-muted">
+                  추천 코스 결과
+                </p>
+                <h3 className="mt-1 text-base font-black text-foreground">
                   {preview.suggestedTitle}
                 </h3>
                 <p className="mt-1 text-xs leading-relaxed text-muted">
@@ -756,22 +772,22 @@ export function AiCourseRecommendModal({
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 rounded-2xl bg-surface p-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-2.5 border-y border-line/70 py-3 text-xs">
                 <div className="flex items-center gap-1.5 font-extrabold text-foreground">
-                  <Wallet className="h-3.5 w-3.5 text-primary" />
+                  <Wallet className="h-3.5 w-3.5 text-muted" />
                   <span>2인 약 {preview.totalEstimatedCost.toLocaleString()}원</span>
                 </div>
                 <div className="flex items-center gap-1.5 font-extrabold text-foreground">
-                  <Clock className="h-3.5 w-3.5 text-primary" />
+                  <Clock className="h-3.5 w-3.5 text-muted" />
                   <span>총 {formatDurationKo(preview.totalDurationMinutes)}</span>
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="divide-y divide-line/70">
                 {preview.places.map((step) => (
                   <div
                     key={`${step.place.id}-${step.visitOrder}`}
-                    className="flex items-start gap-3 rounded-2xl border border-line bg-surface p-3.5"
+                    className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
                   >
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-black text-white">
                       {step.visitOrder}
@@ -792,8 +808,8 @@ export function AiCourseRecommendModal({
                         </p>
                       )}
                       {step.travelMinutesToNext > 0 && (
-                        <p className="mt-1 text-[10px] font-bold text-primary">
-                          ↓ 다음 장소까지 도보 약 {step.travelMinutesToNext}분
+                        <p className="mt-1 text-[10px] font-bold text-muted">
+                          다음 장소까지 도보 약 {step.travelMinutesToNext}분
                         </p>
                       )}
                     </div>
@@ -801,7 +817,7 @@ export function AiCourseRecommendModal({
                 ))}
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-col gap-2 pt-1 sm:flex-row">
                 <button
                   type="button"
                   onClick={() =>
@@ -811,21 +827,21 @@ export function AiCourseRecommendModal({
                       datePlanDate: targetDate || null,
                     })
                   }
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-line bg-surface py-2.5 text-xs font-extrabold text-foreground hover:border-primary"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-line bg-surface py-2.5 text-xs font-extrabold text-foreground transition-colors hover:border-foreground/40"
                 >
                   <span>메이커로 불러와 세부 편집</span>
-                  <ArrowRight className="h-3.5 w-3.5 text-primary" />
+                  <ArrowRight className="h-3.5 w-3.5 text-muted" />
                 </button>
                 <button
                   type="button"
                   disabled={isSavingDirect}
                   onClick={() => void handleConfirmDirectSave()}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-surface-dark py-2.5 text-xs font-extrabold text-white hover:opacity-90 disabled:opacity-60"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-surface-dark py-2.5 text-xs font-extrabold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
                   {isSavingDirect ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <Save className="h-3.5 w-3.5 text-amber-300" />
+                    <Save className="h-3.5 w-3.5" />
                   )}
                   <span>바로 내 코스로 확정 저장</span>
                 </button>

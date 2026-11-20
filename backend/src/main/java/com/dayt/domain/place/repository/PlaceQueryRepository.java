@@ -158,7 +158,13 @@ public class PlaceQueryRepository {
 	) {
 		StringBuilder sql = new StringBuilder("""
 				SELECT p.* FROM places p
-				WHERE (p.sub_category = '축제·행사' OR (p.category_group = 'EXHIBITION' AND p.event_start_date IS NOT NULL))
+				WHERE (
+				    p.external_provider = 'TOUR_API'
+				    OR p.sub_category = '축제·행사'
+				    OR p.event_start_date IS NOT NULL
+				    OR p.event_end_date IS NOT NULL
+				)
+				  AND (p.event_end_date IS NULL OR p.event_end_date >= CURRENT_DATE)
 				""");
 		Map<String, Object> params = new HashMap<>();
 

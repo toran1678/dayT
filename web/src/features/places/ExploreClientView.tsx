@@ -11,7 +11,6 @@ import {
 } from "react";
 import {
   ArrowRight,
-  Calendar,
   ChefHat,
   CloudRain,
   Coffee,
@@ -27,7 +26,6 @@ import {
   Sandwich,
   Search,
   Soup,
-  Sparkles,
   Ticket,
   TrainFront,
   Trash2,
@@ -267,7 +265,12 @@ export function ExploreClientView() {
   const [indoorOnly, setIndoorOnly] = useState(false);
 
   const [places, setPlaces] = useState<PlaceDetail[]>([]);
-  const [allFestivals, setAllFestivals] = useState<PlaceDetail[]>([]);
+  const [visibleMapFestivals, setVisibleMapFestivals] = useState<PlaceDetail[]>(
+    [],
+  );
+  const handleVisibleFestivalsChange = useCallback((items: PlaceDetail[]) => {
+    setVisibleMapFestivals(items);
+  }, []);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(true);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -303,27 +306,6 @@ export function ExploreClientView() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  // Load active festivals nationwide so they are always visible in list & details
-  useEffect(() => {
-    let active = true;
-    async function loadAllFestivals() {
-      try {
-        const res = await fetch("/api/v1/places/festivals?limit=500");
-        if (!res.ok) return;
-        const items = (await res.json()) as PlaceDetail[];
-        if (active && Array.isArray(items)) {
-          setAllFestivals(items);
-        }
-      } catch {
-        // Non-blocking fallback
-      }
-    }
-    void loadAllFestivals();
-    return () => {
-      active = false;
-    };
-  }, [reloadTick]);
 
   // Search Places API Effect with consistent candidate pool (size: 40)
   useEffect(() => {
@@ -380,15 +362,6 @@ export function ExploreClientView() {
                 standardCats.includes(p.categoryGroup);
               return matchFestival || matchStandard;
             });
-
-            // When festival is selected, merge active festivals so the list view is fully populated
-            if (hasFestival && allFestivals.length > 0) {
-              const existingIds = new Set(filtered.map((p) => p.id));
-              const extraFests = allFestivals.filter(
-                (f) => !existingIds.has(f.id),
-              );
-              filtered = [...filtered, ...extraFests];
-            }
           }
 
           // 2. Filter by food categories if specified (narrows down restaurants from the 40 places)
@@ -564,6 +537,23 @@ export function ExploreClientView() {
     ? appliedCoords.label
     : appliedKeyword;
 
+  // Merge visible viewport festivals when festival filter is active
+  const displayedPlaces = useMemo(() => {
+    if (
+      !selectedCategories.includes("FESTIVAL") ||
+      visibleMapFestivals.length === 0
+    ) {
+      return places;
+    }
+    const existingIds = new Set(places.map((p) => p.id));
+    const extraFestivals = visibleMapFestivals.filter((fest) => {
+      if (existingIds.has(fest.id)) return false;
+      if (indoorOnly && !fest.isIndoor) return false;
+      return true;
+    });
+    return [...places, ...extraFestivals];
+  }, [places, selectedCategories, visibleMapFestivals, indoorOnly]);
+
   // Preserve drafted places on map across area searches, appending new area candidates
   const mapStops = useMemo<RouteMapStop[]>(() => {
     // 1. Draft course places (always stay pinned on the map with category icon + course badge)
@@ -595,7 +585,7 @@ export function ExploreClientView() {
 
     // 2. Newly explored candidate spots (excluding already drafted places)
     const draftIds = new Set(draftPlaces.map((p) => p.id));
-    const candidatePlaces = places.filter((p) => !draftIds.has(p.id));
+    const candidatePlaces = displayedPlaces.filter((p) => !draftIds.has(p.id));
 
     const candidateStops: RouteMapStop[] = candidatePlaces
       .slice(0, 32)
@@ -621,34 +611,8 @@ export function ExploreClientView() {
         eventEndDate: place.eventEndDate,
       }));
 
-    // 3. All active festivals nationwide so that ANY festival inside visible map is ALWAYS rendered as a pin
-    const pinnedIds = new Set([
-      ...draftPlaces.map((p) => p.id),
-      ...candidatePlaces.map((p) => p.id),
-    ]);
-    const extraFestivals = allFestivals.filter((f) => !pinnedIds.has(f.id));
-
-    const festivalStops: RouteMapStop[] = extraFestivals.map((fest, idx) => ({
-      id: fest.id,
-      order: draftStops.length + candidateStops.length + idx + 1,
-      name: fest.name,
-      address: fest.address,
-      categoryLabel: "행사·축제",
-      categoryGroup: fest.categoryGroup,
-      latitude: fest.latitude,
-      longitude: fest.longitude,
-      estimatedCost:
-        fest.avgPricePerPerson !== null
-          ? fest.avgPricePerPerson * 2
-          : undefined,
-      placeUrl: fest.placeUrl,
-      isDraft: false,
-      eventStartDate: fest.eventStartDate,
-      eventEndDate: fest.eventEndDate,
-    }));
-
-    return [...draftStops, ...candidateStops, ...festivalStops];
-  }, [places, draftPlaces, allFestivals, isShowingDraftRoute]);
+    return [...draftStops, ...candidateStops];
+  }, [displayedPlaces, draftPlaces, isShowingDraftRoute]);
 
   const totalDraftCostForTwo = useMemo(
     () =>
@@ -660,13 +624,15 @@ export function ExploreClientView() {
   const activeSpotlightPlace = useMemo(() => {
     if (selectedPlaceId !== null) {
       const found =
-        places.find((p) => p.id === selectedPlaceId) ??
+        displayedPlaces.find((p) => p.id === selectedPlaceId) ??
         draftPlaces.find((p) => p.id === selectedPlaceId) ??
-        allFestivals.find((p) => p.id === selectedPlaceId);
+        visibleMapFestivals.find((p) => p.id === selectedPlaceId);
       if (found) return found;
     }
-    return places[0] ?? draftPlaces[0] ?? allFestivals[0] ?? null;
-  }, [selectedPlaceId, places, draftPlaces, allFestivals]);
+    return (
+      displayedPlaces[0] ?? draftPlaces[0] ?? visibleMapFestivals[0] ?? null
+    );
+  }, [selectedPlaceId, displayedPlaces, draftPlaces, visibleMapFestivals]);
 
   const activeSpotlightOrder = useMemo(() => {
     if (!activeSpotlightPlace) return undefined;
@@ -676,18 +642,17 @@ export function ExploreClientView() {
 
   return (
     <div className="h-full space-y-5">
-      {/* Editorial Page Top Header (DayT Style: PLAN YOUR DAY) */}
+      {/* Editorial Page Top Header */}
       <header className="pt-1">
-        <div className="flex items-center gap-2 text-xs font-black tracking-widest text-primary uppercase">
-          <span className="h-0.5 w-6 bg-primary" />
-          <span>PLAN YOUR DAY</span>
+        <div className="flex items-center gap-2 text-xs font-bold tracking-widest text-primary uppercase">
+          <span className="h-0.5 w-5 bg-primary" />
+          <span>ROUTE & SPOTS</span>
         </div>
         <h1 className="mt-2 text-2xl font-black tracking-tight text-foreground sm:text-3xl leading-snug">
-          오늘은 어떤 하루를 <br className="hidden sm:inline" />
-          <span className="text-primary">함께 만들어 볼까요?</span>
+          데이트 탐색 & 코스 큐레이션
         </h1>
         <p className="mt-1 text-xs sm:text-sm font-medium text-muted">
-          지역과 취향, 예산을 고르면 DayT가 하루를 알차게 채워드려요.
+          동네와 분위기, 예산에 맞춘 실시간 장소와 동선을 한눈에 완성하세요.
         </p>
       </header>
 
@@ -696,19 +661,19 @@ export function ExploreClientView() {
         {/* Left Side: Exploration Filter Panel (lg:col-span-5) */}
         <div className="space-y-4 lg:col-span-5 pb-6">
           {/* 1. Header & Unified Search / Category / Food / Budget Filter Card */}
-          <div className="rounded-[28px] border border-line bg-surface p-5 sm:p-6 shadow-[0_10px_32px_rgba(24,24,27,0.03)] space-y-4">
+          <div className="rounded-2xl border border-line bg-surface p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-[11px] font-black text-primary">
-                  <Sparkles className="h-3 w-3" />
-                  <span>실시간 데이트 상권 탐색</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-subtle border border-line px-2.5 py-0.5 text-[11px] font-bold text-foreground">
+                  <Compass className="h-3 w-3 text-primary" />
+                  <span>지역 탐색</span>
                 </span>
                 <h2 className="mt-1.5 text-lg sm:text-xl font-black tracking-tight text-foreground truncate">
                   {activeRegionDisplay}
                 </h2>
-                <p className="mt-0.5 text-xs font-black text-primary">
-                  {places.length > 0
-                    ? `${places.length}곳 탐색됨`
+                <p className="mt-0.5 text-xs font-bold text-primary">
+                  {displayedPlaces.length > 0
+                    ? `${displayedPlaces.length}곳 탐색됨`
                     : "데이트 스팟"}
                 </p>
               </div>
@@ -1080,7 +1045,7 @@ export function ExploreClientView() {
           )}
 
           {/* 2. Draft Course Cart Panel (Always visible in clean white card styling) */}
-          <div className="rounded-[28px] border border-line bg-surface p-5 sm:p-6 shadow-[0_10px_32px_rgba(24,24,27,0.03)] space-y-4">
+          <div className="rounded-2xl border border-line bg-surface p-5 shadow-xs space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
@@ -1207,6 +1172,7 @@ export function ExploreClientView() {
             }
             onSearchInArea={handleSearchInMapArea}
             isSearchingArea={isLoadingPlaces}
+            onVisibleFestivalsChange={handleVisibleFestivalsChange}
             heightClassName="h-[520px] lg:h-[600px] min-h-[460px]"
             headerTitle={
               isShowingDraftRoute
@@ -1218,7 +1184,9 @@ export function ExploreClientView() {
               setIsSpotlightModalOpen(true);
             }}
             onAddPlaceToCourse={(stop) => {
-              const target: PlaceDetail = allFestivals.find((f) => f.id === stop.id) ?? {
+              const target: PlaceDetail = visibleMapFestivals.find(
+                (f) => f.id === stop.id,
+              ) ?? {
                 id: stop.id,
                 externalProvider: "TOUR_API",
                 externalPlaceId: `tour_${stop.id}`,
@@ -1293,7 +1261,7 @@ export function ExploreClientView() {
           onClick={() => setIsSpotlightModalOpen(false)}
         >
           <div
-            className="relative max-h-[88vh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl bg-surface shadow-2xl [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.2)_transparent] dark:[scrollbar-color:rgba(255,255,255,0.2)_transparent]"
+            className="relative max-h-[88vh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl border border-line bg-surface shadow-2xl [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.2)_transparent] dark:[scrollbar-color:rgba(255,255,255,0.2)_transparent]"
             onClick={(e) => e.stopPropagation()}
           >
             <PlaceSpotlightCard

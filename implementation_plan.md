@@ -31,18 +31,22 @@
 
 > _새로운 기능이나 단계(Phase) 구현에 착수할 때 에이전트가 아래 섹션을 현재 작업의 세부 설계(대상 파일, 구현 순서, 검증 방법)로 갱신합니다._
 
-- **현재 목표**: **지도 상단 레이어에 '행사·축제' 토글 버튼 추가 및 코스 지정 기능 구현 · 지도 화면 바운드(Viewport Bounds) 내 전 축제 100% 표출**
+- **현재 목표**: **전체 페이지 UI/UX 쇄신 (`design-taste-frontend` 기반 Anti-Slop 디자인 시스템 적용)**
 - **세부 구현 내역**:
-  1. **백엔드 바운드 축제 쿼리 최적화 (`backend/src/main/java/com/dayt/domain/place/repository/PlaceQueryRepository.java`)**:
-     - `findActiveFestivalsInBounds`에서 `p.event_end_date >= CURRENT_DATE`의 과도한 날짜 제한을 완화하여, TourAPI로 수집된 전국의 모든 사계절 축제·행사(`sub_category = '축제·행사'` 또는 `category_group = 'EXHIBITION' AND event_start_date IS NOT NULL`)가 지도 뷰포트 사각 영역(`minLat ~ maxLat, minLng ~ maxLng`) 안에 들어오면 100% 반환되도록 개선.
-     - `limitCount` 기본 제한을 500개로 넉넉하게 상향.
-  2. **지도 컴포넌트(`CourseRouteMap.tsx`) '행사·축제' 레이어 버튼 & 코스 지정 연동**:
-     - 지도 상단 컨트롤 바(`역`, `명소·공원`, `주차장`) 옆에 **`행사·축제`** 레이어 버튼 신설 (`PartyPopper` 아이콘, 핑크 컬러).
-     - 지도 뷰포트 바운드(`map.getBounds()`)를 기반으로 현재 화면 안에 위치한 축제들을 실시간 로드 및 마커 렌더링.
-     - 축제 마커 클릭 시 하단 정보창에 카카오맵 바로가기와 함께 **`+ 코스에 추가` (`onAddPlaceToCourse`)** 액션 버튼 제공.
-  3. **데이트 탐색 페이지(`ExploreClientView.tsx`) 연동**:
-     - `CourseRouteMap`의 `onAddPlaceToCourse`를 `handleAddDraftPlace`와 연결하여, 지도에서 행사·축제 버튼을 켜고 원하는 축제를 탭했을 때 즉시 현재 코스 후보로 추가할 수 있도록 구현.
-     - 중심점 반경(2km/10km)에 갇히지 않고 지도 화면 내 모든 축제가 표시되도록 뷰포트 기반 데이터 연동.
-  4. **검증**:
-     - 백엔드 쿼리 검증 및 프론트엔드 타입체크/빌드 통과 확인.
-     - 지도 이동 및 줌 레벨 변경 시 화면 내 축제 핀 노출 및 코스 담기 동작 확인.
+  1. **디자인 토큰 & 테마 현대화 (`web/src/app/globals.css`)**:
+     - figma.com / linear.app 수준의 감각적인 웜 미니멀 팔레트(`--background: #fbfbfa`, `--surface-subtle: #f4f3f0`, `--surface-dark: #141312`, `--primary: #e15536`, `--line: #eae7e1`) 확립
+     - 과도하게 부풀려진 `rounded-[28px]` 모서리를 정제된 `rounded-2xl` / `rounded-xl`로 정리하여 정밀한 제품 엣지 형성
+  2. **글로벌 레이아웃 & 네비게이션 개선 (`web/src/components/layout/AppShell.tsx`)**:
+     - 인위적인 Sparkles 장식을 걷어내고, 단단한 DayT 워드마크와 슬림하고 정돈된 세그먼트 네비게이션 탭으로 개편
+     - 모바일 플로팅 독도 미니멀하고 직관적인 블러 도킹 UI로 마감
+  3. **메인 데이트 탐색 뷰 개편 (`web/src/features/places/ExploreClientView.tsx`)**:
+     - 템플릿성 AI 문구("— PLAN YOUR DAY...")를 제거하고, 명확하고 감각적인 도시 데이트 탐색 에디토리얼 헤더 도입
+     - 검색바, 반경, 예산 슬라이더, 카테고리 필터를 단일 컨트롤 시스템으로 깔끔하게 매칭
+     - 담은 코스 패널을 정갈한 미니멀 코스 덱으로 정돈
+  4. **코스 보관함 페이지 개편 (`web/src/features/courses/MyCoursesClientView.tsx`)**:
+     - 뻔한 블로그형 그리드를 탈피하고, 다가오는 D-Day 일정과 루트 동선(1 → 2 → 3)이 한눈에 보이는 세련된 카드 그리드 구축
+  5. **코스 메이커 & 상세 뷰 개편 (`CourseBuilderClientView.tsx`, `CourseDetailClientView.tsx`)**:
+     - 조잡한 장식을 제거하고 지도와 동선 편집 타임라인이 군더더기 없이 조화되는 프로덕트 UI 완성
+  6. **커플 스페이스 & 데이트 일기장 개편 (`TogetherClientView.tsx`, `DiariesClientView.tsx`)**:
+     - 유치하지 않고 따뜻한 감성의 기념일 카운터, 펫 케어, 폴라로이드 감성의 사진 일기장 아카이브 뷰 정돈
+  7. **검증**: `npm run typecheck`, `npm run lint` 통과 확인 (0 error / 0 warning) 및 브라우저 렌더링 점검

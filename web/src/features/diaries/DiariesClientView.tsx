@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import {
+  ArrowLeft,
+  ArrowRight,
   BookOpenText,
   CalendarHeart,
+  ImageIcon,
   ImagePlus,
   Loader2,
   Pencil,
   PenLine,
   Plus,
+  Quote,
   Route,
   Trash2,
   X,
@@ -28,50 +32,14 @@ import {
   fetchDiariesApi,
   updateDiaryApi,
 } from "./diaries-api";
+import {
+  formatDiaryDateDisplay,
+  getTodayIso,
+  readFileAsCompressedDataUrl,
+} from "./diary-utils";
 
-function getTodayIso(): string {
-  const formatter = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return formatter.format(new Date());
-}
-
-function readFileAsCompressedDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("파일을 읽을 수 없습니다."));
-    reader.onload = () => {
-      const rawUrl = typeof reader.result === "string" ? reader.result : "";
-      if (!rawUrl) {
-        reject(new Error("이미지 데이터가 비어 있습니다."));
-        return;
-      }
-      const img = new Image();
-      img.onerror = () => resolve(rawUrl);
-      img.onload = () => {
-        const maxSide = 960;
-        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-        const width = Math.max(1, Math.round(img.width * scale));
-        const height = Math.max(1, Math.round(img.height * scale));
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          resolve(rawUrl);
-          return;
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
-      };
-      img.src = rawUrl;
-    };
-    reader.readAsDataURL(file);
-  });
-}
+type DiaryPageTab = "feed" | "write";
+type DiaryFilterMode = "ALL" | "WITH_PHOTO" | "WITH_COURSE";
 
 export function DiariesClientView() {
   const { user, isInitializing, openLoginModal, authenticatedFetch } =
@@ -82,9 +50,11 @@ export function DiariesClientView() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<DiaryPageTab>("feed");
+  const [filterMode, setFilterMode] = useState<DiaryFilterMode>("ALL");
+
   const [editingDiary, setEditingDiary] = useState<DiaryDetail | null>(null);
-  const [dateAt, setDateAt] = useState<string>("");
+  const [dateAt, setDateAt] = useState<string>(() => getTodayIso());
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
@@ -133,6 +103,26 @@ export function DiariesClientView() {
     return map;
   }, [courses]);
 
+  const stats = useMemo(() => {
+    let photoCount = 0;
+    let courseCount = 0;
+    for (const d of diaries) {
+      if (d.imageUrls.length > 0) photoCount += 1;
+      if (d.courseId !== null) courseCount += 1;
+    }
+    return { photoCount, courseCount };
+  }, [diaries]);
+
+  const filteredDiaries = useMemo(() => {
+    if (filterMode === "WITH_PHOTO") {
+      return diaries.filter((d) => d.imageUrls.length > 0);
+    }
+    if (filterMode === "WITH_COURSE") {
+      return diaries.filter((d) => d.courseId !== null);
+    }
+    return diaries;
+  }, [diaries, filterMode]);
+
   function openNewComposer() {
     if (!user) {
       openLoginModal();
@@ -146,7 +136,7 @@ export function DiariesClientView() {
     setImageUrls([]);
     setPhotoUrlInput("");
     setErrorMessage(null);
-    setIsComposerOpen(true);
+    setActiveTab("write");
   }
 
   function openEditComposer(diary: DiaryDetail) {
@@ -158,7 +148,18 @@ export function DiariesClientView() {
     setImageUrls(diary.imageUrls);
     setPhotoUrlInput("");
     setErrorMessage(null);
-    setIsComposerOpen(true);
+    setActiveTab("write");
+  }
+
+  function cancelComposer() {
+    setErrorMessage(null);
+    setEditingDiary(null);
+    setActiveTab("feed");
+  }
+
+  function handleSelectWriteTab() {
+    if (activeTab === "write") return;
+    openNewComposer();
   }
 
   function handleAddImageUrl() {
@@ -170,6 +171,7 @@ export function DiariesClientView() {
     }
     setImageUrls((prev) => [...prev, trimmed]);
     setPhotoUrlInput("");
+    setErrorMessage(null);
   }
 
   async function handleFileSelect(event: ChangeEvent<HTMLInputElement>) {
@@ -229,8 +231,8 @@ export function DiariesClientView() {
         const created = await createDiaryApi(authenticatedFetch, payload);
         setDiaries((prev) => [created, ...prev]);
       }
-      setIsComposerOpen(false);
       setEditingDiary(null);
+      setActiveTab("feed");
     } catch (err) {
       setErrorMessage(
         err instanceof ApiError
@@ -265,18 +267,21 @@ export function DiariesClientView() {
     return (
       <div className="space-y-6">
         <header>
-          <p className="text-xs font-bold tracking-widest text-primary">
-            MEMORY JOURNAL
-          </p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
-            다녀온 길 위에 남기는 데이트 일기
+          <div className="flex items-center gap-2">
+            <span className="h-0.5 w-5 bg-primary" />
+            <p className="text-xs font-bold tracking-widest text-primary uppercase">
+              JOURNAL & MOMENTS
+            </p>
+          </div>
+          <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
+            데이트 일기장
           </h1>
           <p className="mt-1 text-sm text-muted">
-            그날 걸었던 코스 동선과 사진, 둘만의 감상을 매거진처럼 차곡차곡 모아보세요.
+            함께 걸었던 코스 동선과 사진, 둘만의 순간을 기록합니다.
           </p>
         </header>
 
-        <div className="rounded-[28px] border border-line bg-surface p-10 text-center shadow-xs">
+        <div className="rounded-2xl border border-line bg-surface p-10 text-center shadow-xs">
           <BookOpenText className="mx-auto h-10 w-10 text-primary" />
           <h2 className="mt-3 text-lg font-black text-foreground">
             로그인하고 첫 데이트 일기를 남겨보세요
@@ -287,7 +292,7 @@ export function DiariesClientView() {
           <button
             type="button"
             onClick={openLoginModal}
-            className="mt-5 rounded-full bg-primary px-6 py-3 text-xs font-extrabold text-white hover:bg-primary-hover"
+            className="mt-5 rounded-full bg-surface-dark px-6 py-2.5 text-xs font-bold text-white transition-colors hover:opacity-90"
           >
             로그인하기
           </button>
@@ -298,116 +303,210 @@ export function DiariesClientView() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      {/* Editorial Header + Dedicated Mode Tabs */}
+      <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
-          <p className="text-xs font-bold tracking-widest text-primary">
-            MEMORY JOURNAL
-          </p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
-            다녀온 길 위에 남기는 데이트 일기
+          <div className="flex items-center gap-2">
+            <span className="h-0.5 w-5 bg-primary" />
+            <p className="text-xs font-bold tracking-widest text-primary uppercase">
+              JOURNAL & MOMENTS
+            </p>
+          </div>
+          <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
+            데이트 일기장
           </h1>
-          <p className="mt-1 text-sm text-muted">
-            그날 걸었던 코스 동선과 사진, 둘만의 감상을 매거진처럼 차곡차곡 모아보세요.
+          <p className="mt-1 text-xs font-medium text-muted sm:text-sm">
+            함께 걸었던 코스 동선과 사진, 둘만의 순간을 기록합니다.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={openNewComposer}
-          className="inline-flex items-center gap-1.5 self-start rounded-full bg-primary px-5 py-2.5 text-xs font-extrabold text-white shadow-xs transition-colors hover:bg-primary-hover sm:self-auto"
+        {/* 2-Tab Segmented Switcher with Sliding Pill */}
+        <div
+          role="tablist"
+          aria-label="일기장 보기 전환"
+          className="relative grid w-full grid-cols-2 rounded-full border border-line bg-surface-subtle p-1 sm:w-auto sm:min-w-[320px]"
         >
-          <PenLine className="h-4 w-4" />
-          <span>오늘의 기록 남기기</span>
-        </button>
+          <span
+            aria-hidden="true"
+            style={{
+              transform: `translateX(${activeTab === "write" ? 100 : 0}%)`,
+            }}
+            className="pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full border border-line/80 bg-surface shadow-2xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          />
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "feed"}
+            onClick={() => setActiveTab("feed")}
+            className={`relative z-10 flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-colors ${
+              activeTab === "feed"
+                ? "text-foreground"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            <BookOpenText
+              className={`h-3.5 w-3.5 ${
+                activeTab === "feed" ? "text-primary" : "text-muted"
+              }`}
+            />
+            <span>추억 아카이브</span>
+            <span className="rounded-full bg-surface-subtle px-1.5 py-0.2 text-[10px] font-extrabold text-muted">
+              {diaries.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "write"}
+            onClick={handleSelectWriteTab}
+            className={`relative z-10 flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-colors ${
+              activeTab === "write"
+                ? "text-foreground"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            <PenLine
+              className={`h-3.5 w-3.5 ${
+                activeTab === "write" ? "text-primary" : "text-muted"
+              }`}
+            />
+            <span>{editingDiary ? "일기 수정 중" : "오늘의 기록 남기기"}</span>
+          </button>
+        </div>
       </header>
 
-      {errorMessage && !isComposerOpen && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-600">
+      {errorMessage && activeTab === "feed" && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-600 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-400">
           {errorMessage}
         </div>
       )}
 
-      {/* Composer Modal / Drawer Card */}
-      {isComposerOpen && (
-        <section className="rounded-[28px] border border-primary/35 bg-surface p-6 shadow-lg sm:p-7">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-black text-foreground">
-              {editingDiary ? "데이트 일기 수정하기" : "새 데이트 일기 작성"}
-            </h2>
-            <button
-              type="button"
-              onClick={() => setIsComposerOpen(false)}
-              className="rounded-full p-1.5 text-muted hover:bg-surface-subtle hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
+      {/* TAB 2: Dedicated Write Studio View */}
+      {activeTab === "write" ? (
+        <section className="rounded-2xl border border-line bg-surface p-5 shadow-xs sm:p-7">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/70 pb-4">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={cancelComposer}
+                aria-label="아카이브로 돌아가기"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface-subtle text-muted transition-colors hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div>
+                <h2 className="text-base font-black text-foreground sm:text-lg">
+                  {editingDiary
+                    ? "데이트 일기 수정하기"
+                    : "오늘의 데이트 기록 남기기"}
+                </h2>
+                <p className="text-xs text-muted">
+                  함께 다녀온 코스를 연결하고 기억하고 싶은 장면과 사진을 담아보세요.
+                </p>
+              </div>
+            </div>
           </div>
 
           {errorMessage && (
-            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-bold text-red-600">
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-bold text-red-600 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-400">
               {errorMessage}
             </div>
           )}
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1">
-              <span className="text-[11px] font-bold text-muted">
-                데이트 날짜
-              </span>
-              <input
-                type="date"
-                value={dateAt}
-                onChange={(e) => setDateAt(e.target.value)}
-                className="w-full rounded-xl border border-line bg-background px-3.5 py-2.5 text-xs font-bold text-foreground outline-none focus:border-primary"
-              />
-            </label>
+          {/* 12-Column Compose Studio */}
+          <div className="mt-5 grid items-start gap-6 lg:grid-cols-12">
+            {/* Left: Main Writing Form */}
+            <div className="space-y-4 lg:col-span-7">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-bold text-foreground">
+                    데이트 날짜
+                  </span>
+                  <input
+                    type="date"
+                    value={dateAt}
+                    onChange={(e) => setDateAt(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-background px-3.5 py-2.5 text-xs font-bold text-foreground outline-none transition-colors focus:border-primary"
+                  />
+                </label>
 
-            <label className="space-y-1">
-              <span className="text-[11px] font-bold text-muted">
-                함께 다녀온 코스 연결 (선택)
-              </span>
-              <select
-                value={selectedCourseId}
-                onChange={(e) => setSelectedCourseId(e.target.value)}
-                className="w-full rounded-xl border border-line bg-background px-3.5 py-2.5 text-xs font-bold text-foreground outline-none focus:border-primary"
-              >
-                <option value="">연결할 코스 없음</option>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.title} ({course.placeCount}곳)
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-bold text-foreground">
+                    함께 다녀온 코스 연결{" "}
+                    <span className="font-normal text-muted">(선택)</span>
+                  </span>
+                  <select
+                    value={selectedCourseId}
+                    onChange={(e) => setSelectedCourseId(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-background px-3.5 py-2.5 text-xs font-bold text-foreground outline-none transition-colors focus:border-primary"
+                  >
+                    <option value="">연결할 코스 없음</option>
+                    {courses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.title} ({course.placeCount}곳)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
 
-          <div className="mt-3 space-y-3">
-            <input
-              type="text"
-              maxLength={100}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="일기 제목 (예: 성수동 전시 보고 노을 보며 커피 마신 오후)"
-              className="w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm font-extrabold text-foreground outline-none focus:border-primary"
-            />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="diary-title-input"
+                    className="text-xs font-bold text-foreground"
+                  >
+                    일기 제목
+                  </label>
+                  <span className="text-[11px] text-muted">
+                    {title.length}/100
+                  </span>
+                </div>
+                <input
+                  id="diary-title-input"
+                  type="text"
+                  maxLength={100}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="예: 성수동 전시 보고 노을 보며 커피 마신 오후"
+                  className="w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm font-extrabold text-foreground outline-none transition-colors focus:border-primary"
+                />
+              </div>
 
-            <textarea
-              rows={4}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="가장 좋았던 장소, 나눴던 대화, 기억하고 싶은 장면을 자유롭게 적어보세요."
-              className="w-full resize-none rounded-xl border border-line bg-background p-4 text-xs leading-relaxed text-foreground outline-none focus:border-primary sm:text-sm"
-            />
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="diary-content-textarea"
+                  className="block text-xs font-bold text-foreground"
+                >
+                  오늘의 감상
+                </label>
+                <textarea
+                  id="diary-content-textarea"
+                  rows={8}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="가장 좋았던 장소, 나눴던 대화, 기억하고 싶은 장면을 자유롭게 적어보세요."
+                  className="w-full resize-y rounded-xl border border-line bg-background p-4 text-xs leading-relaxed text-foreground outline-none transition-colors focus:border-primary sm:text-sm"
+                />
+              </div>
+            </div>
 
-            {/* Photo Attachments */}
-            <div className="space-y-2 rounded-2xl bg-background p-4">
+            {/* Right: Photo Attachment Studio */}
+            <div className="space-y-3 rounded-2xl border border-line bg-surface-subtle/50 p-4 sm:p-5 lg:col-span-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-extrabold text-foreground">
-                  추억 사진 첨부 ({imageUrls.length}/6)
-                </span>
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary-soft px-3.5 py-1.5 text-xs font-extrabold text-primary hover:bg-primary/15">
+                <div>
+                  <span className="text-xs font-extrabold text-foreground">
+                    추억 사진 첨부 ({imageUrls.length}/6)
+                  </span>
+                  <p className="text-[11px] text-muted">
+                    첫 번째 사진이 아카이브 카드의 커버로 표시됩니다.
+                  </p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary-soft px-3.5 py-1.5 text-xs font-extrabold text-primary transition-colors hover:bg-primary/15">
                   <ImagePlus className="h-3.5 w-3.5" />
-                  <span>기기에서 사진 선택</span>
+                  <span>사진 선택</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -423,21 +522,21 @@ export function DiariesClientView() {
                   type="url"
                   value={photoUrlInput}
                   onChange={(e) => setPhotoUrlInput(e.target.value)}
-                  placeholder="또는 이미지 URL 붙여넣기 (https://...)"
-                  className="flex-1 rounded-xl border border-line bg-surface px-3.5 py-2 text-xs text-foreground outline-none focus:border-primary"
+                  placeholder="이미지 URL 붙여넣기 (https://...)"
+                  className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-foreground outline-none transition-colors focus:border-primary"
                 />
                 <button
                   type="button"
                   onClick={handleAddImageUrl}
-                  className="inline-flex items-center gap-1 rounded-xl border border-line bg-surface px-3.5 py-2 text-xs font-bold text-foreground hover:border-primary/40"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-bold text-foreground transition-colors hover:border-primary/40"
                 >
                   <Plus className="h-3.5 w-3.5 text-primary" />
-                  <span>URL 추가</span>
+                  <span>추가</span>
                 </button>
               </div>
 
-              {imageUrls.length > 0 && (
-                <div className="mt-2 grid grid-cols-3 gap-2.5 sm:grid-cols-6">
+              {imageUrls.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2.5 pt-1 sm:grid-cols-3">
                   {imageUrls.map((url, index) => (
                     <div
                       key={`${url.slice(0, 24)}-${index}`}
@@ -449,6 +548,11 @@ export function DiariesClientView() {
                         alt={`첨부 사진 ${index + 1}`}
                         className="h-full w-full object-cover"
                       />
+                      {index === 0 && (
+                        <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/65 px-2 py-0.5 text-[9px] font-bold text-white backdrop-blur-xs">
+                          커버
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() =>
@@ -456,150 +560,260 @@ export function DiariesClientView() {
                             prev.filter((_, i) => i !== index),
                           )
                         }
-                        className="absolute top-1 right-1 rounded-full bg-black/65 p-1 text-white"
+                        aria-label={`첨부 사진 ${index + 1} 삭제`}
+                        className="absolute top-1.5 right-1.5 rounded-full bg-black/65 p-1 text-white transition-colors hover:bg-black"
                       >
                         <X className="h-3 w-3" />
                       </button>
                     </div>
                   ))}
                 </div>
+              ) : (
+                <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-line bg-surface/60 p-6 text-center">
+                  <ImageIcon className="h-7 w-7 text-muted/60" />
+                  <p className="mt-2 text-xs font-semibold text-muted">
+                    사진 없이 글로만 기록해도 멋진 에디토리얼 카드로 보관됩니다.
+                  </p>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="mt-5 flex justify-end gap-2">
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line/70 pt-4">
             <button
               type="button"
-              onClick={() => setIsComposerOpen(false)}
-              className="rounded-full border border-line bg-background px-4 py-2 text-xs font-bold text-muted hover:text-foreground"
+              onClick={cancelComposer}
+              className="rounded-full border border-line bg-background px-4 py-2 text-xs font-bold text-muted transition-colors hover:text-foreground"
             >
-              취소
+              아카이브 목록으로 돌아가기
             </button>
             <button
               type="button"
               disabled={isSaving}
               onClick={() => void handleSaveDiary()}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2 text-xs font-extrabold text-white hover:bg-primary-hover disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-6 py-2.5 text-xs font-extrabold text-white shadow-2xs transition-colors hover:bg-primary-hover disabled:opacity-60"
             >
-              {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {isSaving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <PenLine className="h-3.5 w-3.5" />
+              )}
               <span>{editingDiary ? "수정 완료" : "일기 저장하기"}</span>
             </button>
           </div>
         </section>
-      )}
-
-      {/* Diary Feed */}
-      {!hasLoaded ? (
-        <div className="flex min-h-64 flex-col items-center justify-center rounded-[28px] border border-line bg-surface p-10">
-          <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          <p className="mt-3 text-xs font-bold text-muted">
-            데이트 일기장을 불러오고 있어요...
-          </p>
-        </div>
-      ) : diaries.length === 0 ? (
-        <div className="rounded-[28px] border border-dashed border-line bg-surface p-12 text-center">
-          <CalendarHeart className="mx-auto h-9 w-9 text-primary/75" />
-          <h2 className="mt-3 text-base font-black text-foreground">
-            아직 작성된 데이트 일기가 없어요
-          </h2>
-          <p className="mt-1 text-xs text-muted">
-            다녀온 코스를 연결해 첫 번째 추억 기록을 남겨보세요!
-          </p>
-          <button
-            type="button"
-            onClick={openNewComposer}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-xs font-extrabold text-white hover:bg-primary-hover"
-          >
-            <PenLine className="h-3.5 w-3.5" />
-            <span>첫 일기 작성하기</span>
-          </button>
-        </div>
       ) : (
+        /* TAB 1: Editorial Archive Grid Feed */
         <div className="space-y-5">
-          {diaries.map((entry) => {
-            const linkedTitle =
-              entry.courseId !== null
-                ? (courseTitleMap.get(entry.courseId) ??
-                  `데이트 코스 #${entry.courseId}`)
-                : null;
-            return (
-              <article
-                key={entry.id}
-                className="rounded-[28px] border border-line bg-surface p-6 shadow-[0_8px_30px_rgba(24,24,27,0.03)] sm:p-8"
+          {/* Summary & Filter Toolbar */}
+          {hasLoaded && diaries.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3 shadow-2xs">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setFilterMode("ALL")}
+                  className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                    filterMode === "ALL"
+                      ? "bg-surface-dark text-white"
+                      : "bg-surface-subtle text-muted hover:text-foreground"
+                  }`}
+                >
+                  전체 보기 ({diaries.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterMode("WITH_PHOTO")}
+                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                    filterMode === "WITH_PHOTO"
+                      ? "bg-surface-dark text-white"
+                      : "bg-surface-subtle text-muted hover:text-foreground"
+                  }`}
+                >
+                  <ImageIcon className="h-3 w-3" />
+                  <span>사진 기록 ({stats.photoCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterMode("WITH_COURSE")}
+                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                    filterMode === "WITH_COURSE"
+                      ? "bg-surface-dark text-white"
+                      : "bg-surface-subtle text-muted hover:text-foreground"
+                  }`}
+                >
+                  <Route className="h-3 w-3" />
+                  <span>코스 연결 ({stats.courseCount})</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs text-muted">
+                <button
+                  type="button"
+                  onClick={openNewComposer}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-3 py-1.5 text-xs font-extrabold text-primary transition-colors hover:bg-primary hover:text-white"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>새 기록 남기기</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Grid Feed Body */}
+          {!hasLoaded ? (
+            <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-line bg-surface p-10">
+              <Loader2 className="h-7 w-7 animate-spin text-primary" />
+              <p className="mt-3 text-xs font-bold text-muted">
+                데이트 일기장을 불러오고 있어요...
+              </p>
+            </div>
+          ) : diaries.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-line bg-surface p-12 text-center">
+              <CalendarHeart className="mx-auto h-9 w-9 text-primary/75" />
+              <h2 className="mt-3 text-base font-black text-foreground">
+                아직 작성된 데이트 일기가 없어요
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                다녀온 코스를 연결해 첫 번째 추억 기록을 남겨보세요!
+              </p>
+              <button
+                type="button"
+                onClick={openNewComposer}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-white shadow-2xs transition-colors hover:bg-primary-hover"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-primary">
-                    <CalendarHeart className="h-4 w-4" />
-                    <span>{entry.dateAt}</span>
-                    {entry.coupleId !== null && (
-                      <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-[10px] font-extrabold text-primary">
-                        우리 커플 공유 일기
-                      </span>
-                    )}
-                  </div>
+                <PenLine className="h-3.5 w-3.5" />
+                <span>첫 일기 작성하기</span>
+              </button>
+            </div>
+          ) : filteredDiaries.length === 0 ? (
+            <div className="rounded-2xl border border-line bg-surface p-10 text-center">
+              <p className="text-sm font-black text-foreground">
+                선택한 조건에 맞는 일기가 없어요
+              </p>
+              <button
+                type="button"
+                onClick={() => setFilterMode("ALL")}
+                className="mt-3 rounded-full border border-line bg-surface-subtle px-4 py-1.5 text-xs font-bold text-foreground hover:border-primary/40"
+              >
+                전체 일기 보기
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {filteredDiaries.map((entry) => {
+                const linkedTitle =
+                  entry.courseId !== null
+                    ? (courseTitleMap.get(entry.courseId) ??
+                      `데이트 코스 #${entry.courseId}`)
+                    : null;
+                const hasCover = entry.imageUrls.length > 0;
 
-                  <div className="flex items-center gap-2">
-                    {entry.courseId !== null && linkedTitle && (
+                return (
+                  <article
+                    key={entry.id}
+                    className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-xs transition-all duration-150 hover:border-foreground/25 hover:shadow-md"
+                  >
+                    {/* Top Visual Header */}
+                    {hasCover ? (
                       <Link
-                        href={`/courses/${entry.courseId}`}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-surface-subtle px-3 py-1 text-[11px] font-bold text-foreground hover:border-primary/40 hover:text-primary"
-                      >
-                        <Route className="h-3 w-3 text-primary" />
-                        <span>{linkedTitle}</span>
-                      </Link>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => openEditComposer(entry)}
-                      className="inline-flex items-center gap-1 rounded-full border border-line bg-background px-3 py-1 text-[11px] font-bold text-muted hover:text-foreground"
-                    >
-                      <Pencil className="h-3 w-3" />
-                      <span>수정</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={deletingId === entry.id}
-                      onClick={() => void handleDeleteDiary(entry)}
-                      className="inline-flex items-center gap-1 rounded-full border border-line bg-background px-3 py-1 text-[11px] font-bold text-muted hover:border-red-300 hover:text-red-600 disabled:opacity-50"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      <span>삭제</span>
-                    </button>
-                  </div>
-                </div>
-
-                <h2 className="mt-3 text-xl font-black text-foreground">
-                  {entry.title}
-                </h2>
-                <p className="mt-2 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-muted">
-                  {entry.content}
-                </p>
-
-                {entry.imageUrls.length > 0 && (
-                  <div className="mt-5 grid grid-cols-2 gap-3 sm:max-w-2xl sm:grid-cols-3">
-                    {entry.imageUrls.map((url, idx) => (
-                      <div
-                        key={`${entry.id}-img-${idx}`}
-                        className="aspect-4/3 overflow-hidden rounded-2xl border border-line bg-background"
+                        href={`/diaries/${entry.id}`}
+                        className="relative block aspect-16/10 w-full overflow-hidden bg-surface-subtle text-left"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={url}
-                          alt={`${entry.title} 사진 ${idx + 1}`}
-                          className="h-full w-full object-cover"
+                          src={entry.imageUrls[0]}
+                          alt={entry.title}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                         />
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+                        <div className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-xs">
+                          <ImageIcon className="h-3 w-3" />
+                          <span>사진 {entry.imageUrls.length}장</span>
+                        </div>
+                        <span className="absolute bottom-3 left-4 text-xs font-extrabold text-white/95 drop-shadow-xs">
+                          {formatDiaryDateDisplay(entry.dateAt)}
+                        </span>
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/diaries/${entry.id}`}
+                        className="flex items-center justify-between border-b border-line/70 bg-surface-subtle/65 px-5 py-4 text-left transition-colors group-hover:bg-surface-subtle"
+                      >
+                        <div className="inline-flex items-center gap-1.5 text-xs font-extrabold text-primary">
+                          <CalendarHeart className="h-3.5 w-3.5" />
+                          <span>{formatDiaryDateDisplay(entry.dateAt)}</span>
+                        </div>
+                        <Quote className="h-4 w-4 text-muted/40" />
+                      </Link>
+                    )}
+
+                    {/* Card Body */}
+                    <div className="flex flex-1 flex-col justify-between p-5">
+                      <div>
+                        {/* Linked Course Badge */}
+                        {entry.courseId !== null && linkedTitle && (
+                          <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
+                            <Link
+                              href={`/courses/${entry.courseId}`}
+                              className="inline-flex max-w-full items-center gap-1 rounded-full border border-line bg-surface-subtle px-2.5 py-0.5 text-[10px] font-bold text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                            >
+                              <Route className="h-3 w-3 shrink-0 text-primary" />
+                              <span className="truncate">{linkedTitle}</span>
+                            </Link>
+                          </div>
+                        )}
+
+                        <Link
+                          href={`/diaries/${entry.id}`}
+                          className="block w-full text-left"
+                        >
+                          <h2 className="line-clamp-1 text-base font-black tracking-tight text-foreground transition-colors group-hover:text-primary sm:text-lg">
+                            {entry.title}
+                          </h2>
+                          <p className="mt-2 line-clamp-3 whitespace-pre-line text-xs leading-relaxed text-muted sm:text-sm">
+                            {entry.content}
+                          </p>
+                        </Link>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </article>
-            );
-          })}
+
+                      {/* Card Footer Actions */}
+                      <div className="mt-4 flex items-center justify-between gap-2 border-t border-line/70 pt-3.5">
+                        <Link
+                          href={`/diaries/${entry.id}`}
+                          className="inline-flex items-center gap-1 text-xs font-extrabold text-primary transition-transform hover:translate-x-0.5"
+                        >
+                          <span>전문 읽기</span>
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditComposer(entry)}
+                            className="inline-flex items-center gap-1 rounded-full border border-line bg-background px-2.5 py-1 text-[11px] font-bold text-muted transition-colors hover:text-foreground"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            <span>수정</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deletingId === entry.id}
+                            onClick={() => void handleDeleteDiary(entry)}
+                            className="inline-flex items-center gap-1 rounded-full border border-line bg-background px-2.5 py-1 text-[11px] font-bold text-muted transition-colors hover:border-red-300 hover:text-red-600 disabled:opacity-50 dark:hover:border-red-800/70 dark:hover:text-red-400"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>삭제</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
-

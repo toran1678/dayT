@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Check, Loader2, LogOut, Sparkles, UserRound, X } from "lucide-react";
+import { Check, Loader2, LogOut, X } from "lucide-react";
 import { ApiError } from "@/shared/api/client";
 import type { OAuthProvider } from "@/shared/api/types";
 import { buildOAuthAuthorizeUrl } from "./auth-api";
@@ -135,9 +135,13 @@ function LoginDialog({ onClose }: { onClose: () => void }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="dayt-login-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-xs"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
     >
-      <div className="relative w-full max-w-md rounded-3xl border border-line bg-surface p-6 shadow-2xl sm:p-8">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-2xl sm:p-7"
+      >
         <button
           type="button"
           onClick={onClose}
@@ -147,16 +151,11 @@ function LoginDialog({ onClose }: { onClose: () => void }) {
           <X className="h-4 w-4" />
         </button>
 
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-[11px] font-bold text-primary">
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>3초 소셜 로그인</span>
-        </div>
-
         <h2
           id="dayt-login-title"
-          className="mt-3 text-2xl font-black tracking-tight text-foreground"
+          className="text-2xl font-black tracking-tight text-foreground"
         >
-          Day<span className="text-primary">T</span>에서 오늘의 코스를 저장해요
+          Day<span className="text-primary">T</span> 로그인
         </h2>
         <p className="mt-1.5 text-xs leading-relaxed text-muted">
           로그인하면 나만의 데이트 코스를 보관하고 연인과 커플 스페이스·일기장을 함께 사용할 수 있습니다.
@@ -282,9 +281,13 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="dayt-profile-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-xs"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
     >
-      <div className="relative w-full max-w-md rounded-3xl border border-line bg-surface p-6 shadow-2xl sm:p-8">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-2xl sm:p-7"
+      >
         <button
           type="button"
           onClick={onClose}
@@ -294,27 +297,22 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
           <X className="h-4 w-4" />
         </button>
 
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary">
-            <UserRound className="h-6 w-6" />
+        <div className="pr-8">
+          <div className="flex items-center gap-2">
+            <h2
+              id="dayt-profile-title"
+              className="text-lg font-black text-foreground"
+            >
+              내 프로필 설정
+            </h2>
+            <span className="rounded-full bg-surface-subtle px-2.5 py-0.5 text-[10px] font-extrabold text-muted">
+              {user.oauthProvider}
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2
-                id="dayt-profile-title"
-                className="text-lg font-black text-foreground"
-              >
-                내 프로필 설정
-              </h2>
-              <span className="rounded-full bg-surface-subtle px-2.5 py-0.5 text-[10px] font-extrabold text-muted">
-                {user.oauthProvider}
-              </span>
-            </div>
-            <p className="text-xs text-muted">
-              {user.email ?? "이메일 미등록"} ·{" "}
-              {user.coupleId ? `커플 #${user.coupleId} 연결됨` : "솔로 모드"}
-            </p>
-          </div>
+          <p className="mt-1 text-xs text-muted">
+            {user.email ?? "이메일 미등록"} ·{" "}
+            {user.coupleId ? `커플 #${user.coupleId} 연결됨` : "솔로 모드"}
+          </p>
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-4">
@@ -332,7 +330,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
               maxLength={50}
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-line bg-background px-3.5 py-2.5 text-sm font-semibold text-foreground outline-none focus:border-primary"
+              className="mt-1.5 w-full rounded-xl border border-line bg-background px-3.5 py-2.5 text-sm font-semibold text-foreground outline-none transition-colors focus:border-foreground"
             />
           </div>
 
@@ -349,7 +347,7 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
               placeholder="https://example.com/profile.jpg"
               value={profileImageUrl}
               onChange={(e) => setProfileImageUrl(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-line bg-background px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-primary"
+              className="mt-1.5 w-full rounded-xl border border-line bg-background px-3.5 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-foreground"
             />
           </div>
 

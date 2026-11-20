@@ -19,6 +19,15 @@ export function fetchDiariesApi(
   );
 }
 
+export function fetchDiaryDetailApi(
+  authenticatedFetch: AuthenticatedFetchFn,
+  diaryId: number,
+): Promise<DiaryDetail> {
+  return authenticatedFetch<DiaryDetail>(`/api/v1/diaries/${diaryId}`, {
+    method: "GET",
+  });
+}
+
 export function createDiaryApi(
   authenticatedFetch: AuthenticatedFetchFn,
   payload: DiaryUpsertRequest,

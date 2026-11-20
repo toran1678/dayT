@@ -83,3 +83,26 @@ export function getPlaceDetailApi(placeId: number): Promise<PlaceDetail> {
   });
 }
 
+export interface FestivalBoundsQueryParams {
+  minLat?: number;
+  maxLat?: number;
+  minLng?: number;
+  maxLng?: number;
+  limit?: number;
+}
+
+export function fetchFestivalsInBoundsApi(
+  params: FestivalBoundsQueryParams = {},
+): Promise<PlaceDetail[]> {
+  const qs = buildQueryString({
+    minLat: params.minLat,
+    maxLat: params.maxLat,
+    minLng: params.minLng,
+    maxLng: params.maxLng,
+    limit: params.limit,
+  });
+  return apiFetch<PlaceDetail[]>(`/api/v1/places/festivals${qs}`, {
+    method: "GET",
+  });
+}
+

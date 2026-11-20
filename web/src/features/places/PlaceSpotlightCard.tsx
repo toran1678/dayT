@@ -14,7 +14,6 @@ import {
   PartyPopper,
   Phone,
   Plus,
-  Sparkles,
   UtensilsCrossed,
   X,
 } from "lucide-react";
@@ -88,7 +87,6 @@ interface PlaceSpotlightCardProps {
 
 export function PlaceSpotlightCard({
   place,
-  orderNumber,
   isSelectedInDraft,
   onToggleDraft,
   onClose,
@@ -163,6 +161,7 @@ export function PlaceSpotlightCard({
     place.address,
     place.categoryGroup,
     place.foodCategory,
+    place.thumbnailUrl,
   ]);
 
   const activePhoto = photos[selectedPhotoIdx];
@@ -207,7 +206,7 @@ export function PlaceSpotlightCard({
   }
 
   return (
-    <article className="overflow-hidden rounded-3xl border border-primary/25 bg-surface shadow-[0_12px_36px_rgba(232,93,63,0.12)] transition-all">
+    <article className="bg-surface text-foreground">
       {/* 1. Food & Store Photo Gallery Carousel */}
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-surface-subtle">
         {isLoadingPhotos ? (
@@ -311,7 +310,7 @@ export function PlaceSpotlightCard({
 
       {/* 1.1 Photo Thumbnail Strip (if multiple photos available) */}
       {photos.length > 1 && (
-        <div className="flex gap-1.5 overflow-x-auto border-b border-line bg-surface-subtle/50 p-2">
+        <div className="flex gap-2 overflow-x-auto border-b border-line bg-surface-subtle/40 px-5 py-2.5">
           {photos.map((photo, idx) => {
             const thumbSrc =
               photo.thumbnailUrl && !failedUrls[photo.thumbnailUrl]
@@ -322,10 +321,10 @@ export function PlaceSpotlightCard({
                 key={`${photo.url}-${idx}`}
                 type="button"
                 onClick={() => setSelectedPhotoIdx(idx)}
-                className={`relative h-12 w-16 shrink-0 overflow-hidden rounded-xl border-2 transition-transform hover:scale-105 ${
+                className={`relative h-12 w-16 shrink-0 overflow-hidden rounded-lg transition-opacity ${
                   selectedPhotoIdx === idx
-                    ? "border-primary shadow-xs ring-1 ring-primary"
-                    : "border-transparent opacity-70 hover:opacity-100"
+                    ? "ring-2 ring-foreground opacity-100"
+                    : "opacity-60 hover:opacity-100"
                 }`}
               >
                 <Image
@@ -351,7 +350,7 @@ export function PlaceSpotlightCard({
               {place.name}
             </h3>
             {place.subCategory && (
-              <p className="mt-0.5 text-xs font-semibold text-primary">
+              <p className="mt-0.5 text-xs font-semibold text-muted">
                 {place.subCategory}
               </p>
             )}
@@ -360,49 +359,62 @@ export function PlaceSpotlightCard({
           <button
             type="button"
             onClick={() => onToggleDraft(place)}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-extrabold transition-all shadow-xs ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-extrabold transition-colors ${
               isSelectedInDraft
                 ? "bg-surface-dark text-white"
-                : "bg-primary text-white hover:bg-primary-hover hover:scale-105"
+                : "bg-primary text-white hover:bg-primary-hover"
             }`}
           >
             {isSelectedInDraft ? (
               <>
-                <Check className="h-3.5 w-3.5 text-amber-300" />
+                <Check className="h-3.5 w-3.5" />
                 <span>코스에 담김</span>
               </>
             ) : (
               <>
                 <Plus className="h-3.5 w-3.5" />
-                <span>+ 코스에 담기</span>
+                <span>코스에 담기</span>
               </>
             )}
           </button>
         </div>
 
+        {/* Summary description */}
+        {place.aiSummary && (
+          <p className="text-sm leading-relaxed text-foreground/85">
+            {place.aiSummary}
+          </p>
+        )}
+
         {/* Festival Schedule Highlight Box */}
         {festivalStatus && (
-          <div className="rounded-2xl border border-pink-200/90 bg-gradient-to-r from-pink-50/80 to-purple-50/80 p-3.5 space-y-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 font-black text-pink-700">
-                <PartyPopper className="h-4 w-4 text-pink-600" />
+          <div className="rounded-xl border border-line bg-surface-subtle/60 p-3.5 space-y-2 text-xs text-foreground">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2 font-black text-foreground">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-pink-600 text-white shadow-2xs">
+                  <PartyPopper className="h-3.5 w-3.5" />
+                </span>
                 <span>행사·축제 안내</span>
               </span>
-              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-black ${festivalStatus.badgeBg}`}>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-black ${festivalStatus.badgeBg}`}
+              >
                 {festivalStatus.label}
               </span>
             </div>
             <div className="flex items-center gap-2 text-foreground font-extrabold">
-              <Calendar className="h-3.5 w-3.5 shrink-0 text-pink-600" />
-              <span>행사 일정: {place.eventStartDate} ~ {place.eventEndDate}</span>
+              <Calendar className="h-3.5 w-3.5 shrink-0 text-muted" />
+              <span>
+                행사 일정: {place.eventStartDate} ~ {place.eventEndDate}
+              </span>
             </div>
           </div>
         )}
 
-        {/* Address & Price Meta */}
-        <div className="space-y-1.5 rounded-2xl bg-surface-subtle/60 p-3.5 text-xs">
+        {/* Address & Price Meta Rows */}
+        <div className="space-y-2.5 border-y border-line/70 py-3.5 text-xs">
           <div className="flex items-start gap-2">
-            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" />
             <span className="font-medium text-foreground">{place.address}</span>
           </div>
           {place.phone && (
@@ -411,7 +423,7 @@ export function PlaceSpotlightCard({
               <span className="text-muted">{place.phone}</span>
             </div>
           )}
-          <div className="flex items-center justify-between border-t border-line/60 pt-2 text-xs">
+          <div className="flex items-center justify-between pt-1 text-xs">
             <span className="text-muted">1인 예상 비용</span>
             <strong className="font-black text-foreground">
               {place.avgPricePerPerson === null
@@ -423,29 +435,18 @@ export function PlaceSpotlightCard({
           </div>
         </div>
 
-        {/* AI Curation Summary */}
-        {place.aiSummary && (
-          <div className="rounded-2xl bg-primary-soft/45 p-3.5 text-xs leading-relaxed text-foreground">
-            <div className="mb-1 inline-flex items-center gap-1 font-extrabold text-primary">
-              <Sparkles className="h-3 w-3 shrink-0" />
-              <span>AI 데이트 큐레이션 요약</span>
-            </div>
-            <p className="font-medium text-foreground/90">{place.aiSummary}</p>
-          </div>
-        )}
-
         {/* Recommended Menus */}
         {place.recommendedMenus.length > 0 && (
           <div className="space-y-1.5">
-            <p className="inline-flex items-center gap-1 text-[11px] font-extrabold text-foreground">
-              <UtensilsCrossed className="h-3 w-3 text-primary" />
+            <p className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-foreground">
+              <UtensilsCrossed className="h-3 w-3 text-muted" />
               <span>추천 메뉴 · 시그니처</span>
             </p>
             <div className="flex flex-wrap gap-1.5">
               {place.recommendedMenus.map((menu) => (
                 <span
                   key={menu}
-                  className="rounded-xl border border-line bg-background px-2.5 py-1 text-xs font-semibold text-foreground"
+                  className="rounded-lg bg-surface-subtle px-2.5 py-1 text-xs font-semibold text-foreground"
                 >
                   {menu}
                 </span>
@@ -456,7 +457,7 @@ export function PlaceSpotlightCard({
 
         {/* Hashtags */}
         {place.hashtags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
+          <div className="flex flex-wrap gap-1.5">
             {place.hashtags.map((tag) => (
               <span
                 key={tag}
@@ -470,15 +471,15 @@ export function PlaceSpotlightCard({
 
         {/* Kakao Map Detail Link */}
         {place.placeUrl && (
-          <div className="pt-2 border-t border-line/70">
+          <div className="pt-1">
             <a
               href={place.placeUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-line bg-background py-2.5 text-xs font-extrabold text-foreground transition-colors hover:border-primary/40 hover:bg-surface-subtle"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-surface py-2.5 text-xs font-extrabold text-foreground transition-colors hover:border-foreground/30 hover:bg-surface-subtle"
             >
               <span>카카오맵 상세 정보 보기</span>
-              <ExternalLink className="h-3.5 w-3.5 text-primary" />
+              <ExternalLink className="h-3.5 w-3.5 text-muted" />
             </a>
           </div>
         )}

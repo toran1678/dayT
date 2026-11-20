@@ -7,7 +7,6 @@ import {
   ArrowUp,
   Calendar,
   Car,
-  Check,
   Clock,
   Compass,
   Footprints,
@@ -15,9 +14,7 @@ import {
   Loader2,
   Map as MapIcon,
   Plus,
-  Radio,
   Save,
-  Sparkles,
   Trash2,
   Wallet,
   X,
@@ -29,7 +26,6 @@ import {
 } from "@/features/map/CourseRouteMap";
 import {
   addMinutesToClock,
-  clockToMinutes,
   diffMinutesBetweenClocks,
   estimateDrivingRoute,
   estimateWalkingRoute,
@@ -209,6 +205,31 @@ function buildInitialStops(initialCourse?: CourseDetail): EditableCourseStop[] {
   return recalculateStopTransfers(mapped);
 }
 
+function computeTimelineWithClocks(
+  stops: EditableCourseStop[],
+  startClock: string,
+) {
+  const result: (EditableCourseStop & {
+    order: number;
+    arrivalClock: string;
+    departureClock: string;
+  })[] = [];
+  let elapsed = 0;
+  for (let index = 0; index < stops.length; index++) {
+    const stop = stops[index];
+    const arrivalClock = addMinutesToClock(startClock, elapsed);
+    const departureClock = addMinutesToClock(arrivalClock, stop.stayMinutes);
+    elapsed += stop.stayMinutes + stop.travelMinutesToNext;
+    result.push({
+      ...stop,
+      order: index + 1,
+      arrivalClock,
+      departureClock,
+    });
+  }
+  return result;
+}
+
 export function CourseBuilderClientView({
   initialCourse,
   onSaved,
@@ -304,7 +325,7 @@ export function CourseBuilderClientView({
           return;
         }
         if (event.action === "PRESENCE_JOIN") {
-          setCollabNotice(`${event.editorNickname}님이 공동 편집에 접속했어요`);
+          setCollabNotice(`${event.editorNickname}님이 함께 보고 있어요`);
           return;
         }
         if (event.action === "SYNC_COURSE" && event.course) {
@@ -317,11 +338,12 @@ export function CourseBuilderClientView({
           if (event.course.timeSlot) {
             setTimeSlot(event.course.timeSlot);
           }
+          setPlanDate(event.course.datePlanDate ?? "");
           setSourceType(event.course.sourceType);
           setShareWithCouple(Boolean(event.course.coupleId));
           setStops(buildInitialStops(event.course));
           setCollabNotice(
-            `방금 ${event.editorNickname}님이 코스를 실시간 수정했어요`,
+            `${event.editorNickname}님이 방금 수정했어요`,
           );
         }
       },
@@ -340,6 +362,7 @@ export function CourseBuilderClientView({
     }
     if (skipInitialBroadcastRef.current) {
       skipInitialBroadcastRef.current = false;
+      isApplyingRemoteRef.current = false;
       return;
     }
     if (isApplyingRemoteRef.current) {
@@ -356,6 +379,7 @@ export function CourseBuilderClientView({
         description: description.trim() || null,
         themeTags: selectedThemes,
         timeSlot,
+        datePlanDate: planDate || null,
         sourceType,
         shareWithCouple,
         places: stops.map((stop, idx) => ({
@@ -380,6 +404,7 @@ export function CourseBuilderClientView({
     description,
     selectedThemes,
     timeSlot,
+    planDate,
     sourceType,
     shareWithCouple,
     stops,
@@ -667,27 +692,7 @@ export function CourseBuilderClientView({
   }
 
   // Computed Timeline Arrival Clocks & Totals
-  const timelineWithClocks = useMemo(() => {
-    const result: (EditableCourseStop & {
-      order: number;
-      arrivalClock: string;
-      departureClock: string;
-    })[] = [];
-    let elapsed = 0;
-    for (let index = 0; index < stops.length; index++) {
-      const stop = stops[index];
-      const arrivalClock = addMinutesToClock(startClock, elapsed);
-      const departureClock = addMinutesToClock(arrivalClock, stop.stayMinutes);
-      elapsed += stop.stayMinutes + stop.travelMinutesToNext;
-      result.push({
-        ...stop,
-        order: index + 1,
-        arrivalClock,
-        departureClock,
-      });
-    }
-    return result;
-  }, [stops, startClock]);
+  const timelineWithClocks = computeTimelineWithClocks(stops, startClock);
 
   const summary = useMemo(() => {
     const totalCost = stops.reduce((acc, s) => acc + s.estimatedCost, 0);
@@ -767,17 +772,21 @@ export function CourseBuilderClientView({
               </span>
               {isCollabEnabled && (
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-[11px] font-extrabold ${
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${
                     collabStatus === "connected"
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-amber-50 text-amber-700"
+                      ? "border-primary/20 bg-primary-soft text-primary"
+                      : "border-line bg-surface-subtle text-muted"
                   }`}
                 >
-                  <Radio className="h-3 w-3" />
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      collabStatus === "connected"
+                        ? "bg-primary"
+                        : "bg-amber-400 animate-pulse"
+                    }`}
+                  />
                   <span>
-                    {collabStatus === "connected"
-                      ? "실시간 공동 편집 동기화 중"
-                      : "공동 편집 서버 연결 중..."}
+                    {collabStatus === "connected" ? "함께 편집 중" : "연결 중..."}
                   </span>
                 </span>
               )}
@@ -810,10 +819,10 @@ export function CourseBuilderClientView({
               <button
                 type="button"
                 onClick={() => setIsAiModalOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-surface-dark px-4 py-2.5 text-xs font-extrabold text-white shadow-xs transition-opacity hover:opacity-90"
+                className="inline-flex items-center gap-1.5 rounded-full bg-surface-dark px-4 py-2 text-xs font-extrabold text-white shadow-xs transition-opacity hover:opacity-90"
               >
-                <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-                <span>AI 맞춤 코스 설계</span>
+                <Compass className="h-3.5 w-3.5 text-amber-300" />
+                <span>AI 추천 코스 받기</span>
               </button>
             )}
 
@@ -861,95 +870,113 @@ export function CourseBuilderClientView({
           </div>
         </div>
 
-        {/* Theme Tags & TimeSlot Controls */}
-        <div className="mt-5 flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[11px] font-bold text-muted">테마</span>
-            {ALL_THEMES.map((theme) => {
-              const active = selectedThemes.includes(theme);
-              return (
-                <button
-                  key={theme}
-                  type="button"
-                  onClick={() => handleToggleTheme(theme)}
-                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold transition-colors ${
-                    active
-                      ? "bg-surface-dark text-white"
-                      : "border border-line bg-background text-muted hover:text-foreground"
-                  }`}
-                >
-                  {active && <Check className="h-3 w-3 text-amber-300" />}
-                  <span>#{theme}</span>
-                </button>
-              );
-            })}
+        {/* Course Configuration Controls (3 Clean, Dedicated Horizontal Sections) */}
+        <div className="mt-6 space-y-4 border-t border-line/80 pt-4">
+          {/* Row 1: Course Theme Tags */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-1.5 shrink-0 text-xs font-bold text-foreground sm:w-28">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+              <span>데이트 테마</span>
+              <span className="text-[10px] text-muted font-normal sm:hidden">(복수 선택)</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 flex-1">
+              {ALL_THEMES.map((theme) => {
+                const active = selectedThemes.includes(theme);
+                return (
+                  <button
+                    key={theme}
+                    type="button"
+                    onClick={() => handleToggleTheme(theme)}
+                    className={`inline-flex items-center rounded-full border border-solid px-3 py-1 text-xs font-bold transition-colors ${
+                      active
+                        ? "border-surface-dark bg-surface-dark text-white"
+                        : "border-line bg-surface-subtle text-muted hover:border-primary/40 hover:text-foreground"
+                    }`}
+                  >
+                    <span>#{theme}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {TIME_SLOTS.map((slot) => (
+          {/* Row 2: Course Time Slot (Duration) */}
+          <div className="flex flex-col gap-2 border-t border-line/60 pt-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-1.5 shrink-0 text-xs font-bold text-foreground sm:w-28">
+              <Clock className="h-3.5 w-3.5 text-primary" />
+              <span>코스 시간대</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2 flex-1">
+              {TIME_SLOTS.map((slot) => {
+                const active = timeSlot === slot.code;
+                return (
+                  <button
+                    key={slot.code}
+                    type="button"
+                    onClick={() => {
+                      setTimeSlot(slot.code);
+                      setStartClock(slot.defaultClock);
+                    }}
+                    className={`rounded-full py-1.5 px-3 text-center text-xs font-bold transition-all sm:py-1 ${
+                      active
+                        ? "bg-primary text-white shadow-2xs"
+                        : "border border-line bg-surface-subtle text-muted hover:border-primary/40 hover:text-foreground"
+                    }`}
+                  >
+                    {slot.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Row 3: Target Date (Date Planning) */}
+          <div className="flex flex-col gap-2 border-t border-line/60 pt-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-1.5 shrink-0 text-xs font-bold text-foreground sm:w-28">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <span>데이트 예정일</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 flex-1">
+              <input
+                type="date"
+                value={planDate}
+                onChange={(e) => setPlanDate(e.target.value)}
+                className="rounded-xl border border-line bg-surface-subtle px-3 py-1.5 text-xs font-bold text-foreground outline-none transition-all focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+              />
               <button
-                key={slot.code}
                 type="button"
-                onClick={() => {
-                  setTimeSlot(slot.code);
-                  setStartClock(slot.defaultClock);
-                }}
+                onClick={() => setPlanDate(new Date().toISOString().split("T")[0])}
                 className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${
-                  timeSlot === slot.code
-                    ? "bg-primary text-white"
-                    : "border border-line bg-background text-muted hover:text-foreground"
+                  planDate === new Date().toISOString().split("T")[0]
+                    ? "bg-primary text-white shadow-2xs"
+                    : "border border-line bg-surface-subtle text-muted hover:text-foreground"
                 }`}
               >
-                {slot.label}
+                오늘
               </button>
-            ))}
-          </div>
-
-          {/* 데이트 예정일 (언제 만날까요?) */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-line/60">
-            <span className="flex items-center gap-1.5 text-xs font-extrabold text-foreground">
-              <Calendar className="h-3.5 w-3.5 text-primary" />
-              <span>데이트 예정일:</span>
-            </span>
-            <input
-              type="date"
-              value={planDate}
-              onChange={(e) => setPlanDate(e.target.value)}
-              className="rounded-xl border border-line bg-surface px-2.5 py-1 text-xs font-bold text-foreground outline-none transition-all focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-            />
-            <button
-              type="button"
-              onClick={() => setPlanDate(new Date().toISOString().split("T")[0])}
-              className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
-                planDate === new Date().toISOString().split("T")[0]
-                  ? "bg-primary text-white"
-                  : "border border-line bg-surface text-muted hover:text-foreground"
-              }`}
-            >
-              오늘
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const now = new Date();
-                const day = now.getDay();
-                const diff = (6 - day + 7) % 7 || 7;
-                const sat = new Date(now.getTime() + diff * 86400000);
-                setPlanDate(sat.toISOString().split("T")[0]);
-              }}
-              className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-[11px] font-bold text-muted hover:text-foreground transition-colors"
-            >
-              이번 주말
-            </button>
-            {planDate && (
               <button
                 type="button"
-                onClick={() => setPlanDate("")}
-                className="text-[11px] font-bold text-muted hover:text-primary transition-colors ml-1"
+                onClick={() => {
+                  const now = new Date();
+                  const day = now.getDay();
+                  const diff = (6 - day + 7) % 7 || 7;
+                  const sat = new Date(now.getTime() + diff * 86400000);
+                  setPlanDate(sat.toISOString().split("T")[0]);
+                }}
+                className="rounded-full border border-line bg-surface-subtle px-3 py-1 text-xs font-bold text-muted hover:text-foreground transition-colors"
               >
-                지우기
+                이번 주말
               </button>
-            )}
+              {planDate && (
+                <button
+                  type="button"
+                  onClick={() => setPlanDate("")}
+                  className="rounded-full border border-line px-2.5 py-1 text-[11px] font-bold text-muted hover:text-red-500 hover:border-red-200 transition-colors"
+                >
+                  날짜 초기화
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -961,14 +988,14 @@ export function CourseBuilderClientView({
       </header>
 
       {/* Mobile View Switcher (< lg) */}
-      <div className="flex gap-2 lg:hidden">
+      <div className="flex rounded-2xl border border-line bg-surface-subtle p-1 lg:hidden">
         <button
           type="button"
           onClick={() => setMobileTab("timeline")}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-xs font-extrabold ${
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
             mobileTab === "timeline"
-              ? "bg-surface-dark text-white"
-              : "border border-line bg-surface text-muted"
+              ? "bg-surface text-foreground shadow-2xs border border-line/60"
+              : "text-muted hover:text-foreground"
           }`}
         >
           <Compass className="h-3.5 w-3.5" />
@@ -977,10 +1004,10 @@ export function CourseBuilderClientView({
         <button
           type="button"
           onClick={() => setMobileTab("map")}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-xs font-extrabold ${
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
             mobileTab === "map"
-              ? "bg-surface-dark text-white"
-              : "border border-line bg-surface text-muted"
+              ? "bg-surface text-foreground shadow-2xs border border-line/60"
+              : "text-muted hover:text-foreground"
           }`}
         >
           <MapIcon className="h-3.5 w-3.5" />
@@ -998,35 +1025,35 @@ export function CourseBuilderClientView({
           <div className="rounded-3xl border border-line bg-surface p-5 sm:p-7">
             {timelineWithClocks.length === 0 ? (
               <div className="py-12 text-center">
-                <Sparkles className="mx-auto h-8 w-8 text-primary" />
+                <Compass className="mx-auto h-8 w-8 text-primary" />
                 <h2 className="mt-3 text-base font-black text-foreground">
                   아직 코스에 담긴 장소가 없어요
                 </h2>
                 <p className="mt-1 text-xs text-muted">
                   직접 장소를 검색해 경유지를 추가하거나, 성수동 인기 3코스 예시를 불러와 시작해보세요!
                 </p>
-                <div className="mt-5 flex flex-wrap justify-center gap-2.5">
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
                   <button
                     type="button"
                     onClick={() => setIsAiModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-surface-dark px-5 py-2.5 text-xs font-extrabold text-white hover:opacity-90"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-surface-dark px-4 py-2 text-xs font-extrabold text-white hover:opacity-90"
                   >
-                    <Sparkles className="h-4 w-4 text-amber-300" />
-                    <span>AI 맞춤 코스 자동 설계</span>
+                    <Compass className="h-4 w-4 text-amber-300" />
+                    <span>AI 추천 코스 받기</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsPickerOpen(true)}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-xs font-extrabold text-white hover:bg-primary-hover"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-extrabold text-white hover:bg-primary-hover shadow-2xs"
                   >
                     <Plus className="h-4 w-4" />
-                    <span>경유지 검색 · 추가하기</span>
+                    <span>경유지 추가하기</span>
                   </button>
                   <button
                     type="button"
                     disabled={isLoadingSample}
                     onClick={() => void handleLoadStarterCourse()}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-background px-4 py-2.5 text-xs font-bold text-foreground hover:border-primary/40"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-4 py-2 text-xs font-bold text-foreground hover:bg-surface-subtle"
                   >
                     {isLoadingSample && (
                       <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />

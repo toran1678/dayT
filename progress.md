@@ -6,8 +6,11 @@
 ---
 
 ## 1. 현재 포커스 (Current Focus)
-- **현재 단계**: **지도 상단 레이어 '행사·축제' 토글 버튼 신설 · 원클릭 코스 지정 연동 & 뷰포트 바운드(화면 사각 영역) 기반 전 축제 100% 표출 완성**
-- **현재 진행 작업**: `CourseRouteMap` 지도 상단 컨트롤 바에 `[역]`, `[명소·공원]`, `[주차장]`과 동등한 `[행사·축제]` 토글 버튼 신설, 지도 화면(Viewport Bounds) 내에 걸치는 모든 축제를 실시간으로 조회하여 핑크색 마커로 100% 렌더링, 핀 선택 시 하단 카드에서 `+ 코스로 지정` 버튼으로 내 코스 드래프트에 즉시 담기 연동, Next.js 16 프로덕션 빌드(전체 13개 라우트) 완료.
+- **현재 단계**: **전역 테스트용 테마 토글 추가 · 데이트 테마 버튼 위치 고정 · 일기 상세 전용 페이지 전환 완료**
+- **현재 상태**: 
+  - `AppShell.tsx`: 우측 하단(`fixed right-4 bottom-20 z-[70] lg:right-6 lg:bottom-6`)에 모달 위에서도 클릭 가능한 테스트용 라이트/다크 모드 플로팅 토글 추가(`useSyncExternalStore`로 SSR 하이드레이션 일치 보장).
+  - `AiCourseRecommendModal.tsx` & `CourseBuilderClientView.tsx`: 선택 시 조건부 `<Check />` 추가로 인해 버튼 너비와 주변 위치가 밀리던 문제 해결(테마별 고정 SVG 아이콘 `THEME_ICONS` 상시 렌더링 및 `border border-solid` 통일).
+  - `diaries-api.ts` & `diary-utils.ts` & `DiaryDetailClientView.tsx` & `app/diaries/[diaryId]/page.tsx` & `DiariesClientView.tsx`: 일기 상세 모달을 제거하고 `/diaries/[diaryId]` 전용 상세·인라인 수정 페이지로 전환 완료. `npm run typecheck` 및 `npm run lint` 통과 (0 errors).
 
 ---
 
@@ -53,7 +56,73 @@
 
 ## 3. 작업 완료 로그 (Changelog)
 
-### 2026-11-08 (최신 업데이트)
+### 2026-11-21 (최신 업데이트)
+- **전역 테스트용 테마 토글 · 데이트 테마 버튼 위치 고정 · 일기 상세 전용 페이지 전환 완료**:
+  - `AppShell.tsx`: 어느 화면이나 모달(`z-50`~`z-60`) 위에서도 즉시 화이트·다크 모드를 전환할 수 있는 `z-[70]` 플로팅 테마 토글 추가.
+  - `AiCourseRecommendModal.tsx` & `CourseBuilderClientView.tsx`: 조건부 `<Check />` 마운트 제거 및 고정 크기 테마 아이콘(`THEME_ICONS`)·`border border-solid` 지오메트리 적용으로 클릭 시 버튼 위치 이동(`0px`) 해소.
+  - `diaries-api.ts` & `diary-utils.ts` & `DiaryDetailClientView.tsx` & `app/diaries/[diaryId]/page.tsx` & `DiariesClientView.tsx`: 일기 상세 모달 제거, 카드 클릭 및 `전문 읽기` 링크를 `/diaries/[diaryId]` 페이지 이동으로 변경하고 상세 읽기·인라인 수정·삭제 지원. (`typecheck`/`lint` 0 errors)
+- **지도 스팟 모달 이중 테두리 제거 및 전체 모달 Anti-Slop UI 통일 완료 (`design-taste-frontend` 기준)**:
+  - `ExploreClientView.tsx` & `PlaceSpotlightCard.tsx`: 모달 래퍼(`rounded-2xl`) 내부 `<article>`의 `rounded-3xl border-primary/25 shadow-[...]`와 썸네일 `border-2 + ring-1` 이중 테두리 제거, `<Plus />` + `+ 코스에 담기` 오기(`+ + 코스에 담기`) 수정, 컬러 AI 요약 박스 대신 담백한 본문 설명과 `border-y border-line/70` 행 정보 레이아웃 적용.
+  - `PlacePickerModal.tsx` & `AiCourseRecommendModal.tsx` & `LocationPinPickerModal.tsx`: 모달 컨테이너를 `rounded-2xl border border-line bg-surface`로 통일하고, 영문 캡션(`ADD WAYPOINT`, `GEMINI AI CURATOR`)·`Sparkles` 박스·이모지(`📍`, `💡`, `✓`)·이중 포커스 링·내부 박스-인-박스 테두리를 제거하여 구분선(`divide-y`, `border-t`) 기반의 간결한 UI로 정돈.
+  - `AuthModals.tsx` & `DiariesClientView.tsx`: 로그인·프로필 모달 백드롭 클릭 닫기 추가 및 `Sparkles` 배지·과장된 아이콘 박스 제거, 일기 상세 모달 사진 외곽 테두리 제거. (`typecheck`/`lint` 0 errors)
+- **지도 전체 마커 흰 배경/원형 아이콘 통일 · 우선순위 기반 라벨 충돌 처리 완료**:
+  - `CourseRouteMap.tsx`: `"인접 스팟 선택"` 오버레이 제거, 선택 핀·Google Maps 마커의 검은 배경/노란 테두리 제거(`bg-surface text-foreground ring-2 ring-primary` / `#E85D3F` 링), `역`·`명소·공원`·`주차장`·`행사·축제`·일반 스팟 핀과 상단 레이어 토글 버튼·하단 선택 정보 카드를 모두 깔끔한 흰 배경(`bg-surface`) + 원형 컬러 아이콘 배지로 통일하고 부가 텍스트 칩(`축제`, 노선 칩) 제거.
+  - `CourseRouteMap.tsx`: `역`·`명소·공원`·`주차장`·`행사·축제`·일반 장소를 단일 `projectedPins` 파이프라인으로 통합해 겹침 시 아이콘만 표시하고 비겹침 시 `선택/담김 → 역(1) → 명소·공원(2) → 주차장(3) → 행사·축제(4) → 일반 장소(5)` 순으로 이름을 노출하도록 개선. (`typecheck`/`lint` 0 errors)
+- **지도 행사·축제 마커 디자인 통일 및 밀집·겹침 마커 선택 UX 개선 완료**:
+  - `CourseRouteMap.tsx`: 중복 `projectedFestivals.map`을 제거하고 `stops`·`festivalStops` 통합 투영 파이프라인(`projectedPins`) 구축. `MIN_ICON_DIST = 30px` / `MAX_OFFSET = 36px` 픽셀 분산 및 `>= 10px` 이동 시 원점 가이드 점선 표시, 아이콘 중심 고정 좌/우(`"right"`/`"left"`) 방향성 라벨 충돌 회피, 아이콘 전용 마커 `z-25`·호버 `z-40` 계층 및 밀집 구역 `"인접 스팟 선택 (N)"` 빠른 전환 트레이 추가.
+  - `CourseRouteMap.tsx` & `PlaceSpotlightCard.tsx`: 축제 마커 테두리/텍스트 핑크 동색 충돌을 제거하고 기존 마커 계열(`bg-surface text-foreground ring-1.5 ring-line` + 원형 `#DB2777` `<PartyPopper />` 배지, 확장 시 `축제` 마이크로 배지)로 통일, 상세 카드 일정 안내 박스도 `border-line bg-surface-subtle/70`로 정돈. (`typecheck`/`lint` 0 errors)
+- **일기장 카피 정리 · 실시간 공동 편집 UI/동기화 개선 · 지도 뷰포트 행사·축제 노출 수정 완료**:
+  - `DiariesClientView.tsx`: 커플 연결 여부와 무관하게 상단 필터 요약·카드·모달에 표시되던 `"우리 커플 공유 일기"` 관련 배지 및 카운트 문구 제거.
+  - `CourseDetailClientView.tsx` & `CourseBuilderClientView.tsx`: STOMP(`/ws/collab`, `/app/courses/{courseId}/edit`, `/topic/courses/{courseId}`) 파이프라인 코드 검증과 함께 개발자 용어(`(/ws/collab)`)·과도한 초록 배너를 심플한 `border-line bg-surface` UI(`함께 편집 켜짐` / `함께 편집 중`)로 개편, `SYNC_COURSE`·`sendEdit`에 `datePlanDate` 누락 및 `isApplyingRemoteRef` 초기화 누락 보완.
+  - `PlaceQueryRepository.java` & `places-api.ts` & `CourseRouteMap.tsx` & `ExploreClientView.tsx`: 상대 경로(`/api/v1/places/festivals`) 404 원인 수정(`fetchFestivalsInBoundsApi` + `API_BASE_URL`), `TOUR_API`/`축제·행사`/행사일 보유 데이터 전체를 지도 표시 영역(`visibleBounds`) 기준으로 음식점 반경·40개 상한과 분리 조회·렌더링하도록 통합. (`typecheck`/`lint` 0 errors, `gradlew.bat compileJava` `BUILD SUCCESSFUL`)
+- **모바일 개인 설정 선택기 · 하단 풀와이드 슬라이딩 네비 · 일기장 매거진 그리드 & 작성 탭 개편 완료**:
+  - `AppShell.tsx` (`MobileFloatingDockView`): 모바일 하단 네비게이션을 플로팅 형태에서 `inset-x-0 bottom-0` 풀와이드 도킹 바로 변경하고, 호버/선택 탭으로 부드럽게 이동하는 1/5 폭 슬라이딩 캡슐(`translateX(${index * 100}%)`) 및 상단 포인트 바 애니메이션 구현.
+  - `SettingsClientView.tsx`: 모바일(`lg:hidden`) 카테고리 메뉴를 `grid-cols-2` 2열 벤토 카드 선택기로 확대 개편하고, 빠른 화면 모드 스위처 터치 영역(`py-2 text-xs`) 개선.
+  - `DiariesClientView.tsx`: `추억 아카이브`와 `오늘의 기록 남기기` 전용 슬라이딩 탭 분리, 에디토리얼 1/2/3열 매거진 그리드(`md:grid-cols-2 xl:grid-cols-3`), 전체/사진/코스 필터 바, 상세 리더 모달 및 12컬럼 작성·사진 첨부 스튜디오 구축.
+- **네비게이션 5탭 복원 및 헤더 프로필 드롭다운 메뉴 구현 완료**:
+  - `AppShell.tsx`: `NAV_ITEMS`에서 `개인 설정` 탭 제거(데스크톱 슬라이딩 필 `px-3.5` 및 모바일 하단 `grid-cols-5` 복원), `/settings` 진입 시 `DesktopPillNavView`의 `activeRect`를 `null`로 초기화해 비활성 탭 하이라이트 잔존 방지.
+  - `AppShell.tsx`: 헤더 우측 로그인 프로필 버튼에 `HeaderProfileMenuInner` 드롭다운 팝오버 추가(상단 계정 요약 + `/settings` 이동 `환경설정` 메뉴 + `로그아웃` 버튼, 외부 클릭 및 `Escape` 키 닫기 지원).
+- **확장형 개인 설정(`/settings`) 사이드바 아키텍처 구축 완료**:
+  - `SettingsClientView.tsx`: 좌측 그룹형 카테고리 사이드바(모바일 가로 스크롤 탭 + 데스크톱 2그룹 6메뉴 + 상시 빠른 화면 모드 스위처) 및 우측 상세 패널 구조로 개편.
+  - 실연동 섹션: `내 프로필 설정`(닉네임·이미지 URL 수정, 아바타 미리보기, 로그아웃), `화면 · 테마 설정`(화이트/다크/시스템 모드 즉시 전환), `데이터 · 관리`(`useDraftPlaces`/`clearDraftPlaces` 기반 임시 초안 캐시 초기화).
+  - 향후 확장용 인터랙티브 더미 섹션: `데이트 기본 취향`(기본 상권·예산·템포·실내 우선), `커플 · 공개 범위`, `알림 · 리마인더`, `소셜 계정/보안 및 데이터 내보내기` 프리뷰 UI 추가.
+- **개인 설정(`/settings`) 탭 신설 및 테마/프로필 설정 통합 완료**:
+  - `SettingsClientView.tsx` & `app/settings/page.tsx`: 화면 테마(화이트/다크/시스템 모드 프리뷰 카드 및 즉시 전환)와 내 프로필 설정(아바타 미리보기, 닉네임·프로필 이미지 URL 수정, 로그아웃, 비로그인 시 로그인 유도)을 정갈한 2컬럼 UI로 구현.
+  - `AppShell.tsx`: `개인 설정` 탭(`/settings`)을 데스크톱 슬라이딩 필 탭(`px-3`)과 모바일 하단 6분할 독(`grid-cols-6`)에 추가, 상단 헤더 `ThemeToggleButton` 제거 및 헤더 프로필 칩을 `/settings` 링크로 연결.
+- **코스 메이커 모바일 설정 레이아웃 분리 및 비주얼 정돈 완료**:
+  - `CourseBuilderClientView.tsx`:
+    - 모바일에서 한 덩어리로 뭉쳐있던 테마, 시간대, 데이트 예정일을 **3개의 독립된 가로 행(Row)**으로 분리 (1행: 데이트 테마 태그, 2행: 3분할 코스 시간대 그리드, 3행: 데이트 예정일 인풋 & 퀵 칩).
+    - 모바일 뷰 전환 버튼(`경유지 편집` / `동선 지도 & 예산 리포트`)을 세련된 세그먼트 Pill 탭으로 개편.
+    - AI 버튼 카피 및 아이콘을 `Compass` 기반 'AI 추천 코스 받기'로 Anti-Slop 디자인 통일.
+  - `CourseDetailClientView.tsx`: 코스 상세 뷰 상단에 남아있던 초록색(emerald) 예정일 뱃지를 `primary-soft` 브랜드 태그로 통일.
+- **탭 안정화, 모바일 UI 최적화, 커플 스페이스 & 코스 보관함 비주얼 쇄신 완료**:
+  - `globals.css`: `scrollbar-gutter: stable` 적용으로 페이지별 스크롤바 유무에 따른 헤더/내비 가로 흔들림(Jitter) 원천 차단. `theme-transitioning` 적용 범위를 구조적 요소로 한정하여 성능 및 테마 전환 부드러움 극대화.
+  - `AppShell.tsx`:
+    - 데스크톱 탭: 활성/비활성 간 텍스트 굵기를 `font-semibold`로 통일하여 탭 너비 변동 및 덜컹거림 제거. 첫 렌더 시 0px에서 날아오는 트랜지션 억제.
+    - 모바일 하단 독: 레이아웃을 흔들던 `scale-105`를 제거하고 부드러운 아이콘 하이라이트 배경 전환으로 모바일 탭 이동 안정화.
+    - 최상단 헤더 배지: 기존의 작은 이모지 느낌 캐릭터 대신, 14x14px에서도 획이 선명한 정밀 듀오 하트 & 스파크 SVG 아이콘(`CompanionBadgeSvg`) 적용.
+  - `TogetherClientView.tsx`: 화이트 모드에서도 시커멓게 보이던 `bg-surface-dark` 하드코딩 박스를 제거하고, 화사한 소프트 앰버 그라디언트 헤일로와 웜 에디토리얼 카드(`bg-surface border-line`)로 전면 개편.
+  - `PetStageIcon.tsx`: 캐릭터 전용 64x64 벡터 일러스트레이션으로 전면 재설계 (아기 삐약이, 설렘 앵무, 로맨틱 백조, 전설의 불사조) 및 헤더 전용 `variant="badge"` 신설.
+  - `MyCoursesClientView.tsx`: 코스 보관함의 튀는 초록색(emerald) '예정된 데이트', 날짜 뱃지를 정갈한 `primary-soft` 및 `surface-subtle` 라운드 뱃지로 변경.
+- **네비게이션 탭 슬라이딩 애니메이션 & 전역 다크/라이트 테마 시스템 구축 완료**:
+  - `ThemeContext.tsx`: `useSyncExternalStore` 기반 시스템 테마 감지, `localStorage` 영속화, `theme: light | dark | system` 상태 제공.
+  - `layout.tsx`: 초기 마운트 전 테마 깜빡임(FOUC) 방지 인라인 스크립트 삽입 및 `ThemeProvider` 전역 감싸기.
+  - `globals.css`: Tailwind v4 `@custom-variant dark` 적용, 딥 웜 차콜 다크 팔레트(`.dark`) 정의, `theme-transitioning` 부드러운 색상 전환 적용.
+  - `AppShell.tsx`:
+    - 탭 호버 시 부드러운 반투명 하이라이트 글라이딩(`hoverRect`) 및 탭 선택/클릭 시 물리적 관성으로 이동하는 슬라이딩 필(`activeRect`) 구현.
+    - 클릭 즉시 낙관적 활성 탭 반영(`clickedHref`)으로 라우팅 딜레이/새로고침 체감 100% 해소.
+    - 상단 헤더에 회전·스케일 모핑 애니메이션이 적용된 `ThemeToggleButton` 배치.
+  - `CourseRouteMap.tsx`: 전역 다크모드 전환 시 구글/OSM 지도 테마(`NIGHT` / `WARM`) 자동 전환 동기화.
+- **전체 페이지 UI/UX 쇄신 (`design-taste-frontend` 기반 Anti-Slop 디자인 시스템) 완료**:
+  - `globals.css`: 웜 미니멀 캔버스(`--background: #fbfbfa`), 순백 카드(`--surface: #ffffff`), 미니멀 서피스(`--surface-subtle: #f5f4f0`), 절제된 테라코타 오렌지(`--primary: #df5435`), 1px 정밀 보더(`--line: #eae7e1`)로 쇄신.
+  - `AppShell.tsx`: Sparkles 마크 제거, 모던 워드마크 + `ROUTE & MOMENTS` 에디토리얼 태그, 슬림 세그먼트 Pill 탭 네비, 실용적인 '새 코스 만들기' CTA 구축.
+  - `ExploreClientView.tsx`: 에디토리얼 무드 헤더(`ROUTE & SPOTS`), 절제된 카드 엣지(`rounded-2xl border border-line bg-surface`), 실내·야외 스위치 및 장소 카드 미니멀화.
+  - `MyCoursesClientView.tsx`: 패스 바우처 레이아웃(`COURSES & PASSES`), 불필요한 인라인 보더 컬러 일원화, 보관함 카드 정돈.
+  - `CourseBuilderClientView.tsx` & `CourseDetailClientView.tsx`: AI 템플릿 카피 정돈(`AI 추천 코스 받기` + `Compass` 아이콘), 타임라인 렌더 최적화, 1px 보더 카드 일원화.
+  - `TogetherClientView.tsx` & `DiariesClientView.tsx`: 커플 스페이스(`OUR SPACE`) 및 일기장(`JOURNAL & MOMENTS`) 카드 반경 축소 및 모던 에디토리얼 타이포그래피 적용.
+  - `CourseRouteMap.tsx`: React Compiler / ESLint 규칙(`set-state-in-effect`, `refs`) 준수를 위해 뷰포트 파생 메모이제이션 및 주변 역 배지 useMemo 적용, 전체 typecheck 및 lint 통과 (0 error).
+
+### 2026-11-08
 - **TourAPI 행사·축제 DB 적재 & 날짜/위치 맞춤 추천 · 탐색 지도 행사 뱃지 · 코스 보관함 데이트 일정 관리 풀스택 구현 완료**:
   1. **단일 기준 API 명세서 동기화 (`docs/api-spec.yaml`, `api.d.ts`)**:
      - `DateTheme`: `[감성 카페, 맛집 투어, 전시·문화, 액티비티, 산책·야외, 어디든, 행사·축제]` 추가.

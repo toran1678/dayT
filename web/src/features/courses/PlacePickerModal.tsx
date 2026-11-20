@@ -82,47 +82,47 @@ export function PlacePickerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-xs"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <div>
-            <p className="text-[11px] font-bold tracking-widest text-primary">
-              ADD WAYPOINT
-            </p>
             <h2 className="text-base font-black text-foreground">
-              코스에 경유지 검색 · 추가
+              경유지 추가
             </h2>
+            <p className="mt-0.5 text-xs text-muted">
+              지역이나 장소 이름으로 검색해 코스에 담으세요.
+            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="rounded-full p-2 text-muted hover:bg-surface-subtle hover:text-foreground"
+            className="rounded-full p-2 text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="space-y-3 border-b border-line bg-background/60 px-6 py-4">
+        <div className="space-y-3 border-b border-line px-6 py-4">
           <form onSubmit={handleSearch} className="flex gap-2">
-            <div className="flex flex-1 items-center gap-2 rounded-full border border-line bg-surface px-4 py-2">
-              <Search className="h-4 w-4 text-muted" />
+            <div className="flex flex-1 items-center gap-2 rounded-xl border border-line bg-background px-3.5 py-2 transition-colors focus-within:border-foreground">
+              <Search className="h-4 w-4 shrink-0 text-muted" />
               <input
                 type="text"
                 value={keywordInput}
                 onChange={(e) => setKeywordInput(e.target.value)}
                 placeholder="역·동네·장소명 검색 (예: 성수역, 연남동, 한남동)"
-                className="w-full bg-transparent text-xs font-bold text-foreground outline-none placeholder:font-normal"
+                className="w-full bg-transparent text-xs font-bold text-foreground outline-none placeholder:font-normal placeholder:text-muted/70"
               />
             </div>
             <button
               type="submit"
-              className="rounded-full bg-primary px-4 py-2 text-xs font-extrabold text-white hover:bg-primary-hover"
+              className="rounded-xl bg-primary px-4 py-2 text-xs font-extrabold text-white transition-colors hover:bg-primary-hover"
             >
               검색
             </button>
@@ -140,7 +140,7 @@ export function PlacePickerModal({
                       setCategory(tab.code);
                     }
                   }}
-                  className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-bold ${
+                  className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${
                     category === tab.code
                       ? "bg-surface-dark text-white"
                       : "border border-line bg-surface text-muted hover:text-foreground"
@@ -163,7 +163,7 @@ export function PlacePickerModal({
                       setRadiusMeters(opt.meters);
                     }
                   }}
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
                     radiusMeters === opt.meters
                       ? "bg-primary text-white"
                       : "border border-line bg-surface text-muted hover:text-foreground"
@@ -176,7 +176,7 @@ export function PlacePickerModal({
           </div>
         </div>
 
-        <div className="flex-1 space-y-2.5 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto divide-y divide-line/70">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -185,8 +185,8 @@ export function PlacePickerModal({
               </p>
             </div>
           ) : items.length === 0 ? (
-            <p className="py-12 text-center text-xs font-semibold text-muted">
-              검색 조건에 맞는 장소가 없어요. 다른 키워드로 검색해 보세요!
+            <p className="px-6 py-12 text-center text-xs font-semibold text-muted">
+              검색 조건에 맞는 장소가 없어요. 다른 키워드로 검색해 보세요.
             </p>
           ) : (
             items.map((place) => {
@@ -194,7 +194,7 @@ export function PlacePickerModal({
               return (
                 <div
                   key={place.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-background p-3.5"
+                  className="flex items-center justify-between gap-3 px-6 py-3.5 transition-colors hover:bg-surface-subtle/40"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-extrabold text-foreground">
@@ -215,13 +215,13 @@ export function PlacePickerModal({
                     onClick={() => onAddPlace(place)}
                     className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-extrabold transition-colors ${
                       alreadyAdded
-                        ? "bg-surface-dark text-white"
+                        ? "border border-line bg-surface-subtle text-foreground hover:bg-line/50"
                         : "bg-primary text-white hover:bg-primary-hover"
                     }`}
                   >
                     {alreadyAdded ? (
                       <>
-                        <Check className="h-3.5 w-3.5 text-amber-300" />
+                        <Check className="h-3.5 w-3.5 text-primary" />
                         <span>한 번 더 추가</span>
                       </>
                     ) : (

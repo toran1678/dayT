@@ -179,29 +179,24 @@ export function LocationPinPickerModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-white">
-              <MapPin className="h-4 w-4" />
-            </span>
-            <div>
-              <h3 className="text-sm font-black text-foreground">
-                지도에서 탐색 중심 핀 꽂기
-              </h3>
-              <p className="text-[11px] font-bold text-muted">
-                원하는 지점을 클릭하면 해당 위치와 탐색 반경({radiusKm}km) 기준으로 AI 코스가 설계됩니다.
-              </p>
-            </div>
+        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+          <div>
+            <h3 className="text-base font-black text-foreground">
+              지도에서 중심 위치 선택
+            </h3>
+            <p className="mt-0.5 text-xs text-muted">
+              원하는 지점을 클릭하면 해당 위치와 반경({radiusKm}km) 기준으로 코스가 설계됩니다.
+            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="rounded-full p-1.5 text-muted hover:bg-surface-subtle hover:text-foreground"
+            className="rounded-full p-2 text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
@@ -328,8 +323,8 @@ export function LocationPinPickerModal({
           <div className="min-w-0 flex-1 pr-3">
             {pinnedCoord ? (
               <p className="truncate text-xs font-bold text-foreground">
-                📍 선택 좌표:{" "}
-                <span className="text-primary">
+                선택 좌표:{" "}
+                <span className="font-mono text-primary">
                   {pinnedCoord.lat.toFixed(5)}, {pinnedCoord.lng.toFixed(5)}
                 </span>
               </p>

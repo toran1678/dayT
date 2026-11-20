@@ -30,7 +30,13 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import type { LatLngPoint, PlaceCategoryGroup } from "@/shared/api/types";
+import { useTheme } from "@/features/theme/ThemeContext";
+import { fetchFestivalsInBoundsApi } from "@/features/places/places-api";
+import type {
+  LatLngPoint,
+  PlaceCategoryGroup,
+  PlaceDetail,
+} from "@/shared/api/types";
 import {
   calculateStraightMeters,
   estimateWalkingRoute,
@@ -60,6 +66,7 @@ import {
   clampZoom,
   computeBestFitViewport,
   computeMetricScaleBar,
+  containerPxToLatLng,
   getVisibleOsmTiles,
   latLngToContainerPx,
   panViewportByPixels,
@@ -105,6 +112,7 @@ interface CourseRouteMapProps {
   footerNode?: ReactNode;
   onAddPlaceToCourse?: (place: RouteMapStop) => void;
   initialShowFestivals?: boolean;
+  onVisibleFestivalsChange?: (festivals: PlaceDetail[]) => void;
 }
 
 type SelectedContextTarget =
@@ -152,8 +160,8 @@ function buildCategoryMarkerSvgUrl(
   isActive = false,
 ): string {
   const visual = getStopCategoryVisual(categoryGroup, categoryLabel);
-  const fill = isActive ? "#1C1917" : visual.color;
-  const ring = isActive ? "#FBBF24" : "#FFFFFF";
+  const fill = visual.color;
+  const ring = isActive ? "#E85D3F" : "#FFFFFF";
 
   let iconPath = "";
   if (categoryLabel.includes("축제") || categoryLabel.includes("행사")) {
@@ -218,18 +226,6 @@ function buildPoiMarkerSvgUrl(kind: SurroundingPoi["kind"]): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26">
     <circle cx="13" cy="13" r="11" fill="#0D9488" stroke="#FFFFFF" stroke-width="2"/>
     <path d="M13 7.2L7.8 10.2V11.5H18.2V10.2L13 7.2ZM9.4 12.5V16.8H11V12.5H9.4ZM12.2 12.5V16.8H13.8V12.5H12.2ZM15 12.5V16.8H16.6V12.5H15ZM8 17.8V19.2H18V17.8H8Z" fill="#FFFFFF"/>
-  </svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
-function buildFestivalMarkerSvgUrl(): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
-    <circle cx="14" cy="14" r="12" fill="#DB2777" stroke="#FFFFFF" stroke-width="2"/>
-    <path d="M7 21l3.5-10.5 7 7L7 21z" fill="#FCE7F3" stroke="#FFFFFF" stroke-width="1.2"/>
-    <path d="M17.5 17.5l-7-7" stroke="#DB2777" stroke-width="1.5"/>
-    <circle cx="19" cy="8" r="1.5" fill="#FDE047"/>
-    <circle cx="21" cy="14" r="1.2" fill="#FFFFFF"/>
-    <circle cx="13" cy="6" r="1.2" fill="#FFFFFF"/>
   </svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
@@ -330,12 +326,24 @@ export function CourseRouteMap({
   footerNode,
   onAddPlaceToCourse,
   initialShowFestivals = true,
+  onVisibleFestivalsChange,
 }: CourseRouteMapProps) {
   const apiKey = getConfiguredGoogleMapsApiKey();
   const [mapMode, setMapMode] = useState<"google" | "tile">(() =>
     apiKey ? "google" : "tile",
   );
-  const [themeId, setThemeId] = useState<DaytMapThemeId>("WARM");
+  const { resolvedTheme } = useTheme();
+  const [themeId, setThemeId] = useState<DaytMapThemeId>(() =>
+    resolvedTheme === "dark" ? "NIGHT" : "WARM",
+  );
+  const userChangedThemeRef = useRef(false);
+
+  useEffect(() => {
+    if (!userChangedThemeRef.current) {
+      setThemeId(resolvedTheme === "dark" ? "NIGHT" : "WARM");
+    }
+  }, [resolvedTheme]);
+
   const activeTheme = DAYT_MAP_THEMES[themeId];
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -359,9 +367,15 @@ export function CourseRouteMap({
   const setSelectedStopId = useCallback((id: number | null) => {
     setInternalSelectedStopId(id);
   }, []);
-  const [hoveredStopId, setHoveredStopId] = useState<number | null>(null);
+  const [hoveredMarkerKey, setHoveredMarkerKey] = useState<string | null>(null);
   const [selectedContext, setSelectedContext] =
     useState<SelectedContextTarget>(null);
+  const selectedStationId =
+    selectedContext?.type === "STATION" ? selectedContext.station.id : null;
+  const selectedPoiId =
+    selectedContext?.type === "POI" ? selectedContext.poi.id : null;
+  const selectedFestivalId =
+    selectedContext?.type === "FESTIVAL" ? selectedContext.stop.id : null;
 
   const stopsAnchor = useMemo(() => {
     if (stops.length === 0) {
@@ -506,28 +520,18 @@ export function CourseRouteMap({
     [],
   );
 
-  const lastActiveOrderRef = useRef<number | null>(activeOrder);
+  const activeFocusedViewport = useMemo<MapViewportState | null>(() => {
+    if (activeOrder === null) return null;
+    const target = stops.find((s) => s.order === activeOrder);
+    if (!target) return null;
+    return {
+      centerLat: target.latitude,
+      centerLng: target.longitude,
+      zoom: Math.max(currentViewport.zoom, 16),
+    };
+  }, [activeOrder, stops, currentViewport.zoom]);
 
-  useEffect(() => {
-    if (activeOrder !== null && activeOrder !== lastActiveOrderRef.current) {
-      lastActiveOrderRef.current = activeOrder;
-      const target = stops.find((s) => s.order === activeOrder);
-      if (target) {
-        commitViewport(
-          {
-            centerLat: target.latitude,
-            centerLng: target.longitude,
-            zoom: Math.max(currentViewport.zoom, 16),
-          },
-          true,
-        );
-      }
-    } else if (activeOrder === null) {
-      lastActiveOrderRef.current = null;
-    }
-  }, [activeOrder, stops, currentViewport.zoom, commitViewport]);
-
-  const viewport: MapViewportState = currentViewport;
+  const viewport: MapViewportState = activeFocusedViewport ?? currentViewport;
 
   // Google Maps JS API state
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -570,6 +574,41 @@ export function CourseRouteMap({
   }, [mapMode, googleView, viewport]);
 
   const [isDragging, setIsDragging] = useState(false);
+
+  const onVisibleFestivalsChangeRef = useRef(onVisibleFestivalsChange);
+  useEffect(() => {
+    onVisibleFestivalsChangeRef.current = onVisibleFestivalsChange;
+  }, [onVisibleFestivalsChange]);
+
+  // Compute exact visible lat/lng bounds across both Google Maps and Tile modes
+  const visibleBounds = useMemo(() => {
+    if (mapMode === "google" && currentBounds) {
+      return currentBounds;
+    }
+    const vp: MapViewportState = {
+      centerLat: activeCenter.lat,
+      centerLng: activeCenter.lng,
+      zoom: activeCenter.zoom,
+    };
+    const w = Math.max(containerSize.width, 320);
+    const h = Math.max(containerSize.height, 260);
+    const topLeft = containerPxToLatLng(0, 0, vp, w, h);
+    const bottomRight = containerPxToLatLng(w, h, vp, w, h);
+    return {
+      minLat: Math.min(bottomRight.lat, topLeft.lat),
+      maxLat: Math.max(bottomRight.lat, topLeft.lat),
+      minLng: Math.min(topLeft.lng, bottomRight.lng),
+      maxLng: Math.max(topLeft.lng, bottomRight.lng),
+    };
+  }, [
+    mapMode,
+    currentBounds,
+    activeCenter.lat,
+    activeCenter.lng,
+    activeCenter.zoom,
+    containerSize.width,
+    containerSize.height,
+  ]);
 
   // Debounced fetch of surrounding context (stations, landmarks, parking) only when active and not actively dragging
   useEffect(() => {
@@ -629,53 +668,22 @@ export function CourseRouteMap({
     isDragging,
   ]);
 
-  // Viewport bounds-based festival synchronization (fetches 100% of festivals inside map bounds)
+  // Viewport bounds-based festival synchronization (fetches 100% of festivals inside visible map bounds)
   useEffect(() => {
-    if (!showFestivalLayer) {
-      setFestivalStops([]);
+    if (!showFestivalLayer || isDragging) {
       return;
     }
 
     let active = true;
     const timer = setTimeout(async () => {
       try {
-        let b = currentBounds;
-        if (!b) {
-          const cLat = activeCenter.lat;
-          const cLng = activeCenter.lng;
-          const zoomLevel = Math.max(7, Math.min(activeCenter.zoom, 18));
-          const latSpan = 180 / Math.pow(2, zoomLevel - 1);
-          const lngSpan = 360 / Math.pow(2, zoomLevel - 1);
-          b = {
-            minLat: cLat - latSpan * 0.85,
-            maxLat: cLat + latSpan * 0.85,
-            minLng: cLng - lngSpan * 0.85,
-            maxLng: cLng + lngSpan * 0.85,
-          };
-        }
-
-        const params = new URLSearchParams({
-          minLat: String(b.minLat),
-          maxLat: String(b.maxLat),
-          minLng: String(b.minLng),
-          maxLng: String(b.maxLng),
-          limit: "500",
+        const data = await fetchFestivalsInBoundsApi({
+          minLat: visibleBounds.minLat,
+          maxLat: visibleBounds.maxLat,
+          minLng: visibleBounds.minLng,
+          maxLng: visibleBounds.maxLng,
+          limit: 500,
         });
-
-        const res = await fetch(`/api/v1/places/festivals?${params.toString()}`);
-        if (!active || !res.ok) return;
-        const data = (await res.json()) as {
-          id: number;
-          name: string;
-          address: string;
-          subCategory?: string | null;
-          categoryGroup?: PlaceCategoryGroup;
-          latitude: number;
-          longitude: number;
-          placeUrl?: string | null;
-          eventStartDate?: string | null;
-          eventEndDate?: string | null;
-        }[];
 
         if (active && Array.isArray(data)) {
           const mapped: RouteMapStop[] = data.map((item, idx) => ({
@@ -692,23 +700,18 @@ export function CourseRouteMap({
             eventEndDate: item.eventEndDate,
           }));
           setFestivalStops(mapped);
+          onVisibleFestivalsChangeRef.current?.(data);
         }
       } catch {
         // non-blocking
       }
-    }, 320);
+    }, 300);
 
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [
-    showFestivalLayer,
-    currentBounds,
-    activeCenter.lat,
-    activeCenter.lng,
-    activeCenter.zoom,
-  ]);
+  }, [showFestivalLayer, isDragging, visibleBounds]);
 
   // Closest stations sorted relative to settled map center (no recalculation jitter while dragging)
   // Showing at most 2 stations as per user request
@@ -1127,15 +1130,20 @@ export function CourseRouteMap({
         // Prevent duplicate pin if already in main course stops
         if (stops.some((s) => s.id === fest.id)) return;
 
+        const isSelected = selectedFestivalId === fest.id;
         const fMarker = new gmaps.Marker({
           position: { lat: fest.latitude, lng: fest.longitude },
           map,
           title: `[행사·축제] ${fest.name}`,
-          zIndex: 7,
+          zIndex: isSelected ? 100 : 7,
           icon: {
-            url: buildFestivalMarkerSvgUrl(),
-            scaledSize: new gmaps.Size(26, 26),
-            anchor: new gmaps.Point(13, 13),
+            url: buildCategoryMarkerSvgUrl(
+              fest.categoryGroup,
+              "축제·행사",
+              isSelected,
+            ),
+            scaledSize: new gmaps.Size(34, 34),
+            anchor: new gmaps.Point(17, 17),
           },
         });
         fMarker.addListener("click", () => {
@@ -1154,6 +1162,7 @@ export function CourseRouteMap({
     showFestivalLayer,
     festivalStops,
     stops,
+    selectedFestivalId,
   ]);
 
   // Detect whether map was panned away from the searched reference center (> 220m)
@@ -1223,9 +1232,183 @@ export function CourseRouteMap({
     return null;
   }, [stops, selectedStopId, activeOrder]);
 
-  // Project stops into pixel coordinates + smart collision detection so labels never pile up
-  const projectedStops = useMemo(() => {
-    const raw = stops.map((stop) => {
+  // Unified pixel projection, de-stacking, and priority-ordered directional label collision resolution
+  // Priority: selected/draft -> stations (1) -> landmarks/parks (2) -> parkings (3) -> festivals (4) -> regular spots (5)
+  const projectedPins = useMemo(() => {
+    type Box2D = { left: number; right: number; top: number; bottom: number };
+    type ProjectedPin = {
+      markerKey: string;
+      kind: "STATION" | "POI" | "FESTIVAL" | "STOP";
+      priorityGroup: 1 | 2 | 3 | 4 | 5;
+      orderIndex: number;
+      name: string;
+      title: string;
+      iconColor: string;
+      iconType: "STATION" | "PARK" | "LANDMARK" | "PARKING" | "STOP";
+      stop?: RouteMapStop;
+      station?: SubwayStationPoi;
+      poi?: SurroundingPoi;
+      rawX: number;
+      rawY: number;
+      x: number;
+      y: number;
+      isOffset: boolean;
+      inViewport: boolean;
+      isSelected: boolean;
+      isDraft: boolean;
+      baseShowFullLabel: boolean;
+      preferredDir: "right" | "left";
+    };
+
+    const isPointInViewport = (px: number, py: number) =>
+      px >= -80 &&
+      px <= containerSize.width + 80 &&
+      py >= -40 &&
+      py <= containerSize.height + 40;
+
+    const allPins: ProjectedPin[] = [];
+
+    if (showSubwayLayer) {
+      surrounding.stations.forEach((st, idx) => {
+        const px = latLngToContainerPx(
+          st.latitude,
+          st.longitude,
+          viewport,
+          containerSize.width,
+          containerSize.height,
+        );
+        const isSelected = selectedStationId === st.id;
+        const lineLabels = st.lines.map((l) => l.label).join("·");
+        allPins.push({
+          markerKey: `station:${st.id}`,
+          kind: "STATION",
+          priorityGroup: 1,
+          orderIndex: idx,
+          name: st.name,
+          title: lineLabels ? `${st.name} (${lineLabels})` : st.name,
+          iconColor: st.lines[0]?.color ?? "#0284C7",
+          iconType: "STATION",
+          station: st,
+          rawX: px.x,
+          rawY: px.y,
+          x: px.x,
+          y: px.y,
+          isOffset: false,
+          inViewport: isPointInViewport(px.x, px.y),
+          isSelected,
+          isDraft: false,
+          baseShowFullLabel: isSelected,
+          preferredDir: "right",
+        });
+      });
+    }
+
+    if (showLandmarkLayer) {
+      surrounding.landmarks.forEach((lm, idx) => {
+        const px = latLngToContainerPx(
+          lm.latitude,
+          lm.longitude,
+          viewport,
+          containerSize.width,
+          containerSize.height,
+        );
+        const isSelected = selectedPoiId === lm.id;
+        allPins.push({
+          markerKey: `poi:${lm.id}`,
+          kind: "POI",
+          priorityGroup: 2,
+          orderIndex: idx,
+          name: lm.name,
+          title: `${lm.name} (${lm.categoryLabel})`,
+          iconColor: lm.kind === "PARK" ? "#059669" : "#0D9488",
+          iconType: lm.kind === "PARK" ? "PARK" : "LANDMARK",
+          poi: lm,
+          rawX: px.x,
+          rawY: px.y,
+          x: px.x,
+          y: px.y,
+          isOffset: false,
+          inViewport: isPointInViewport(px.x, px.y),
+          isSelected,
+          isDraft: false,
+          baseShowFullLabel: isSelected,
+          preferredDir: "right",
+        });
+      });
+    }
+
+    if (showParkingLayer) {
+      surrounding.parkings.forEach((pk, idx) => {
+        const px = latLngToContainerPx(
+          pk.latitude,
+          pk.longitude,
+          viewport,
+          containerSize.width,
+          containerSize.height,
+        );
+        const isSelected = selectedPoiId === pk.id;
+        allPins.push({
+          markerKey: `poi:${pk.id}`,
+          kind: "POI",
+          priorityGroup: 3,
+          orderIndex: idx,
+          name: pk.name,
+          title: `${pk.name} (주차장)`,
+          iconColor: "#2563EB",
+          iconType: "PARKING",
+          poi: pk,
+          rawX: px.x,
+          rawY: px.y,
+          x: px.x,
+          y: px.y,
+          isOffset: false,
+          inViewport: isPointInViewport(px.x, px.y),
+          isSelected,
+          isDraft: false,
+          baseShowFullLabel: isSelected,
+          preferredDir: "right",
+        });
+      });
+    }
+
+    const stopIdSet = new Set(stops.map((s) => s.id));
+
+    if (showFestivalLayer) {
+      festivalStops.forEach((fest, idx) => {
+        if (stopIdSet.has(fest.id)) return;
+        const px = latLngToContainerPx(
+          fest.latitude,
+          fest.longitude,
+          viewport,
+          containerSize.width,
+          containerSize.height,
+        );
+        const isSelected = selectedFestivalId === fest.id;
+        allPins.push({
+          markerKey: `fest:${fest.id}`,
+          kind: "FESTIVAL",
+          priorityGroup: 4,
+          orderIndex: idx,
+          name: fest.name,
+          title: `[행사·축제] ${fest.name}`,
+          iconColor: "#DB2777",
+          iconType: "STOP",
+          stop: fest,
+          rawX: px.x,
+          rawY: px.y,
+          x: px.x,
+          y: px.y,
+          isOffset: false,
+          inViewport: isPointInViewport(px.x, px.y),
+          isSelected,
+          isDraft: false,
+          baseShowFullLabel: isSelected,
+          preferredDir: "right",
+        });
+      });
+    }
+
+    for (const stop of stops) {
       const px = latLngToContainerPx(
         stop.latitude,
         stop.longitude,
@@ -1233,52 +1416,235 @@ export function CourseRouteMap({
         containerSize.width,
         containerSize.height,
       );
-      const isFocused =
-        activeStop?.id === stop.id ||
-        activeOrder === stop.order ||
-        hoveredStopId === stop.id;
-      return {
+      const isSelected =
+        activeStop?.id === stop.id || activeOrder === stop.order;
+      const isFestival = Boolean(
+        (stop.eventStartDate && stop.eventEndDate) ||
+        stop.categoryLabel.includes("축제") ||
+        stop.categoryLabel.includes("행사"),
+      );
+      const visual = getStopCategoryVisual(
+        stop.categoryGroup,
+        stop.categoryLabel,
+      );
+      allPins.push({
+        markerKey: `stop:${stop.id}:${stop.order}`,
+        kind: "STOP",
+        priorityGroup: isFestival ? 4 : 5,
+        orderIndex: stop.order,
+        name: stop.name,
+        title: isFestival
+          ? `[행사·축제] ${stop.name}`
+          : `${stop.order}. ${stop.name} (${stop.categoryLabel})`,
+        iconColor: visual.color,
+        iconType: "STOP",
         stop,
+        rawX: px.x,
+        rawY: px.y,
         x: px.x,
         y: px.y,
-        isFocused,
-        showFullLabel: isFocused,
-      };
-    });
+        isOffset: false,
+        inViewport: isPointInViewport(px.x, px.y),
+        isSelected,
+        isDraft: Boolean(stop.isDraft),
+        baseShowFullLabel: isSelected,
+        preferredDir: "right",
+      });
+    }
 
-    const prioritized = [...raw].sort((a, b) => {
-      if (a.isFocused !== b.isFocused) return a.isFocused ? -1 : 1;
-      return a.stop.order - b.stop.order;
-    });
-
-    const occupiedBoxes: { x: number; y: number }[] = [];
-    for (const item of prioritized) {
-      if (item.isFocused) {
-        item.showFullLabel = true;
-        occupiedBoxes.push({ x: item.x, y: item.y });
-        continue;
-      }
-      const collides = occupiedBoxes.some(
-        (box) => Math.abs(box.x - item.x) < 76 && Math.abs(box.y - item.y) < 34,
-      );
-      if (!collides) {
-        item.showFullLabel = true;
-        occupiedBoxes.push({ x: item.x, y: item.y });
-      } else {
-        item.showFullLabel = false;
+    const visibleIndices: number[] = [];
+    for (let idx = 0; idx < allPins.length; idx++) {
+      if (allPins[idx].inViewport) {
+        visibleIndices.push(idx);
       }
     }
 
-    return raw;
+    // Step 1: De-stack overlapping / near-coincident visible icons
+    const MIN_ICON_DIST = 30;
+    const MAX_OFFSET = 36;
+    for (let iter = 0; iter < 4; iter++) {
+      for (let aPos = 0; aPos < visibleIndices.length; aPos++) {
+        const i = visibleIndices[aPos];
+        for (let bPos = aPos + 1; bPos < visibleIndices.length; bPos++) {
+          const j = visibleIndices[bPos];
+          const pinA = allPins[i];
+          const pinB = allPins[j];
+          let dx = pinB.x - pinA.x;
+          let dy = pinB.y - pinA.y;
+          let dist = Math.hypot(dx, dy);
+          if (dist < MIN_ICON_DIST) {
+            if (dist < 0.5) {
+              const angle =
+                (aPos * 2.39996 + bPos * 1.0472) % (Math.PI * 2);
+              dx = Math.cos(angle);
+              dy = Math.sin(angle);
+              dist = 1;
+            } else {
+              dx /= dist;
+              dy /= dist;
+            }
+            const push = (MIN_ICON_DIST - dist) * 0.5;
+            pinA.x -= dx * push;
+            pinA.y -= dy * push;
+            pinB.x += dx * push;
+            pinB.y += dy * push;
+
+            for (const p of [pinA, pinB]) {
+              const ox = p.x - p.rawX;
+              const oy = p.y - p.rawY;
+              const oDist = Math.hypot(ox, oy);
+              if (oDist > MAX_OFFSET) {
+                p.x = p.rawX + (ox / oDist) * MAX_OFFSET;
+                p.y = p.rawY + (oy / oDist) * MAX_OFFSET;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (const idx of visibleIndices) {
+      const p = allPins[idx];
+      p.isOffset = Math.hypot(p.x - p.rawX, p.y - p.rawY) >= 10;
+    }
+
+    // Step 2: Icon-anchored directional label collision detection
+    const boxesOverlap = (a: Box2D, b: Box2D) =>
+      a.left < b.right &&
+      a.right > b.left &&
+      a.top < b.bottom &&
+      a.bottom > b.top;
+
+    const iconBoxes = visibleIndices.map((idx) => {
+      const p = allPins[idx];
+      return {
+        pinIdx: idx,
+        box: {
+          left: p.x - 15,
+          right: p.x + 15,
+          top: p.y - 15,
+          bottom: p.y + 15,
+        } satisfies Box2D,
+      };
+    });
+
+    const estimatePillWidth = (pin: ProjectedPin) => {
+      let textPx = 0;
+      for (const ch of pin.name) {
+        textPx += ch.charCodeAt(0) > 127 ? 10 : 6.5;
+        if (textPx >= 112) {
+          textPx = 112;
+          break;
+        }
+      }
+      const draftPx = pin.isDraft ? 18 : 0;
+      return Math.round(42 + textPx + draftPx);
+    };
+
+    const prioritizedIndices = [...visibleIndices].sort((ia, ib) => {
+      const a = allPins[ia];
+      const b = allPins[ib];
+      if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
+      if (a.isDraft !== b.isDraft) return a.isDraft ? -1 : 1;
+      if (a.priorityGroup !== b.priorityGroup) {
+        return a.priorityGroup - b.priorityGroup;
+      }
+      return a.orderIndex - b.orderIndex;
+    });
+
+    const occupiedPillBoxes: Box2D[] = [];
+
+    for (const idx of prioritizedIndices) {
+      const pin = allPins[idx];
+      const pillWidth = estimatePillWidth(pin);
+      const rightBox: Box2D = {
+        left: pin.x - 14,
+        right: pin.x - 14 + pillWidth,
+        top: pin.y - 14,
+        bottom: pin.y + 14,
+      };
+      const leftBox: Box2D = {
+        left: pin.x + 14 - pillWidth,
+        right: pin.x + 14,
+        top: pin.y - 14,
+        bottom: pin.y + 14,
+      };
+
+      const countIconHits = (box: Box2D) =>
+        iconBoxes.reduce(
+          (acc, other) =>
+            other.pinIdx !== idx && boxesOverlap(box, other.box) ? acc + 1 : acc,
+          0,
+        );
+      const countPillHits = (box: Box2D) =>
+        occupiedPillBoxes.reduce(
+          (acc, occ) => (boxesOverlap(box, occ) ? acc + 1 : acc),
+          0,
+        );
+
+      const rightIconHits = countIconHits(rightBox);
+      const leftIconHits = countIconHits(leftBox);
+      const rightPillHits = countPillHits(rightBox);
+      const leftPillHits = countPillHits(leftBox);
+      const rightClip = rightBox.right > containerSize.width - 6 ? 1 : 0;
+      const leftClip = leftBox.left < 6 ? 1 : 0;
+
+      if (pin.isSelected) {
+        pin.baseShowFullLabel = true;
+        const rightScore = rightIconHits + rightPillHits * 0.5 + rightClip * 2;
+        const leftScore = leftIconHits + leftPillHits * 0.5 + leftClip * 2;
+        pin.preferredDir = rightScore <= leftScore ? "right" : "left";
+        occupiedPillBoxes.push(
+          pin.preferredDir === "right" ? rightBox : leftBox,
+        );
+        continue;
+      }
+
+      if (rightIconHits === 0 && rightPillHits === 0 && rightClip === 0) {
+        pin.baseShowFullLabel = true;
+        pin.preferredDir = "right";
+        occupiedPillBoxes.push(rightBox);
+      } else if (leftIconHits === 0 && leftPillHits === 0 && leftClip === 0) {
+        pin.baseShowFullLabel = true;
+        pin.preferredDir = "left";
+        occupiedPillBoxes.push(leftBox);
+      } else {
+        pin.baseShowFullLabel = false;
+        const rightScore = rightIconHits + rightClip * 0.5;
+        const leftScore = leftIconHits + leftClip * 0.5;
+        pin.preferredDir = rightScore <= leftScore ? "right" : "left";
+      }
+    }
+
+    return allPins;
   }, [
     stops,
+    festivalStops,
+    showFestivalLayer,
+    showSubwayLayer,
+    showLandmarkLayer,
+    showParkingLayer,
+    surrounding.stations,
+    surrounding.landmarks,
+    surrounding.parkings,
     viewport,
     containerSize.width,
     containerSize.height,
     activeStop?.id,
     activeOrder,
-    hoveredStopId,
+    selectedStationId,
+    selectedPoiId,
+    selectedFestivalId,
   ]);
+
+  const projectedStops = useMemo(
+    () =>
+      projectedPins.filter(
+        (pin): pin is (typeof projectedPins)[number] & { stop: RouteMapStop } =>
+          pin.kind === "STOP" && Boolean(pin.stop),
+      ),
+    [projectedPins],
+  );
 
   const projectedPolylines = useMemo(() => {
     if (!connectRoute) return [];
@@ -1332,74 +1698,6 @@ export function CourseRouteMap({
     }
     return segs;
   }, [connectRoute, projectedStops]);
-
-  const projectedStations = useMemo(() => {
-    if (!showSubwayLayer) return [];
-    return surrounding.stations.map((st) => {
-      const px = latLngToContainerPx(
-        st.latitude,
-        st.longitude,
-        viewport,
-        containerSize.width,
-        containerSize.height,
-      );
-      return { station: st, x: px.x, y: px.y };
-    });
-  }, [
-    showSubwayLayer,
-    surrounding.stations,
-    viewport,
-    containerSize.width,
-    containerSize.height,
-  ]);
-
-  const projectedPois = useMemo(() => {
-    const items: SurroundingPoi[] = [
-      ...(showLandmarkLayer ? surrounding.landmarks : []),
-      ...(showParkingLayer ? surrounding.parkings : []),
-    ];
-    return items.map((poi) => {
-      const px = latLngToContainerPx(
-        poi.latitude,
-        poi.longitude,
-        viewport,
-        containerSize.width,
-        containerSize.height,
-      );
-      return { poi, x: px.x, y: px.y };
-    });
-  }, [
-    showLandmarkLayer,
-    showParkingLayer,
-    surrounding.landmarks,
-    surrounding.parkings,
-    viewport,
-    containerSize.width,
-    containerSize.height,
-  ]);
-
-  const projectedFestivals = useMemo(() => {
-    if (!showFestivalLayer) return [];
-    return festivalStops
-      .filter((fest) => !stops.some((s) => s.id === fest.id))
-      .map((fest) => {
-        const px = latLngToContainerPx(
-          fest.latitude,
-          fest.longitude,
-          viewport,
-          containerSize.width,
-          containerSize.height,
-        );
-        return { fest, x: px.x, y: px.y };
-      });
-  }, [
-    showFestivalLayer,
-    festivalStops,
-    stops,
-    viewport,
-    containerSize.width,
-    containerSize.height,
-  ]);
 
   const stationToFirstStopGuide = useMemo(() => {
     if (selectedContext?.type !== "STATION" || stops.length === 0) return null;
@@ -1498,56 +1796,95 @@ export function CourseRouteMap({
     setCurrentViewport(defaultAnchorCenter);
   }
 
-  function handleFocusStation(station: SubwayStationPoi) {
-    const isAlreadySelected =
-      selectedContext?.type === "STATION" &&
-      selectedContext.station.id === station.id;
-    if (isAlreadySelected) {
-      setSelectedContext(null);
-      return;
-    }
-    setShowSubwayLayer(true);
-    setSelectedContext({ type: "STATION", station });
-
-    if (mapMode === "google" && mapInstanceRef.current) {
-      mapInstanceRef.current.panTo({
-        lat: station.latitude,
-        lng: station.longitude,
-      });
-      if ((mapInstanceRef.current.getZoom() ?? 15) < 15) {
-        mapInstanceRef.current.setZoom(15);
-      }
-      return;
-    }
-
-    if (stops.length > 0) {
-      const distToFirst = calculateStraightMeters(
-        station.latitude,
-        station.longitude,
-        stops[0].latitude,
-        stops[0].longitude,
-      );
-      if (distToFirst <= 2500) {
-        const fitted = computeBestFitViewport(
-          [
-            { latitude: station.latitude, longitude: station.longitude },
-            { latitude: stops[0].latitude, longitude: stops[0].longitude },
-          ],
-          containerSize.width,
-          containerSize.height,
-          { top: 72, right: 64, bottom: footerNode ? 120 : 88, left: 64 },
-        );
-        commitViewport(fitted, true);
+  const handleFocusStation = useCallback(
+    (station: SubwayStationPoi) => {
+      const isAlreadySelected =
+        selectedContext?.type === "STATION" &&
+        selectedContext.station.id === station.id;
+      if (isAlreadySelected) {
+        setSelectedContext(null);
         return;
       }
-    }
+      setShowSubwayLayer(true);
+      setSelectedContext({ type: "STATION", station });
 
-    commitViewport({
-      centerLat: station.latitude,
-      centerLng: station.longitude,
-      zoom: 16,
-    }, true);
-  }
+      if (mapMode === "google" && mapInstanceRef.current) {
+        mapInstanceRef.current.panTo({
+          lat: station.latitude,
+          lng: station.longitude,
+        });
+        if ((mapInstanceRef.current.getZoom() ?? 15) < 15) {
+          mapInstanceRef.current.setZoom(15);
+        }
+        return;
+      }
+
+      if (stops.length > 0) {
+        const distToFirst = calculateStraightMeters(
+          station.latitude,
+          station.longitude,
+          stops[0].latitude,
+          stops[0].longitude,
+        );
+        if (distToFirst <= 2500) {
+          const fitted = computeBestFitViewport(
+            [
+              { latitude: station.latitude, longitude: station.longitude },
+              { latitude: stops[0].latitude, longitude: stops[0].longitude },
+            ],
+            containerSize.width,
+            containerSize.height,
+            { top: 72, right: 64, bottom: footerNode ? 120 : 88, left: 64 },
+          );
+          commitViewport(fitted, true);
+          return;
+        }
+      }
+
+      commitViewport(
+        {
+          centerLat: station.latitude,
+          centerLng: station.longitude,
+          zoom: 16,
+        },
+        true,
+      );
+    },
+    [
+      selectedContext,
+      mapMode,
+      stops,
+      containerSize.width,
+      containerSize.height,
+      footerNode,
+      commitViewport,
+    ],
+  );
+
+  const closestStationBadge = useMemo(() => {
+    if (visibleClosestStations.length === 0) return null;
+    const st = visibleClosestStations[0];
+    const walkBaseMinutes =
+      stops.length > 0 && !hasMovedFromSearchOrigin
+        ? estimateWalkingRoute(
+            st.latitude,
+            st.longitude,
+            stops[0].latitude,
+            stops[0].longitude,
+          ).walkingMinutes
+        : Math.max(1, Math.round((st.distanceFromCenter * 1.25) / 67));
+
+    const isSelected =
+      selectedContext?.type === "STATION" &&
+      selectedContext.station.id === st.id;
+
+    return { station: st, walkBaseMinutes, isSelected };
+  }, [
+    visibleClosestStations,
+    stops,
+    hasMovedFromSearchOrigin,
+    selectedContext,
+  ]);
 
   const effectiveHeightClass = isExpanded
     ? "h-[520px] lg:h-[620px]"
@@ -1577,53 +1914,16 @@ export function CourseRouteMap({
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setThemeId(key)}
+                  onClick={() => {
+                    userChangedThemeRef.current = true;
+                    setThemeId(key);
+                  }}
                   className={`rounded-full px-3 py-1 text-xs font-extrabold transition-colors ${selected
                       ? "bg-surface-dark text-white"
                       : "text-muted hover:text-foreground"
                     }`}
                 >
                   {spec.label}
-                </button>
-              );
-            })}
-
-            {/* Surrounding Festivals Pins (Pure SVG Icon) */}
-            {projectedFestivals.map(({ fest, x, y }) => {
-              if (
-                x < -70 ||
-                x > containerSize.width + 70 ||
-                y < -40 ||
-                y > containerSize.height + 40
-              ) {
-                return null;
-              }
-              const isSelected =
-                selectedContext?.type === "FESTIVAL" &&
-                selectedContext.stop.id === fest.id;
-
-              return (
-                <button
-                  key={`fest-${fest.id}`}
-                  type="button"
-                  suppressHydrationWarning
-                  onClick={() =>
-                    setSelectedContext(
-                      isSelected ? null : { type: "FESTIVAL", stop: fest },
-                    )
-                  }
-                  style={{
-                    left: `${Math.round(x)}px`,
-                    top: `${Math.round(y)}px`,
-                  }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 z-[15] ${isSelected
-                      ? "border-pink-500 bg-pink-600 text-white ring-2 ring-pink-300"
-                      : "border-pink-300 bg-surface/95 text-pink-700 hover:border-pink-500"
-                    }`}
-                  aria-label={`${fest.name} 축제 보기`}
-                >
-                  <PartyPopper className="h-3 w-3 shrink-0 text-pink-600" />
-                  <span className="max-w-[100px] truncate">{fest.name}</span>
                 </button>
               );
             })}
@@ -1638,102 +1938,96 @@ export function CourseRouteMap({
           <button
             type="button"
             onClick={() => setShowSubwayLayer((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${showSubwayLayer
-                ? "bg-slate-800 text-white shadow-2xs"
-                : "border border-line bg-surface text-muted hover:text-foreground"
-              }`}
+            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${
+              showSubwayLayer
+                ? "border-foreground/45 bg-surface text-foreground shadow-2xs"
+                : "border-line bg-surface/70 text-muted opacity-70 hover:text-foreground hover:opacity-100"
+            }`}
           >
-            <TrainFront className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sky-600 text-white">
+              <TrainFront className="h-2.5 w-2.5" />
+            </span>
             <span>역</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowLandmarkLayer((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${showLandmarkLayer
-                ? "bg-emerald-700 text-white shadow-2xs"
-                : "border border-line bg-surface text-muted hover:text-foreground"
-              }`}
+            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${
+              showLandmarkLayer
+                ? "border-foreground/45 bg-surface text-foreground shadow-2xs"
+                : "border-line bg-surface/70 text-muted opacity-70 hover:text-foreground hover:opacity-100"
+            }`}
           >
-            <Trees className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+              <Trees className="h-2.5 w-2.5" />
+            </span>
             <span>명소·공원</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowParkingLayer((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${showParkingLayer
-                ? "bg-blue-600 text-white shadow-2xs"
-                : "border border-line bg-surface text-muted hover:text-foreground"
-              }`}
+            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${
+              showParkingLayer
+                ? "border-foreground/45 bg-surface text-foreground shadow-2xs"
+                : "border-line bg-surface/70 text-muted opacity-70 hover:text-foreground hover:opacity-100"
+            }`}
           >
-            <SquareParking className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+              <SquareParking className="h-2.5 w-2.5" />
+            </span>
             <span>주차장</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowFestivalLayer((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors sm:text-xs ${showFestivalLayer
-                ? "bg-pink-600 text-white shadow-2xs"
-                : "border border-line bg-surface text-muted hover:text-foreground"
-              }`}
+            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${
+              showFestivalLayer
+                ? "border-foreground/45 bg-surface text-foreground shadow-2xs"
+                : "border-line bg-surface/70 text-muted opacity-70 hover:text-foreground hover:opacity-100"
+            }`}
           >
-            <PartyPopper className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-pink-600 text-white">
+              <PartyPopper className="h-2.5 w-2.5" />
+            </span>
             <span>행사·축제</span>
           </button>
         </div>
 
         {/* Closest Station Single Badge (Fits cleanly on one line) */}
-        {visibleClosestStations.length > 0 && (() => {
-          const st = visibleClosestStations[0];
-          const walkBaseMinutes =
-            stops.length > 0 && !hasMovedFromSearchOrigin
-              ? estimateWalkingRoute(
-                st.latitude,
-                st.longitude,
-                stops[0].latitude,
-                stops[0].longitude,
-              ).walkingMinutes
-              : Math.max(
-                1,
-                Math.round((st.distanceFromCenter * 1.25) / 67),
-              );
-
-          const isSelected =
-            selectedContext?.type === "STATION" &&
-            selectedContext.station.id === st.id;
-
-          return (
-            <button
-              type="button"
-              onClick={() => handleFocusStation(st)}
-              title={`${st.name} 기준 동선 확인 (클릭)`}
-              className={`inline-flex min-w-0 max-w-[210px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors truncate sm:text-xs ${isSelected
-                  ? "border-surface-dark bg-surface-dark text-white"
-                  : "border-line bg-surface text-foreground hover:border-primary/50"
-                }`}
+        {closestStationBadge && (
+          <button
+            type="button"
+            onClick={() => handleFocusStation(closestStationBadge.station)}
+            title={`${closestStationBadge.station.name} 기준 동선 확인 (클릭)`}
+            className={`inline-flex min-w-0 max-w-[210px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors truncate sm:text-xs ${
+              closestStationBadge.isSelected
+                ? "border-primary bg-surface text-foreground ring-1 ring-primary/25"
+                : "border-line bg-surface text-foreground hover:border-primary/50"
+            }`}
+          >
+            <span className="flex shrink-0 items-center gap-0.5">
+              {closestStationBadge.station.lines.slice(0, 2).map((line) => (
+                <span
+                  key={line.label}
+                  style={{ backgroundColor: line.color }}
+                  className="h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5"
+                  title={line.label}
+                />
+              ))}
+            </span>
+            <span className="truncate">{closestStationBadge.station.name}</span>
+            <span
+              className={`shrink-0 text-[10px] font-semibold sm:text-[11px] ${
+                closestStationBadge.isSelected ? "text-primary" : "text-muted"
+              }`}
             >
-              <span className="flex shrink-0 items-center gap-0.5">
-                {st.lines.slice(0, 2).map((line) => (
-                  <span
-                    key={line.label}
-                    style={{ backgroundColor: line.color }}
-                    className="h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5"
-                    title={line.label}
-                  />
-                ))}
-              </span>
-              <span className="truncate">{st.name}</span>
-              <span
-                className={`shrink-0 text-[10px] font-semibold sm:text-[11px] ${isSelected ? "text-amber-300" : "text-muted"
-                  }`}
-              >
-                도보 {walkBaseMinutes}분
-              </span>
-            </button>
-          );
-        })()}
+              도보 {closestStationBadge.walkBaseMinutes}분
+            </span>
+          </button>
+        )}
       </div>
 
       {/* 3. Interactive Map Canvas */}
@@ -1862,6 +2156,31 @@ export function CourseRouteMap({
                   />
                 </g>
               ))}
+
+              {projectedPins
+                .filter((pin) => pin.inViewport && pin.isOffset)
+                .map((pin) => (
+                  <g key={`offset-${pin.markerKey}`}>
+                    <line
+                      x1={pin.rawX}
+                      y1={pin.rawY}
+                      x2={pin.x}
+                      y2={pin.y}
+                      stroke="#64748B"
+                      strokeWidth="1.5"
+                      strokeDasharray="2.5 2.5"
+                      opacity="0.75"
+                    />
+                    <circle
+                      cx={pin.rawX}
+                      cy={pin.rawY}
+                      r="2.5"
+                      fill="#FFFFFF"
+                      stroke="#475569"
+                      strokeWidth="1.5"
+                    />
+                  </g>
+                ))}
             </svg>
 
             {/* Walking Segment Minute Badges */}
@@ -1881,304 +2200,133 @@ export function CourseRouteMap({
               ) : null,
             )}
 
-            {/* Surrounding Landmarks, Parks & Parking Pins (Pure SVG Icons) */}
-            {projectedPois.map(({ poi, x, y }) => {
-              if (
-                x < -70 ||
-                x > containerSize.width + 70 ||
-                y < -40 ||
-                y > containerSize.height + 40
-              ) {
-                return null;
-              }
-              const isParking = poi.kind === "PARKING";
-              const isPark = poi.kind === "PARK";
-              const isSelected =
-                selectedContext?.type === "POI" &&
-                selectedContext.poi.id === poi.id;
-
-              return (
-                <button
-                  key={poi.id}
-                  type="button"
-                  suppressHydrationWarning
-                  onClick={() =>
-                    setSelectedContext(
-                      isSelected ? null : { type: "POI", poi },
-                    )
-                  }
-                  style={{
-                    left: `${Math.round(x)}px`,
-                    top: `${Math.round(y)}px`,
-                  }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold whitespace-nowrap shadow-xs transition-transform hover:scale-105 ${isSelected
-                      ? "z-30 border-amber-300 bg-surface-dark text-white"
-                      : isParking
-                        ? "z-[12] border-blue-200 bg-blue-50/95 text-blue-700"
-                        : isPark
-                          ? "z-[12] border-emerald-200 bg-emerald-50/95 text-emerald-800"
-                          : "z-[12] border-teal-200 bg-teal-50/95 text-teal-800"
-                    }`}
-                >
-                  <span
-                    className={`flex h-4 w-4 items-center justify-center rounded-full text-white ${isParking
-                        ? "bg-blue-600"
-                        : isPark
-                          ? "bg-emerald-600"
-                          : "bg-teal-600"
-                      }`}
-                  >
-                    {isParking ? (
-                      <SquareParking className="h-2.5 w-2.5" />
-                    ) : isPark ? (
-                      <Trees className="h-2.5 w-2.5" />
-                    ) : (
-                      <Landmark className="h-2.5 w-2.5" />
-                    )}
-                  </span>
-                  <span className="max-w-24 truncate">{poi.name}</span>
-                </button>
-              );
-            })}
-
-            {/* Surrounding Festivals Pins (Pure SVG Icon) */}
-            {projectedFestivals.map(({ fest, x, y }) => {
-              if (
-                x < -70 ||
-                x > containerSize.width + 70 ||
-                y < -40 ||
-                y > containerSize.height + 40
-              ) {
-                return null;
-              }
-              const isSelected =
-                selectedContext?.type === "FESTIVAL" &&
-                selectedContext.stop.id === fest.id;
-
-              return (
-                <button
-                  key={`fest-${fest.id}`}
-                  type="button"
-                  suppressHydrationWarning
-                  onClick={() =>
-                    setSelectedContext(
-                      isSelected ? null : { type: "FESTIVAL", stop: fest },
-                    )
-                  }
-                  style={{
-                    left: `${Math.round(x)}px`,
-                    top: `${Math.round(y)}px`,
-                  }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 z-[15] ${isSelected
-                      ? "border-pink-500 bg-pink-600 text-white ring-2 ring-pink-300"
-                      : "border-pink-300 bg-surface/95 text-pink-700 hover:border-pink-500"
-                    }`}
-                  aria-label={`${fest.name} 축제 보기`}
-                >
-                  <PartyPopper className="h-3 w-3 shrink-0 text-pink-600" />
-                  <span className="max-w-[100px] truncate">{fest.name}</span>
-                </button>
-              );
-            })}
-
-            {/* Nearby Subway Station Pins (Pure SVG Icon) */}
-            {projectedStations.map(({ station, x, y }) => {
-              if (
-                x < -80 ||
-                x > containerSize.width + 80 ||
-                y < -40 ||
-                y > containerSize.height + 40
-              ) {
-                return null;
-              }
-              const isSelected =
-                selectedContext?.type === "STATION" &&
-                selectedContext.station.id === station.id;
-              const primaryLineColor = station.lines[0]?.color ?? "#0EA5E9";
-
-              return (
-                <button
-                  key={station.id}
-                  type="button"
-                  suppressHydrationWarning
-                  onClick={() => handleFocusStation(station)}
-                  style={{
-                    left: `${Math.round(x)}px`,
-                    top: `${Math.round(y)}px`,
-                  }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 ${isSelected
-                      ? "z-30 border-amber-300 bg-slate-900 text-white ring-2 ring-amber-300"
-                      : "z-[15] border-slate-700/80 bg-slate-900/92 text-white"
-                    }`}
-                >
-                  <span
-                    style={{ backgroundColor: primaryLineColor }}
-                    className="flex h-4 w-4 items-center justify-center rounded-full text-white"
-                  >
-                    <TrainFront className="h-2.5 w-2.5" />
-                  </span>
-                  <span>{station.name}</span>
-                  {station.lines.length > 0 && (
-                    <span className="rounded bg-white/15 px-1 py-0.5 text-[9px] font-bold text-white/90">
-                      {station.lines[0].label}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-
-            {/* Surrounding Festivals Pins (Pure SVG Icon) */}
-            {projectedFestivals.map(({ fest, x, y }) => {
-              if (
-                x < -70 ||
-                x > containerSize.width + 70 ||
-                y < -40 ||
-                y > containerSize.height + 40
-              ) {
-                return null;
-              }
-              const isSelected =
-                selectedContext?.type === "FESTIVAL" &&
-                selectedContext.stop.id === fest.id;
-
-              return (
-                <button
-                  key={`fest-${fest.id}`}
-                  type="button"
-                  suppressHydrationWarning
-                  onClick={() =>
-                    setSelectedContext(
-                      isSelected ? null : { type: "FESTIVAL", stop: fest },
-                    )
-                  }
-                  style={{
-                    left: `${Math.round(x)}px`,
-                    top: `${Math.round(y)}px`,
-                  }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 z-[15] ${isSelected
-                      ? "border-pink-500 bg-pink-600 text-white ring-2 ring-pink-300"
-                      : "border-pink-300 bg-surface/95 text-pink-700 hover:border-pink-500"
-                    }`}
-                  aria-label={`${fest.name} 축제 보기`}
-                >
-                  <PartyPopper className="h-3 w-3 shrink-0 text-pink-600" />
-                  <span className="max-w-[100px] truncate">{fest.name}</span>
-                </button>
-              );
-            })}
-
-            {/* Numbered Date Spot Markers with Category SVG Icons */}
-            {projectedStops.map((pin) => {
-              if (
-                pin.x < -80 ||
-                pin.x > containerSize.width + 80 ||
-                pin.y < -40 ||
-                pin.y > containerSize.height + 40
-              ) {
+            {/* Unified Map Pins (White Pill + Circular Icon Badge + Priority Label Collision) */}
+            {projectedPins.map((pin) => {
+              if (!pin.inViewport) {
                 return null;
               }
 
-              const visual = getStopCategoryVisual(
-                pin.stop.categoryGroup,
-                pin.stop.categoryLabel,
-              );
-              const CategoryIcon = visual.icon;
+              const isHovered = hoveredMarkerKey === pin.markerKey;
+              const isFocusedOrSelected = pin.isSelected || isHovered;
+              const showFullLabel = pin.baseShowFullLabel || isHovered;
+              const labelDir = pin.preferredDir;
+
+              const anchorTransform = !showFullLabel
+                ? "-translate-x-1/2 -translate-y-1/2 p-0.5"
+                : labelDir === "left"
+                  ? "-translate-x-[calc(100%-14px)] -translate-y-1/2 flex-row-reverse gap-1.5 pr-1 pl-2.5 py-1"
+                  : "-translate-x-[14px] -translate-y-1/2 gap-1.5 pl-1 pr-2.5 py-1";
+
+              const zClass = isHovered
+                ? "z-40 scale-105"
+                : pin.isSelected
+                  ? "z-35"
+                  : !showFullLabel
+                    ? "z-25"
+                    : pin.priorityGroup === 1
+                      ? "z-[24]"
+                      : pin.priorityGroup === 2
+                        ? "z-[23]"
+                        : pin.priorityGroup === 3 || pin.priorityGroup === 4
+                          ? "z-[22]"
+                          : pin.isDraft
+                            ? "z-[21]"
+                            : "z-20";
+
+              const surfaceClass = isFocusedOrSelected
+                ? "bg-surface text-foreground ring-2 ring-primary shadow-md"
+                : pin.isDraft
+                  ? "bg-surface text-foreground ring-1.5 ring-primary/60 shadow-sm"
+                  : "bg-surface text-foreground ring-1 ring-line shadow-sm";
+
+              const iconCls = showFullLabel ? "h-3 w-3" : "h-3.5 w-3.5";
+              const renderPinIcon = () => {
+                if (pin.iconType === "STATION") {
+                  return <TrainFront className={iconCls} />;
+                }
+                if (pin.iconType === "PARK") {
+                  return <Trees className={iconCls} />;
+                }
+                if (pin.iconType === "LANDMARK") {
+                  return <Landmark className={iconCls} />;
+                }
+                if (pin.iconType === "PARKING") {
+                  return <SquareParking className={iconCls} />;
+                }
+                const visual = getStopCategoryVisual(
+                  pin.stop?.categoryGroup,
+                  pin.stop?.categoryLabel ?? "",
+                );
+                const CategoryIcon = visual.icon;
+                return <CategoryIcon className={iconCls} />;
+              };
 
               return (
                 <button
-                  key={`${pin.stop.id}-${pin.stop.order}`}
+                  key={pin.markerKey}
                   type="button"
                   suppressHydrationWarning
-                  onMouseEnter={() => setHoveredStopId(pin.stop.id)}
+                  onMouseEnter={() => setHoveredMarkerKey(pin.markerKey)}
                   onMouseLeave={() =>
-                    setHoveredStopId((cur) =>
-                      cur === pin.stop.id ? null : cur,
+                    setHoveredMarkerKey((cur) =>
+                      cur === pin.markerKey ? null : cur,
                     )
                   }
                   onClick={() => {
-                    setSelectedContext(null);
-                    setSelectedStopId(pin.stop.id);
-                    onSelectStop?.(pin.stop);
+                    if (pin.kind === "STATION" && pin.station) {
+                      handleFocusStation(pin.station);
+                    } else if (pin.kind === "POI" && pin.poi) {
+                      const already =
+                        selectedContext?.type === "POI" &&
+                        selectedContext.poi.id === pin.poi.id;
+                      setSelectedContext(
+                        already ? null : { type: "POI", poi: pin.poi },
+                      );
+                    } else if (pin.kind === "FESTIVAL" && pin.stop) {
+                      const already =
+                        selectedContext?.type === "FESTIVAL" &&
+                        selectedContext.stop.id === pin.stop.id;
+                      setSelectedContext(
+                        already ? null : { type: "FESTIVAL", stop: pin.stop },
+                      );
+                    } else if (pin.stop) {
+                      setSelectedContext(null);
+                      setSelectedStopId(pin.stop.id);
+                      onSelectStop?.(pin.stop);
+                    }
                   }}
-                  title={`${pin.stop.order}. ${pin.stop.name} (${pin.stop.categoryLabel})`}
+                  title={pin.title}
+                  aria-label={pin.title}
                   style={{
                     left: `${Math.round(pin.x)}px`,
                     top: `${Math.round(pin.y)}px`,
                   }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center rounded-full font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 ${pin.showFullLabel
-                      ? "gap-1.5 px-2.5 py-1 text-[11px]"
-                      : "p-0.5 text-[11px]"
-                    } ${pin.isFocused
-                      ? "z-30 bg-surface-dark text-white ring-2 ring-amber-300"
-                      : pin.stop.isDraft
-                        ? "z-25 bg-surface text-foreground ring-2 ring-primary shadow-primary/30"
-                        : "z-20 bg-surface text-foreground ring-1.5 ring-line"
-                    }`}
+                  className={`absolute flex items-center rounded-full text-[11px] font-extrabold whitespace-nowrap transition-transform hover:scale-105 ${anchorTransform} ${zClass} ${surfaceClass}`}
                 >
                   <span
-                    style={{ backgroundColor: visual.color }}
-                    className={`flex items-center justify-center rounded-full text-white shadow-2xs ${pin.showFullLabel ? "h-4.5 w-4.5" : "h-6 w-6"
-                      }`}
+                    style={{ backgroundColor: pin.iconColor }}
+                    className={`flex shrink-0 items-center justify-center rounded-full text-white shadow-2xs ${
+                      showFullLabel ? "h-5 w-5" : "h-6 w-6"
+                    }`}
                   >
-                    <CategoryIcon
-                      className={
-                        pin.showFullLabel ? "h-2.5 w-2.5" : "h-3.5 w-3.5"
-                      }
-                    />
+                    {renderPinIcon()}
                   </span>
-                  {pin.showFullLabel && (
-                    <span className="max-w-28 truncate">{pin.stop.name}</span>
+
+                  {showFullLabel && (
+                    <span className="max-w-28 truncate">{pin.name}</span>
                   )}
-                  {pin.stop.eventStartDate && pin.stop.eventEndDate && (
-                    <span className="rounded bg-purple-600 px-1 py-0.2 text-[8px] font-black text-white shrink-0">
-                      축제
-                    </span>
-                  )}
-                  {pin.stop.isDraft && (
-                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-black text-white -ml-0.5">
+
+                  {pin.isDraft && pin.stop && (
+                    <span
+                      className={
+                        showFullLabel
+                          ? "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-primary text-[8px] font-black text-white"
+                          : "absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-black text-white ring-1 ring-surface"
+                      }
+                    >
                       {pin.stop.order}
                     </span>
                   )}
-                </button>
-              );
-            })}
-
-            {/* Surrounding Festivals Pins (Pure SVG Icon) */}
-            {projectedFestivals.map(({ fest, x, y }) => {
-              if (
-                x < -70 ||
-                x > containerSize.width + 70 ||
-                y < -40 ||
-                y > containerSize.height + 40
-              ) {
-                return null;
-              }
-              const isSelected =
-                selectedContext?.type === "FESTIVAL" &&
-                selectedContext.stop.id === fest.id;
-
-              return (
-                <button
-                  key={`fest-${fest.id}`}
-                  type="button"
-                  suppressHydrationWarning
-                  onClick={() =>
-                    setSelectedContext(
-                      isSelected ? null : { type: "FESTIVAL", stop: fest },
-                    )
-                  }
-                  style={{
-                    left: `${Math.round(x)}px`,
-                    top: `${Math.round(y)}px`,
-                  }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-extrabold whitespace-nowrap shadow-md transition-transform hover:scale-105 z-[15] ${isSelected
-                      ? "border-pink-500 bg-pink-600 text-white ring-2 ring-pink-300"
-                      : "border-pink-300 bg-surface/95 text-pink-700 hover:border-pink-500"
-                    }`}
-                  aria-label={`${fest.name} 축제 보기`}
-                >
-                  <PartyPopper className="h-3 w-3 shrink-0 text-pink-600" />
-                  <span className="max-w-[100px] truncate">{fest.name}</span>
                 </button>
               );
             })}
@@ -2291,17 +2439,25 @@ export function CourseRouteMap({
           />
         </div>
 
-        {/* 6. Selected Subway Station / Landmark / Parking Context Info Card (Pure SVG Icons) */}
+        {/* 6. Selected Subway Station / Landmark / Parking / Festival Context Info Card */}
         {selectedContext && (
           <div
-            className={`absolute inset-x-4 z-30 flex items-center justify-between gap-3 rounded-2xl border border-slate-700/20 bg-slate-900/95 px-4 py-2.5 text-white shadow-lg backdrop-blur-md ${footerNode ? "bottom-18" : "bottom-4"
+            className={`absolute inset-x-4 z-30 flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface/95 px-4 py-2.5 text-foreground shadow-lg backdrop-blur-md ${footerNode ? "bottom-18" : "bottom-4"
               }`}
           >
             {selectedContext.type === "STATION" ? (
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-extrabold">
-                    <TrainFront className="h-3.5 w-3.5 shrink-0 text-sky-400" />
+                  <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-foreground">
+                    <span
+                      style={{
+                        backgroundColor:
+                          selectedContext.station.lines[0]?.color ?? "#0284C7",
+                      }}
+                      className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full text-white"
+                    >
+                      <TrainFront className="h-2.5 w-2.5" />
+                    </span>
                     <span>{selectedContext.station.name}</span>
                   </span>
                   {selectedContext.station.lines.map((line) => (
@@ -2314,7 +2470,7 @@ export function CourseRouteMap({
                     </span>
                   ))}
                 </div>
-                <p className="mt-0.5 truncate text-[11px] text-slate-300">
+                <p className="mt-0.5 truncate text-[11px] text-muted">
                   {stationToFirstStopGuide
                     ? `1번 '${stationToFirstStopGuide.firstStop.name}'까지 도보 약 ${stationToFirstStopGuide.walkMinutes}분 (${stationToFirstStopGuide.distanceLabel})`
                     : `현 지도 중심에서 약 ${selectedContext.station.distanceMeters}m`}
@@ -2322,50 +2478,71 @@ export function CourseRouteMap({
               </div>
             ) : selectedContext.type === "FESTIVAL" ? (
               <div className="min-w-0">
-                <p className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-pink-300">
-                  <PartyPopper className="h-3.5 w-3.5 shrink-0" />
+                <p className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-foreground">
+                  <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pink-600 text-white">
+                    <PartyPopper className="h-2.5 w-2.5" />
+                  </span>
                   <span>행사·축제 안내</span>
-                  {selectedContext.stop.eventStartDate && selectedContext.stop.eventEndDate && (
-                    <span className="text-[10px] font-medium text-pink-200">
-                      ({selectedContext.stop.eventStartDate} ~ {selectedContext.stop.eventEndDate})
-                    </span>
-                  )}
+                  {selectedContext.stop.eventStartDate &&
+                    selectedContext.stop.eventEndDate && (
+                      <span className="text-[10px] font-semibold text-muted">
+                        ({selectedContext.stop.eventStartDate} ~{" "}
+                        {selectedContext.stop.eventEndDate})
+                      </span>
+                    )}
                 </p>
-                <p className="mt-0.5 truncate text-xs font-extrabold text-white">
+                <p className="mt-0.5 truncate text-xs font-extrabold text-foreground">
                   {selectedContext.stop.name}
                 </p>
-                <p className="truncate text-[11px] text-slate-300">
+                <p className="truncate text-[11px] text-muted">
                   {selectedContext.stop.address}
                 </p>
               </div>
             ) : (
               <div className="min-w-0">
-                <p
-                  className={`inline-flex items-center gap-1.5 text-[11px] font-extrabold ${selectedContext.poi.kind === "PARKING"
-                      ? "text-sky-300"
-                      : "text-emerald-300"
+                <p className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-foreground">
+                  <span
+                    className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full text-white ${
+                      selectedContext.poi.kind === "PARKING"
+                        ? "bg-blue-600"
+                        : selectedContext.poi.kind === "PARK"
+                          ? "bg-emerald-600"
+                          : "bg-teal-600"
                     }`}
-                >
-                  {selectedContext.poi.kind === "PARKING" ? (
-                    <SquareParking className="h-3.5 w-3.5 shrink-0" />
-                  ) : selectedContext.poi.kind === "PARK" ? (
-                    <Trees className="h-3.5 w-3.5 shrink-0" />
-                  ) : (
-                    <Landmark className="h-3.5 w-3.5 shrink-0" />
-                  )}
+                  >
+                    {selectedContext.poi.kind === "PARKING" ? (
+                      <SquareParking className="h-2.5 w-2.5" />
+                    ) : selectedContext.poi.kind === "PARK" ? (
+                      <Trees className="h-2.5 w-2.5" />
+                    ) : (
+                      <Landmark className="h-2.5 w-2.5" />
+                    )}
+                  </span>
                   <span>
                     {selectedContext.poi.kind === "PARKING"
                       ? "주변 주차장"
                       : `주변 ${selectedContext.poi.categoryLabel}`}
                   </span>
                 </p>
-                <p className="mt-0.5 truncate text-xs font-extrabold text-white">
+                <p className="mt-0.5 truncate text-xs font-extrabold text-foreground">
                   {selectedContext.poi.name}
                 </p>
               </div>
             )}
 
             <div className="flex shrink-0 items-center gap-1.5">
+              {selectedContext.type === "FESTIVAL" && onSelectStop && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectStop(selectedContext.stop);
+                    setSelectedContext(null);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-subtle px-2.5 py-1.5 text-[11px] font-bold text-foreground hover:bg-line/60"
+                >
+                  <span>상세 보기</span>
+                </button>
+              )}
               {selectedContext.type === "FESTIVAL" && onAddPlaceToCourse && (
                 <button
                   type="button"
@@ -2373,7 +2550,7 @@ export function CourseRouteMap({
                     onAddPlaceToCourse(selectedContext.stop);
                     setSelectedContext(null);
                   }}
-                  className="inline-flex items-center gap-1 rounded-full bg-pink-600 px-3 py-1.5 text-[11px] font-black text-white hover:bg-pink-500 shadow-sm"
+                  className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-[11px] font-black text-white shadow-sm hover:bg-primary-hover"
                 >
                   <Plus className="h-3 w-3" />
                   <span>코스로 지정</span>
@@ -2394,7 +2571,7 @@ export function CourseRouteMap({
                     }
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/25"
+                    className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-subtle px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-line/60"
                   >
                     <span>지도</span>
                     <ExternalLink className="h-3 w-3" />
@@ -2404,7 +2581,7 @@ export function CourseRouteMap({
                 type="button"
                 onClick={() => setSelectedContext(null)}
                 aria-label="주변 정보 닫기"
-                className="rounded-full p-1 text-slate-300 hover:bg-white/15 hover:text-white"
+                className="rounded-full p-1 text-muted hover:bg-surface-subtle hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
               </button>

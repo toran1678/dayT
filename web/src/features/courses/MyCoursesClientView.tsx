@@ -7,14 +7,12 @@ import {
   Calendar,
   Clock,
   Compass,
-  ExternalLink,
   Loader2,
   LogIn,
   MapPin,
   Navigation,
   Pencil,
   Plus,
-  Sparkles,
   Ticket,
   Trash2,
   Wallet,
@@ -22,15 +20,9 @@ import {
 import { useAuth } from "@/features/auth/AuthContext";
 import { formatDurationKo } from "@/features/map/geo-utils";
 import { ApiError } from "@/shared/api/client";
-import type { CourseListItem, DateTimeSlot } from "@/shared/api/types";
+import type { CourseListItem } from "@/shared/api/types";
 import { openCourseGoogleMapsNavigation } from "./course-actions";
 import { deleteCourse, fetchMyCourses } from "./courses-api";
-
-const TIME_SLOT_LABELS: Record<DateTimeSlot, string> = {
-  HALF_DAY: "반나절",
-  ALL_DAY: "종일",
-  EVENING: "저녁 무드",
-};
 
 function formatDatePlanDisplay(dateStr?: string | null) {
   if (!dateStr) return null;
@@ -144,19 +136,19 @@ export function MyCoursesClientView() {
   return (
     <div className="space-y-7 pb-12">
       {/* Editorial Header */}
-      <header className="flex flex-col justify-between gap-5 border-b border-black/[0.08] dark:border-white/[0.08] pb-6 sm:flex-row sm:items-end">
+      <header className="flex flex-col justify-between gap-5 border-b border-line pb-6 sm:flex-row sm:items-end">
         <div>
           <div className="flex items-center gap-2">
-            <span className="h-1 w-5 rounded-full bg-primary" />
-            <p className="text-[11px] font-black tracking-widest text-primary uppercase">
-              DATE PASS REGISTRY
+            <span className="h-0.5 w-5 bg-primary" />
+            <p className="text-xs font-bold tracking-widest text-primary uppercase">
+              COURSES & PASSES
             </p>
           </div>
           <h1 className="mt-2 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
             코스 보관함
           </h1>
           <p className="mt-1 text-xs sm:text-sm font-medium text-muted">
-            완성된 데이트 패스를 관리하고, 약속 당일 원클릭 네비게이션으로 이어집니다.
+            완성된 데이트 동선을 보관하고, 약속 당일 원클릭 길안내로 이어집니다.
           </p>
         </div>
 
@@ -164,17 +156,17 @@ export function MyCoursesClientView() {
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <Link
             href="/courses/new?ai=1"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-black/[0.08] dark:border-white/[0.08] bg-surface px-3.5 py-2 text-xs font-bold text-foreground shadow-2xs hover:border-primary/50 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3.5 py-2 text-xs font-bold text-foreground shadow-2xs hover:border-primary/50 transition-colors"
           >
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <span>AI 자동 설계</span>
+            <Compass className="h-3.5 w-3.5 text-primary" />
+            <span>자동 코스 추천</span>
           </Link>
           <Link
             href="/courses/new"
             className="inline-flex items-center gap-1.5 rounded-lg bg-surface-dark px-4 py-2 text-xs font-bold text-white shadow-2xs hover:bg-black transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>새 패스 생성</span>
+            <span>새 코스 작성</span>
           </Link>
         </div>
       </header>
@@ -253,8 +245,8 @@ export function MyCoursesClientView() {
               href="/courses/new?ai=1"
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary-hover transition-colors"
             >
-              <Sparkles className="h-3.5 w-3.5 text-white" />
-              <span>AI 자동 추천 받기</span>
+              <Compass className="h-3.5 w-3.5 text-white" />
+              <span>AI 추천 코스 받기</span>
             </Link>
           </div>
         </div>
@@ -268,8 +260,8 @@ export function MyCoursesClientView() {
                 총 <strong className="text-primary font-black">{courses.length}개</strong>의 패스
               </span>
               {upcomingCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200/50">
-                  <Calendar className="h-3 w-3" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary-soft px-2.5 py-0.5 text-[11px] font-bold text-primary">
+                  <Calendar className="h-3 w-3 text-primary" />
                   <span>예정된 데이트 {upcomingCount}건</span>
                 </span>
               )}
@@ -285,7 +277,7 @@ export function MyCoursesClientView() {
               return (
                 <article
                   key={course.id}
-                  className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-black/[0.08] dark:border-white/[0.08] bg-surface p-5 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:border-black/[0.2] dark:hover:border-white/[0.2] hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)] transition-all duration-150"
+                  className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-line bg-surface p-5 shadow-xs hover:border-foreground/30 transition-all duration-150"
                 >
                   {/* Top Header: Schedule & Metadata */}
                   <div>
@@ -293,23 +285,23 @@ export function MyCoursesClientView() {
                       {plan ? (
                         <div className="flex items-center gap-1.5">
                           <span
-                            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-black ${
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
                               plan.isUpcoming
-                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-                                : "bg-black/[0.04] text-muted border border-black/[0.06]"
+                                ? "bg-surface-subtle text-foreground border border-line"
+                                : "bg-surface-subtle text-muted border border-line"
                             }`}
                           >
-                            <Calendar className="h-3 w-3" />
+                            <Calendar className="h-3 w-3 text-primary" />
                             <span>{plan.formatted}</span>
                           </span>
                           {plan.dDay && (
                             <span
-                              className={`rounded px-1.5 py-0.5 text-[10px] font-black ${
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
                                 plan.dDay.startsWith("D-Day")
-                                  ? "bg-rose-500 text-white"
+                                  ? "bg-primary text-white"
                                   : plan.isUpcoming
                                     ? "bg-foreground text-background"
-                                    : "bg-surface-subtle text-muted"
+                                    : "bg-surface-subtle text-muted border border-line"
                               }`}
                             >
                               {plan.dDay}
@@ -317,7 +309,7 @@ export function MyCoursesClientView() {
                           )}
                         </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded bg-black/[0.03] dark:bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium text-muted border border-black/[0.05]">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-subtle px-2.5 py-0.5 text-[11px] font-medium text-muted border border-line">
                           <Calendar className="h-3 w-3 opacity-60" />
                           <span>일정 미지정</span>
                         </span>
@@ -344,7 +336,7 @@ export function MyCoursesClientView() {
                         {course.themeTags.map((tag) => (
                           <span
                             key={tag}
-                            className="rounded bg-black/[0.03] dark:bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-muted"
+                            className="rounded bg-surface-subtle px-1.5 py-0.5 text-[10px] font-medium text-muted border border-line/60"
                           >
                             #{tag}
                           </span>
@@ -353,7 +345,7 @@ export function MyCoursesClientView() {
                     )}
 
                     {/* Voucher Specs Strip */}
-                    <div className="mt-3.5 flex items-center divide-x divide-black/[0.08] dark:divide-white/[0.08] rounded-lg border border-black/[0.06] dark:border-white/[0.06] bg-surface-subtle/40 px-3 py-2 text-xs">
+                    <div className="mt-3.5 flex items-center divide-x divide-line rounded-lg border border-line bg-surface-subtle/50 px-3 py-2 text-xs">
                       <div className="flex items-center gap-1.5 pr-3 font-bold text-foreground">
                         <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
                         <span>스팟 {course.placeCount}곳</span>
@@ -370,7 +362,7 @@ export function MyCoursesClientView() {
                   </div>
 
                   {/* Bottom Footer Actions (Dashed Separator Ticket Style) */}
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-black/[0.08] dark:border-white/[0.08] pt-3.5">
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-line pt-3.5">
                     <Link
                       href={`/courses/${course.id}`}
                       className="inline-flex items-center gap-1 text-xs font-extrabold text-foreground hover:text-primary transition-colors"
