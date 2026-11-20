@@ -19,6 +19,11 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+import {
+  DatePickerField,
+  getThisWeekendSaturdayIso,
+  getTodaySeoulIso,
+} from "@/components/ui/DatePickerField";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
   CourseRouteMap,
@@ -931,53 +936,58 @@ export function CourseBuilderClientView({
           </div>
 
           {/* Row 3: Target Date (Date Planning) */}
-          <div className="flex flex-col gap-2 border-t border-line/60 pt-3 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-1.5 shrink-0 text-xs font-bold text-foreground sm:w-28">
-              <Calendar className="h-3.5 w-3.5 text-primary" />
-              <span>데이트 예정일</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 flex-1">
-              <input
-                type="date"
-                value={planDate}
-                onChange={(e) => setPlanDate(e.target.value)}
-                className="rounded-xl border border-line bg-surface-subtle px-3 py-1.5 text-xs font-bold text-foreground outline-none transition-all focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-              />
-              <button
-                type="button"
-                onClick={() => setPlanDate(new Date().toISOString().split("T")[0])}
-                className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${
-                  planDate === new Date().toISOString().split("T")[0]
-                    ? "bg-primary text-white shadow-2xs"
-                    : "border border-line bg-surface-subtle text-muted hover:text-foreground"
-                }`}
-              >
-                오늘
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const now = new Date();
-                  const day = now.getDay();
-                  const diff = (6 - day + 7) % 7 || 7;
-                  const sat = new Date(now.getTime() + diff * 86400000);
-                  setPlanDate(sat.toISOString().split("T")[0]);
-                }}
-                className="rounded-full border border-line bg-surface-subtle px-3 py-1 text-xs font-bold text-muted hover:text-foreground transition-colors"
-              >
-                이번 주말
-              </button>
-              {planDate && (
-                <button
-                  type="button"
-                  onClick={() => setPlanDate("")}
-                  className="rounded-full border border-line px-2.5 py-1 text-[11px] font-bold text-muted hover:text-red-500 hover:border-red-200 transition-colors"
-                >
-                  날짜 초기화
-                </button>
-              )}
-            </div>
-          </div>
+          {(() => {
+            const todayIso = getTodaySeoulIso();
+            const weekendIso = getThisWeekendSaturdayIso();
+            const isTodaySelected = planDate === todayIso;
+            const isWeekendSelected = planDate === weekendIso;
+            return (
+              <div className="flex flex-col gap-2 border-t border-line/60 pt-3 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-1.5 shrink-0 text-xs font-bold text-foreground sm:w-28">
+                  <Calendar className="h-3.5 w-3.5 text-primary" />
+                  <span>데이트 예정일</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 flex-1">
+                  <DatePickerField
+                    value={planDate}
+                    onChange={setPlanDate}
+                    placeholder="연도. 월. 일 선택"
+                    className="w-48 sm:w-52"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPlanDate((prev) =>
+                        prev === todayIso ? "" : todayIso,
+                      )
+                    }
+                    className={`rounded-full border border-solid px-3 py-1 text-xs font-bold transition-colors ${
+                      isTodaySelected
+                        ? "border-primary bg-primary text-white"
+                        : "border-line bg-surface-subtle text-muted hover:border-foreground/30 hover:text-foreground"
+                    }`}
+                  >
+                    오늘
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPlanDate((prev) =>
+                        prev === weekendIso ? "" : weekendIso,
+                      )
+                    }
+                    className={`rounded-full border border-solid px-3 py-1 text-xs font-bold transition-colors ${
+                      isWeekendSelected
+                        ? "border-primary bg-primary text-white"
+                        : "border-line bg-surface-subtle text-muted hover:border-foreground/30 hover:text-foreground"
+                    }`}
+                  >
+                    이번 주말
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {errorMessage && (

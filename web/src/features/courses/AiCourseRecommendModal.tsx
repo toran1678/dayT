@@ -20,6 +20,11 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import {
+  DatePickerField,
+  getThisWeekendSaturdayIso,
+  getTodaySeoulIso,
+} from "@/components/ui/DatePickerField";
 import { useAuth } from "@/features/auth/AuthContext";
 import { formatDurationKo } from "@/features/map/geo-utils";
 import {
@@ -508,68 +513,69 @@ export function AiCourseRecommendModal({
           </div>
 
           {/* 1-2. Date Picker (언제 만날까요?) */}
-          <div className="border-t border-line/70 pt-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label
-                htmlFor="ai-target-date"
-                className="flex items-center gap-1.5 text-xs font-extrabold text-foreground"
-              >
-                <Calendar className="h-3.5 w-3.5 text-muted" />
-                <span>언제 만날까요? (데이트 예정일 선택)</span>
-              </label>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setTargetDate(new Date().toISOString().split("T")[0])
-                  }
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
-                    targetDate === new Date().toISOString().split("T")[0]
-                      ? "bg-primary text-white"
-                      : "border border-line bg-surface text-muted hover:text-foreground"
-                  }`}
-                >
-                  오늘
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const day = now.getDay();
-                    const diff = (6 - day + 7) % 7 || 7;
-                    const sat = new Date(now.getTime() + diff * 86400000);
-                    setTargetDate(sat.toISOString().split("T")[0]);
-                  }}
-                  className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-[11px] font-bold text-muted hover:text-foreground transition-colors"
-                >
-                  이번 주말
-                </button>
-                {targetDate && (
-                  <button
-                    type="button"
-                    onClick={() => setTargetDate("")}
-                    className="ml-1 text-[11px] font-bold text-muted transition-colors hover:text-foreground"
-                    title="날짜 초기화"
+          {(() => {
+            const todayIso = getTodaySeoulIso();
+            const weekendIso = getThisWeekendSaturdayIso();
+            const isTodaySelected = targetDate === todayIso;
+            const isWeekendSelected = targetDate === weekendIso;
+            return (
+              <div className="border-t border-line/70 pt-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label
+                    htmlFor="ai-target-date"
+                    className="flex items-center gap-1.5 text-xs font-extrabold text-foreground"
                   >
-                    초기화
-                  </button>
-                )}
-              </div>
-            </div>
+                    <Calendar className="h-3.5 w-3.5 text-muted" />
+                    <span>언제 만날까요? (데이트 예정일 선택)</span>
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTargetDate((prev) =>
+                          prev === todayIso ? "" : todayIso,
+                        )
+                      }
+                      className={`rounded-full border border-solid px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
+                        isTodaySelected
+                          ? "border-primary bg-primary text-white"
+                          : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
+                      }`}
+                    >
+                      오늘
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTargetDate((prev) =>
+                          prev === weekendIso ? "" : weekendIso,
+                        )
+                      }
+                      className={`rounded-full border border-solid px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
+                        isWeekendSelected
+                          ? "border-primary bg-primary text-white"
+                          : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
+                      }`}
+                    >
+                      이번 주말
+                    </button>
+                  </div>
+                </div>
 
-            <div className="mt-2.5">
-              <input
-                id="ai-target-date"
-                type="date"
-                value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
-                className="w-full rounded-xl border border-line bg-background px-3 py-2 text-xs font-bold text-foreground outline-none transition-colors focus:border-foreground"
-              />
-            </div>
-            <p className="mt-1.5 text-[11px] font-medium text-muted">
-              날짜를 지정하고 테마에서 &apos;행사·축제&apos;를 선택하면 해당 일자의 축제·야시장·팝업스토어를 우선 반영합니다.
-            </p>
-          </div>
+                <div className="mt-2.5">
+                  <DatePickerField
+                    id="ai-target-date"
+                    value={targetDate}
+                    onChange={setTargetDate}
+                    placeholder="연도. 월. 일 (데이트 예정일 선택)"
+                  />
+                </div>
+                <p className="mt-1.5 text-[11px] font-medium text-muted">
+                  날짜를 지정하고 테마에서 &apos;행사·축제&apos;를 선택하면 해당 일자의 축제·야시장·팝업스토어를 우선 반영합니다.
+                </p>
+              </div>
+            );
+          })()}
 
           {/* 2. Themes & TimeSlot */}
           <div className="grid gap-4 border-t border-line/70 pt-5 sm:grid-cols-2">

@@ -6,11 +6,11 @@
 ---
 
 ## 1. 현재 포커스 (Current Focus)
-- **현재 단계**: **전역 테스트용 테마 토글 추가 · 데이트 테마 버튼 위치 고정 · 일기 상세 전용 페이지 전환 완료**
+- **현재 단계**: **커스텀 달력 날짜 선택기(`DatePickerField`) 구현 및 `오늘`/`이번 주말` 선택 강조·초기화 정리 완료**
 - **현재 상태**: 
-  - `AppShell.tsx`: 우측 하단(`fixed right-4 bottom-20 z-[70] lg:right-6 lg:bottom-6`)에 모달 위에서도 클릭 가능한 테스트용 라이트/다크 모드 플로팅 토글 추가(`useSyncExternalStore`로 SSR 하이드레이션 일치 보장).
-  - `AiCourseRecommendModal.tsx` & `CourseBuilderClientView.tsx`: 선택 시 조건부 `<Check />` 추가로 인해 버튼 너비와 주변 위치가 밀리던 문제 해결(테마별 고정 SVG 아이콘 `THEME_ICONS` 상시 렌더링 및 `border border-solid` 통일).
-  - `diaries-api.ts` & `diary-utils.ts` & `DiaryDetailClientView.tsx` & `app/diaries/[diaryId]/page.tsx` & `DiariesClientView.tsx`: 일기 상세 모달을 제거하고 `/diaries/[diaryId]` 전용 상세·인라인 수정 페이지로 전환 완료. `npm run typecheck` 및 `npm run lint` 통과 (0 errors).
+  - `DatePickerField.tsx`: 브라우저 기본 `<input type="date">`를 대체하는 DayT 테마 연동 커스텀 달력 팝오버 구현(월 이동, 6×7 달력 그리드, 주말 색상 구분, `오늘`/`이번 주말` 빠른 선택, 외부 클릭/`Escape` 닫기).
+  - `AiCourseRecommendModal.tsx` & `CourseBuilderClientView.tsx`: KST(`Asia/Seoul`) 기준 `todayIso`/`weekendIso` 계산으로 `오늘`과 `이번 주말` 각각 해당 날짜일 때만 선택 활성 표시, 그 외 날짜 선택 시 양쪽 모두 비활성 처리, 별도 `"초기화"`/`"날짜 초기화"` 버튼 제거(재클릭 시 해제).
+  - `DiariesClientView.tsx` & `DiaryDetailClientView.tsx`: 일기 작성·수정 폼 날짜 입력에도 `DatePickerField` 일괄 적용. `npm run typecheck` 및 `npm run lint` 통과 (0 errors).
 
 ---
 
@@ -57,6 +57,10 @@
 ## 3. 작업 완료 로그 (Changelog)
 
 ### 2026-11-21 (최신 업데이트)
+- **커스텀 달력 날짜 선택기(`DatePickerField`) 직접 구현 및 `오늘`/`이번 주말` 선택 상태 정리 완료**:
+  - `DatePickerField.tsx`: 브라우저 기본 날짜 팝업 대신 화이트/다크 모드 토큰(`bg-surface`, `border-line`, `bg-primary`)과 어울리는 커스텀 달력 팝오버 및 서울 시간 기준 날짜 유틸(`getTodaySeoulIso`, `getThisWeekendSaturdayIso`, `formatKoreanDateLabel`) 구현.
+  - `AiCourseRecommendModal.tsx` & `CourseBuilderClientView.tsx`: `"이번 주말"` 선택 시 누락되었던 활성 표시를 보완해 `오늘`·`이번 주말` 각각의 날짜와 일치할 때만 활성 강조, 다른 날짜 선택 시 미강조, 재클릭으로 해제되도록 통합해 별도 `"초기화"` 버튼 제거.
+  - `DiariesClientView.tsx` & `DiaryDetailClientView.tsx`: 일기 작성/수정 날짜 입력 필드까지 모두 `DatePickerField`로 교체 완료. (`typecheck`/`lint` 0 errors)
 - **전역 테스트용 테마 토글 · 데이트 테마 버튼 위치 고정 · 일기 상세 전용 페이지 전환 완료**:
   - `AppShell.tsx`: 어느 화면이나 모달(`z-50`~`z-60`) 위에서도 즉시 화이트·다크 모드를 전환할 수 있는 `z-[70]` 플로팅 테마 토글 추가.
   - `AiCourseRecommendModal.tsx` & `CourseBuilderClientView.tsx`: 조건부 `<Check />` 마운트 제거 및 고정 크기 테마 아이콘(`THEME_ICONS`)·`border border-solid` 지오메트리 적용으로 클릭 시 버튼 위치 이동(`0px`) 해소.

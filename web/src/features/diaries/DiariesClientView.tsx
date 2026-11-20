@@ -18,6 +18,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { DatePickerField } from "@/components/ui/DatePickerField";
 import { useAuth } from "@/features/auth/AuthContext";
 import { fetchMyCourses } from "@/features/courses/courses-api";
 import { ApiError } from "@/shared/api/client";
@@ -420,17 +421,20 @@ export function DiariesClientView() {
             {/* Left: Main Writing Form */}
             <div className="space-y-4 lg:col-span-7">
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1.5">
-                  <span className="text-xs font-bold text-foreground">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="diary-date-input"
+                    className="block text-xs font-bold text-foreground"
+                  >
                     데이트 날짜
-                  </span>
-                  <input
-                    type="date"
+                  </label>
+                  <DatePickerField
+                    id="diary-date-input"
                     value={dateAt}
-                    onChange={(e) => setDateAt(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-background px-3.5 py-2.5 text-xs font-bold text-foreground outline-none transition-colors focus:border-primary"
+                    onChange={setDateAt}
+                    allowClear={false}
                   />
-                </label>
+                </div>
 
                 <label className="space-y-1.5">
                   <span className="text-xs font-bold text-foreground">
