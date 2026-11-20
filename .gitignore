@@ -77,3 +77,6 @@ yarn-error.*
 
 
 .agents/taste
+.agents/skills/design-taste-frontend/
+skills/design-taste-frontend/
+**/design-taste-frontend/
