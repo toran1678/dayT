@@ -179,11 +179,11 @@ export function LocationPinPickerModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+        <div className="border-b border-line px-6 py-4">
           <div>
             <h3 className="text-base font-black text-foreground">
               지도에서 중심 위치 선택
@@ -192,14 +192,6 @@ export function LocationPinPickerModal({
               원하는 지점을 클릭하면 해당 위치와 반경({radiusKm}km) 기준으로 코스가 설계됩니다.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            className="rounded-full p-2 text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
 
         {/* Map Canvas */}

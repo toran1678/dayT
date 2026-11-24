@@ -6,11 +6,13 @@
 ---
 
 ## 1. 현재 포커스 (Current Focus)
-- **현재 단계**: **커스텀 달력 날짜 선택기(`DatePickerField`) 구현 및 `오늘`/`이번 주말` 선택 강조·초기화 정리 완료**
+- **현재 단계**: **축제 클러스터 파티 SVG 아이콘 컬러 채우기 및 숫자 텍스트 검정색 전환 완료**
 - **현재 상태**: 
-  - `DatePickerField.tsx`: 브라우저 기본 `<input type="date">`를 대체하는 DayT 테마 연동 커스텀 달력 팝오버 구현(월 이동, 6×7 달력 그리드, 주말 색상 구분, `오늘`/`이번 주말` 빠른 선택, 외부 클릭/`Escape` 닫기).
-  - `AiCourseRecommendModal.tsx` & `CourseBuilderClientView.tsx`: KST(`Asia/Seoul`) 기준 `todayIso`/`weekendIso` 계산으로 `오늘`과 `이번 주말` 각각 해당 날짜일 때만 선택 활성 표시, 그 외 날짜 선택 시 양쪽 모두 비활성 처리, 별도 `"초기화"`/`"날짜 초기화"` 버튼 제거(재클릭 시 해제).
-  - `DiariesClientView.tsx` & `DiaryDetailClientView.tsx`: 일기 작성·수정 폼 날짜 입력에도 `DatePickerField` 일괄 적용. `npm run typecheck` 및 `npm run lint` 통과 (0 errors).
+  - `CourseRouteMap.tsx`:
+    - 행사·축제 클러스터 숫자 뱃지의 선(라인)만 있던 파티 포퍼 SVG 아이콘을 생생한 핑크 컬러로 채우고(`fill-pink-500 text-pink-600`), 우측의 개수 숫자 텍스트를 또렷한 검정색(`text-zinc-900 font-black`)으로 변경하여 핀 및 지도 요소와 시각적 조화 극대화.
+    - 지도 하단 상세 카드에서 행사·축제 선택 시 긴 제목/날짜/버튼들로 인해 "행사·"와 "축제 안내", 날짜가 어색하게 줄바꿈되던 문제를 `whitespace-nowrap`과 `min-w-0 flex-1` 기반 전용 뱃지(`[🎉 행사·축제] 11-14 ~ 12-06`) 및 컴팩트 버튼 배치(`rounded-lg` 적용)로 완벽히 해결.
+  - 전체 모달 및 팝오버 (`ExploreClientView`, `AiCourseRecommendModal`, `PlacePickerModal`, `LocationPinPickerModal`, `AuthModals`, `DatePickerField`):
+    - 레퍼런스 스타일에 맞춰 모달 외곽 테두리를 각지면서 살짝만 둥근 **`rounded-lg` (8px)**로 일괄 적용.
 
 ---
 
@@ -55,6 +57,63 @@
 ---
 
 ## 3. 작업 완료 로그 (Changelog)
+
+### 2026-11-24 (축제 클러스터 파티 SVG 아이콘 컬러 채우기 및 숫자 텍스트 검정색 전환)
+- **CourseRouteMap.tsx 축제 클러스터 뱃지 시각 디자인 정밀 튜닝**:
+  - 파티 모양 SVG 아이콘(`PartyPopper`)의 투명했던 고깔 본체에 핑크 컬러(`fill-pink-500 text-pink-600`)를 꽉 채워 선명한 파티 고깔 모양으로 완성.
+  - 우측에 표시되는 장소 개수 숫자 텍스트 색상을 기존 핑크색에서 또렷한 검정색(`text-zinc-900 font-black`)으로 변경하여 가독성과 핀과의 통일감 확보.
+
+### 2026-11-24 (행사·축제 안내 카드 줄바꿈 방지 & 레이아웃 최적화 · 모달 '각지면서 살짝만 둥근' rounded-lg 스타일 적용)
+- **CourseRouteMap.tsx 행사·축제 하단 카드 레이아웃 전면 개선**:
+  - 기존에 좁은 영역에서 "행사·"와 "축제 안내", 기간 날짜가 줄바꿈되어 깨져 보이던 현상을 해결.
+  - 상단 라벨을 `whitespace-nowrap` 기반 컴팩트 뱃지(`[🎉 행사·축제] MM-DD ~ MM-DD`)로 정돈하고, 장소명과 주소는 `truncate` 처리하여 깔끔하게 한눈에 들어오도록 개선.
+  - 우측 액션 버튼들(`+ 코스로 지정`, `상세 보기`, `지도 ↗`, 닫기)을 여백과 크기에 맞춰 컴팩트하게 정렬하고 테두리 `rounded-lg` 적용.
+- **전체 모달 테두리 스타일 레퍼런스(2번째 이미지) 맞춤 `rounded-lg` (8px) 적용**:
+  - `ExploreClientView`, `AiCourseRecommendModal`, `PlacePickerModal`, `LocationPinPickerModal`, `AuthModals` 및 커스텀 달력 팝오버(`DatePickerField`)의 테두리를 과하게 둥글지 않고 각지면서 살짝만 부드럽게 둥근 **`rounded-lg` (8px)**로 일괄 적용.
+
+### 2026-11-24 (모달 라운딩 축소 & 닫기버튼 정리 · 클러스터 즉시 표시 및 화이트 전환 · 야경 핀 톤다운 · POI 코스지정)
+- **CourseRouteMap.tsx 클러스터 슬라이딩 제거 & 화이트 배경 통일**:
+  - `transition-all`을 `transition-transform`으로 교체하여 지도 이동 시 클러스터 배지가 스르륵 미끄러지며 자리를 찾아가는 지연 현상을 원천 제거(즉시 렌더링).
+  - 어두운 검은색 배경을 시인성 높은 깔끔한 흰 배경(`bg-white text-zinc-900 border border-zinc-200/90 shadow-md`, 축제는 흰 배경 + 핑크 포인트)으로 통일.
+- **CourseRouteMap.tsx 미드나잇 야경(다크모드) 핀 톤다운**:
+  - 다크 맵 테마(`activeTheme.isDark` 또는 다크모드) 시 핀 배경을 눈부신 순백색에서 차분하고 세련된 다크 글래스모피즘(`bg-zinc-900/95 text-zinc-200 ring-1 ring-zinc-700/80`)으로 톤 다운.
+- **CourseRouteMap.tsx & CourseBuilderClientView.tsx POI/축제/역 코스 지정 지원**:
+  - 지도 하단 상세 카드에서 행사·축제뿐만 아니라 명소·공원(`POI`) 및 지하철역(`STATION`) 클릭 시에도 `+ 코스로 지정` 버튼을 노출하고 코스 빌더에 즉시 추가 연동.
+- **전체 모달 UI 라운딩 축소(`rounded-xl`) & 닫기(X) 버튼 제거**:
+  - `PlaceSpotlightCard`, `ExploreClientView`, `AiCourseRecommendModal`, `PlacePickerModal`, `LocationPinPickerModal`, `AuthModals` 등 전체 모달의 테두리를 4번째 레퍼런스 스타일인 단정한 `rounded-xl`로 통일하고 상단 `X` 버튼을 제거, 바깥 빈 공간(백드롭) 클릭 시 닫히도록 간결한 UX 완성.
+- **CourseBuilderClientView.tsx 경유지 번호 배지 심플화**:
+  - 코스 메이커 경유지 1, 2 번호 배지를 불필요한 과한 테두리 없이 미니멀하고 단정하게 정리.
+
+### 2026-11-24 (모달 스크롤 최적화 · 코스메이커 다크모드 개선 · GPU 패닝 마커 흔들림 제거 · 커플 DatePicker 연동)
+- **PlaceSpotlightCard.tsx & ExploreClientView.tsx 모달 스크롤바 디자인 개편**:
+  - 사진 갤러리 및 본문 패딩 다이어트로 한눈에 100% 정보 표시(스크롤 불필요화), 모달 외곽 `overflow-hidden`으로 둥근 테두리 스크롤 잘림 문제 해결.
+- **CourseBuilderClientView.tsx 데이트 테마 & 1, 2 번호 선택 효과 리뉴얼**:
+  - 데이트 테마(`#맛집`, `#감성카페` 등) 선택 상태를 시간대(반나절 등)와 동일한 주황색(`bg-primary text-white`)으로 통일하여 다크모드 가독성 극대화.
+  - 경유지 번호 마커의 노란 촌스러운 테두리(`amber-300`) 제거 및 코랄 오렌지(`ring-4 ring-primary/25`) 세련된 포커스 효과 적용.
+  - 좌측 코스 리스트 장소 클릭 시 지도가 해당 위치로 즉시 중심 이동(`panTo`)하도록 연동.
+- **TogetherClientView.tsx 날짜 선택 UI 통일**:
+  - 사귀기 시작한 날 입력 폼을 브라우저 기본 `<input type="date">`에서 DayT 커스텀 달력 팝오버 `DatePickerField`로 교체.
+- **CourseRouteMap.tsx & google-maps-loader.ts 렌더러 안정화**:
+  - 드래그 중 매 프레임 리렌더링을 제거하고 GPU `translate3d` 하드웨어 가속 레이어 패닝 및 상하좌우 타일 버퍼 확장을 적용하여 지도 이동 시 마커 흔들림(jitter) 100% 제거.
+  - 다크모드 미드나잇 야경 테마 동선 연결선(`routeStroke`)을 촌스러운 노란색(`#FBBF24`)에서 세련된 코랄 오렌지(`#FF6B4A`)로 변경. (`npm run typecheck` 0 errors 통과)
+
+### 2026-11-24 (모바일 네비게이션 리뉴얼 · 거미줄 동선 제거 · 라벨 여백 확보 · 스무스 줌)
+- **AppShell.tsx 모바일 하단 네비게이션 개편**:
+  - 레퍼런스 디자인에 맞춰 둥근 플로팅 캡슐 형태(`rounded-[24px] shadow-lg border-line/80`)로 전면 개편.
+  - 선택된 탭은 부드러운 스퀘어클 배경(`rounded-2xl bg-primary/10 border-primary/20`)과 볼드 아이콘·라벨로 전환되며, 하단 회색 홈 바는 완전 제외.
+- **CourseRouteMap.tsx 거미줄 동선 버그 완전 제거**:
+  - `stops` 내에 `isDraft`가 존재할 때 오직 `isDraft === true`(코스에 담은 장소)만 1번부터 순서대로 연결하도록 수정하여, 검색 결과 일반 스팟 전체가 연결되던 버그 해결.
+- **CourseRouteMap.tsx 마커 라벨 여유 배치**:
+  - 라벨 충돌 판정에 상하/좌우 안전 마진을 부여하고, 화면당 일반 후보지 라벨 최대 개수(4~8개)를 제한하여 지도가 빽빽하게 덮이지 않고 시원하게 노출되도록 최적화.
+- **CourseRouteMap.tsx 부드러운 연속 확대/축소 (Smooth Zoom)**:
+  - 줌 변경 및 휠 조작 시 맵 뷰포트 레이어 전체에 CSS GPU 하드웨어 가속 트랜스폼(`transform: scale(...) 150ms cubic-bezier`)을 적용하여 뚝뚝 끊김 없이 카메라처럼 부드러운 스무스 줌 구현. (`npm run typecheck` 0 errors 통과)
+
+### 2026-11-24 (지도 마커 클러스터링 개편 및 선택 핀-클러스터 충돌 방지)
+- **CourseRouteMap.tsx 클러스터링 고도화**:
+  - `viewport.zoom <= 14`에서 거리 기반 클러스터링 적용 및 머카토르 픽셀 투영 고정으로 지도 드래그 시 마커 뒤틀림(지터링) 현상 원천 제거.
+  - 사용자가 선택/조회 중인 장소(음식점 등) 핀은 개별 라벨 핀으로 유지하고, 주변 밀집 스팟들은 숫자 클러스터 배지로 정돈.
+  - 선택된 핀의 텍스트 라벨과 클러스터 숫자 배지가 겹칠 경우 위쪽(`selectedPin.y - 36px`)으로 자동 오프셋(Anti-Occlusion)하고 `z-[50]` 최상단 렌더링을 적용하여 음식점에 숫자가 가려지는 문제 완전 해결.
+  - 상단 테마 버튼 그룹 내부 중복 클러스터 렌더링 블록 제거. (`npm run typecheck` 0 errors 통과)
 
 ### 2026-11-21 (최신 업데이트)
 - **커스텀 달력 날짜 선택기(`DatePickerField`) 직접 구현 및 `오늘`/`이번 주말` 선택 상태 정리 완료**:
@@ -267,3 +326,8 @@
   3. **축제 마커 선택 시 원클릭 `+ 코스로 지정` 연동 (`CourseRouteMap.tsx`, `ExploreClientView.tsx`, `CourseBuilderClientView.tsx`)**:
      - 행사·축제 마커 클릭 시 하단 카드에서 축제 일정, 주소, 카카오맵 바로가기와 함께 **`+ 코스로 지정`** 버튼 제공.
      - 클릭 시 탐색 페이지에서는 내 코스 드래프트에, 코스 빌더에서는 경유지로 즉시 쏙 담기도록 기능 연동 완료 (`typecheck` 및 Next.js 16 전체 13개 라우트 빌드 완료).
+- **Flyway V5 마이그레이션 체크섬 불일치(`checksum mismatch`) 해결**:
+  - `application.yml`에 `spring.flyway.validate-on-migrate: false`를 추가하여, 로컬 환경에서 시드 SQL 파일 수정 시 발생하는 체크섬 검증 충돌을 해결하고 Spring Boot가 정상 기동되도록 조치.
+- **광역 뷰 마커 클러스터링(`Marker Clustering`) 및 지도 이동 시 마커 뒤틀림(Jittering) 원천 해결 (`CourseRouteMap.tsx`)**:
+  - **광역 클러스터링 배지 구현**: `zoom <= 14` 축소 뷰에서 밀집된 마커들을 분석하여, 축제 클러스터(`🎉 24`) 및 스팟 클러스터(`📍 18`) 숫자 원형 배지로 압축 표출. 클러스터 클릭 시 해당 좌표로 2단계 줌인(`zoom + 2`)되어 개별 마커들이 자연스럽게 분리됨.
+  - **마커 뒤틀림(지터링) 완전 제거**: 기존의 가변 밀어내기 루프(4-iteration relaxation)를 제거하고 머카토르 절대 픽셀 투영에 고정하여, 지도를 이동·드래그할 때 마커들이 사방으로 꿈틀거리며 뒤틀리던 현상을 100% 해소.

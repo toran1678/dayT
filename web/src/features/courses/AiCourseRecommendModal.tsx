@@ -251,11 +251,11 @@ export function AiCourseRecommendModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+        <div className="border-b border-line px-6 py-4">
           <div>
             <h2 className="text-base font-black text-foreground">
               맞춤 데이트 코스 설계
@@ -264,15 +264,6 @@ export function AiCourseRecommendModal({
               지역, 예산, 테마에 맞춰 최적의 동선을 구성합니다.
             </p>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            className="rounded-full p-2 text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
 
         {/* Scrollable Body */}
@@ -381,11 +372,10 @@ export function AiCourseRecommendModal({
                             setSelectedPoint(null);
                             setIsSearchHintOpen(false);
                           }}
-                          className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
-                            isFocused
+                          className={`w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${isFocused
                               ? "bg-primary-soft text-primary font-black"
                               : "text-foreground hover:bg-surface-subtle"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <span
@@ -440,11 +430,10 @@ export function AiCourseRecommendModal({
                     setSelectedPoint(null);
                     setIsSearchHintOpen(false);
                   }}
-                  className={`rounded-full px-3 py-1 text-xs font-bold ${
-                    regionKeyword === chip && !selectedPoint
+                  className={`rounded-full px-3 py-1 text-xs font-bold ${regionKeyword === chip && !selectedPoint
                       ? "bg-surface-dark text-white"
                       : "border border-line bg-background text-muted hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   {chip}
                 </button>
@@ -500,11 +489,10 @@ export function AiCourseRecommendModal({
                   key={item.km}
                   type="button"
                   onClick={() => setRadiusKm(item.km)}
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
-                    radiusKm === item.km
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-colors ${radiusKm === item.km
                       ? "border border-primary bg-primary text-white"
                       : "border border-line bg-surface text-muted hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   {item.label}
                 </button>
@@ -536,11 +524,10 @@ export function AiCourseRecommendModal({
                           prev === todayIso ? "" : todayIso,
                         )
                       }
-                      className={`rounded-full border border-solid px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
-                        isTodaySelected
+                      className={`rounded-full border border-solid px-2.5 py-0.5 text-[11px] font-bold transition-colors ${isTodaySelected
                           ? "border-primary bg-primary text-white"
                           : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
-                      }`}
+                        }`}
                     >
                       오늘
                     </button>
@@ -551,11 +538,10 @@ export function AiCourseRecommendModal({
                           prev === weekendIso ? "" : weekendIso,
                         )
                       }
-                      className={`rounded-full border border-solid px-2.5 py-0.5 text-[11px] font-bold transition-colors ${
-                        isWeekendSelected
+                      className={`rounded-full border border-solid px-2.5 py-0.5 text-[11px] font-bold transition-colors ${isWeekendSelected
                           ? "border-primary bg-primary text-white"
                           : "border-line bg-surface text-muted hover:border-foreground/30 hover:text-foreground"
-                      }`}
+                        }`}
                     >
                       이번 주말
                     </button>
@@ -592,11 +578,10 @@ export function AiCourseRecommendModal({
                       key={theme}
                       type="button"
                       onClick={() => toggleTheme(theme)}
-                      className={`inline-flex items-center gap-1.5 rounded-full border border-solid px-3 py-1.5 text-xs font-bold transition-colors ${
-                        active
+                      className={`inline-flex items-center gap-1.5 rounded-full border border-solid px-3 py-1.5 text-xs font-bold transition-colors ${active
                           ? "border-primary bg-primary text-white"
                           : "border-line bg-background text-muted hover:border-foreground/30 hover:text-foreground"
-                      }`}
+                        }`}
                     >
                       <ThemeIcon className="h-3.5 w-3.5 shrink-0" />
                       <span>{theme}</span>
@@ -616,11 +601,10 @@ export function AiCourseRecommendModal({
                     key={slot.code}
                     type="button"
                     onClick={() => setTimeSlot(slot.code)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
-                      timeSlot === slot.code
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${timeSlot === slot.code
                         ? "border border-surface-dark bg-surface-dark text-white"
                         : "border border-line bg-background text-muted hover:text-foreground"
-                    }`}
+                      }`}
                   >
                     {slot.label}
                   </button>
@@ -642,11 +626,10 @@ export function AiCourseRecommendModal({
                     key={food}
                     type="button"
                     onClick={() => toggleFood(food)}
-                    className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${
-                      active
+                    className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${active
                         ? "border border-surface-dark bg-surface-dark text-white"
                         : "border border-line bg-background text-muted hover:text-foreground"
-                    }`}
+                      }`}
                   >
                     {food}
                   </button>
@@ -669,11 +652,10 @@ export function AiCourseRecommendModal({
                 <button
                   type="button"
                   onClick={() => setIsUnlimitedBudget((prev) => !prev)}
-                  className={`inline-flex items-center rounded-lg border border-solid px-2.5 py-1 text-xs font-bold transition-colors ${
-                    isUnlimitedBudget
+                  className={`inline-flex items-center rounded-lg border border-solid px-2.5 py-1 text-xs font-bold transition-colors ${isUnlimitedBudget
                       ? "border-primary bg-primary text-white"
                       : "border-line bg-surface text-muted hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   <span>예산 무관</span>
                 </button>
@@ -682,8 +664,8 @@ export function AiCourseRecommendModal({
                   {isUnlimitedBudget
                     ? "1인 예산 무관 (분위기·인기 중심)"
                     : `1인 하루 ${sliderBudget.toLocaleString()}원 (2인 ${(
-                        sliderBudget * 2
-                      ).toLocaleString()}원)`}
+                      sliderBudget * 2
+                    ).toLocaleString()}원)`}
                 </span>
               </div>
             </div>
@@ -700,9 +682,8 @@ export function AiCourseRecommendModal({
                   setSliderBudget(Number(e.target.value));
                   setIsUnlimitedBudget(false);
                 }}
-                className={`h-2 w-full cursor-pointer accent-primary ${
-                  isUnlimitedBudget ? "opacity-50" : "opacity-100"
-                }`}
+                className={`h-2 w-full cursor-pointer accent-primary ${isUnlimitedBudget ? "opacity-50" : "opacity-100"
+                  }`}
               />
               <div className="mt-1.5 flex justify-between text-[11px] font-bold text-muted">
                 <span>10,000원</span>
@@ -724,11 +705,10 @@ export function AiCourseRecommendModal({
                     key={mood}
                     type="button"
                     onClick={() => toggleMood(mood)}
-                    className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${
-                      active
+                    className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${active
                         ? "border border-foreground bg-surface-subtle text-foreground"
                         : "border border-line bg-background text-muted hover:text-foreground"
-                    }`}
+                      }`}
                   >
                     #{mood}
                   </button>

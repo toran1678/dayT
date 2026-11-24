@@ -140,17 +140,8 @@ function LoginDialog({ onClose }: { onClose: () => void }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-2xl sm:p-7"
+        className="relative w-full max-w-md rounded-lg border border-line bg-surface p-6 shadow-2xl sm:p-7"
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="닫기"
-          className="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
-        >
-          <X className="h-4 w-4" />
-        </button>
-
         <h2
           id="dayt-login-title"
           className="text-2xl font-black tracking-tight text-foreground"
@@ -286,18 +277,9 @@ function ProfileDialog({ onClose }: { onClose: () => void }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-2xl sm:p-7"
+        className="relative w-full max-w-md rounded-lg border border-line bg-surface p-6 shadow-2xl sm:p-7"
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="닫기"
-          className="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
-        >
-          <X className="h-4 w-4" />
-        </button>
-
-        <div className="pr-8">
+        <div>
           <div className="flex items-center gap-2">
             <h2
               id="dayt-profile-title"

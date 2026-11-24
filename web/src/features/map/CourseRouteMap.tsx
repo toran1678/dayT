@@ -478,6 +478,13 @@ export function CourseRouteMap({
 
   const [currentViewport, setCurrentViewport] =
     useState<MapViewportState>(defaultAnchorCenter);
+  const [zoomAnimScale, setZoomAnimScale] = useState<number>(1);
+  const zoomAnimTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [dragPanOffset, setDragPanOffset] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
+  const dragTotalOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [settledCenter, setSettledCenter] = useState<{
     lat: number;
     lng: number;
@@ -520,18 +527,46 @@ export function CourseRouteMap({
     [],
   );
 
-  const activeFocusedViewport = useMemo<MapViewportState | null>(() => {
-    if (activeOrder === null) return null;
-    const target = stops.find((s) => s.order === activeOrder);
-    if (!target) return null;
-    return {
-      centerLat: target.latitude,
-      centerLng: target.longitude,
-      zoom: Math.max(currentViewport.zoom, 16),
-    };
-  }, [activeOrder, stops, currentViewport.zoom]);
+  const prevActiveOrderRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (activeOrder !== null && activeOrder !== prevActiveOrderRef.current) {
+      prevActiveOrderRef.current = activeOrder;
+      const target = stops.find((s) => s.order === activeOrder);
+      if (target) {
+        commitViewport(
+          {
+            centerLat: target.latitude,
+            centerLng: target.longitude,
+            zoom: Math.max(currentViewport.zoom, 16),
+          },
+          true,
+        );
+      }
+    }
+  }, [activeOrder, stops, currentViewport.zoom, commitViewport]);
 
-  const viewport: MapViewportState = activeFocusedViewport ?? currentViewport;
+  const prevSelectedStopIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (
+      externalSelectedStopId !== null &&
+      externalSelectedStopId !== prevSelectedStopIdRef.current
+    ) {
+      prevSelectedStopIdRef.current = externalSelectedStopId;
+      const target = stops.find((s) => s.id === externalSelectedStopId);
+      if (target) {
+        commitViewport(
+          {
+            centerLat: target.latitude,
+            centerLng: target.longitude,
+            zoom: Math.max(currentViewport.zoom, 16),
+          },
+          true,
+        );
+      }
+    }
+  }, [externalSelectedStopId, stops, currentViewport.zoom, commitViewport]);
+
+  const viewport: MapViewportState = currentViewport;
 
   // Google Maps JS API state
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -556,6 +591,37 @@ export function CourseRouteMap({
   useEffect(() => {
     onSelectStopRef.current = onSelectStop;
   }, [onSelectStop]);
+
+  const handleZoomDelta = useCallback((delta: 1 | -1) => {
+    if (mapMode === "google" && mapInstanceRef.current) {
+      const cur = mapInstanceRef.current.getZoom() ?? 15;
+      const next = clampZoom(cur + delta);
+      mapInstanceRef.current.setZoom(next);
+      setGoogleView((prev) => ({ ...prev, zoom: next }));
+      return;
+    }
+
+    const cur = viewportRef.current;
+    const nextZoom = clampZoom(cur.zoom + delta);
+    if (nextZoom === cur.zoom) return;
+
+    if (zoomAnimTimeoutRef.current) {
+      clearTimeout(zoomAnimTimeoutRef.current);
+    }
+
+    // Step 1: Smooth camera lens scale animation
+    setZoomAnimScale(delta > 0 ? 1.25 : 0.8);
+
+    // Step 2: Settle to exact new integer zoom with sharp new tiles after visual transition
+    zoomAnimTimeoutRef.current = setTimeout(() => {
+      setZoomAnimScale(1);
+      commitViewport({
+        centerLat: cur.centerLat,
+        centerLng: cur.centerLng,
+        zoom: nextZoom,
+      }, true);
+    }, 150);
+  }, [mapMode, commitViewport]);
 
   // Active viewport center (works across both Tile and Google Maps modes)
   const activeCenter = useMemo(() => {
@@ -746,19 +812,11 @@ export function CourseRouteMap({
     function onWheel(e: WheelEvent) {
       e.preventDefault();
       const now = Date.now();
-      if (now - lastWheelAt < 110) return;
+      if (now - lastWheelAt < 160) return;
       lastWheelAt = now;
 
-      const cur = viewportRef.current;
-      const delta = e.deltaY < 0 ? 1 : -1;
-      const nextZoom = clampZoom(cur.zoom + delta);
-      if (nextZoom !== cur.zoom) {
-        commitViewport({
-          centerLat: cur.centerLat,
-          centerLng: cur.centerLng,
-          zoom: nextZoom,
-        }, true);
-      }
+      const delta: 1 | -1 = e.deltaY < 0 ? 1 : -1;
+      handleZoomDelta(delta);
     }
 
     node.addEventListener("wheel", onWheel, { passive: false });
@@ -782,6 +840,8 @@ export function CourseRouteMap({
       return;
     }
     e.currentTarget.setPointerCapture(e.pointerId);
+    dragTotalOffsetRef.current = { x: 0, y: 0 };
+    setDragPanOffset({ x: 0, y: 0 });
     dragStateRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
@@ -808,7 +868,13 @@ export function CourseRouteMap({
     if (dx !== 0 || dy !== 0) {
       st.lastX = e.clientX;
       st.lastY = e.clientY;
-      commitViewport(panViewportByPixels(viewportRef.current, dx, dy));
+      dragTotalOffsetRef.current.x += dx;
+      dragTotalOffsetRef.current.y += dy;
+      // GPU translate3d layer panning - guarantees 0 jittering during drag
+      setDragPanOffset({
+        x: dragTotalOffsetRef.current.x,
+        y: dragTotalOffsetRef.current.y,
+      });
     }
   }
 
@@ -818,13 +884,18 @@ export function CourseRouteMap({
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
+    const totalDx = dragTotalOffsetRef.current.x;
+    const totalDy = dragTotalOffsetRef.current.y;
     dragStateRef.current = null;
+    dragTotalOffsetRef.current = { x: 0, y: 0 };
+    setDragPanOffset({ x: 0, y: 0 });
     setIsDragging(false);
-    const finalVp = viewportRef.current;
-    setSettledCenter({
-      lat: finalVp.centerLat,
-      lng: finalVp.centerLng,
-    });
+
+    // Commit final settled viewport only on drag release
+    if (totalDx !== 0 || totalDy !== 0) {
+      const finalVp = panViewportByPixels(viewportRef.current, totalDx, totalDy);
+      commitViewport(finalVp, true);
+    }
   }
 
   // Google Maps Effect 1: Stops & Route Polyline (only fits bounds when stops/route change)
@@ -1234,31 +1305,48 @@ export function CourseRouteMap({
 
   // Unified pixel projection, de-stacking, and priority-ordered directional label collision resolution
   // Priority: selected/draft -> stations (1) -> landmarks/parks (2) -> parkings (3) -> festivals (4) -> regular spots (5)
-  const projectedPins = useMemo(() => {
+  interface ProjectedPin {
+    markerKey: string;
+    kind: "STATION" | "POI" | "FESTIVAL" | "STOP";
+    priorityGroup: 1 | 2 | 3 | 4 | 5;
+    orderIndex: number;
+    name: string;
+    title: string;
+    iconColor: string;
+    iconType: "STATION" | "PARK" | "LANDMARK" | "PARKING" | "STOP";
+    stop?: RouteMapStop;
+    station?: SubwayStationPoi;
+    poi?: SurroundingPoi;
+    latitude: number;
+    longitude: number;
+    rawX: number;
+    rawY: number;
+    x: number;
+    y: number;
+    isOffset: boolean;
+    inViewport: boolean;
+    isSelected: boolean;
+    isDraft: boolean;
+    baseShowFullLabel: boolean;
+    preferredDir: "right" | "left";
+  }
+
+  interface ProjectedCluster {
+    clusterKey: string;
+    latitude: number;
+    longitude: number;
+    x: number;
+    y: number;
+    totalCount: number;
+    festivalCount: number;
+    stopCount: number;
+    isMainlyFestival: boolean;
+    hasSelected: boolean;
+    title: string;
+  }
+
+  const { visiblePins: projectedPins, clusters: projectedClusters } = useMemo(() => {
     type Box2D = { left: number; right: number; top: number; bottom: number };
-    type ProjectedPin = {
-      markerKey: string;
-      kind: "STATION" | "POI" | "FESTIVAL" | "STOP";
-      priorityGroup: 1 | 2 | 3 | 4 | 5;
-      orderIndex: number;
-      name: string;
-      title: string;
-      iconColor: string;
-      iconType: "STATION" | "PARK" | "LANDMARK" | "PARKING" | "STOP";
-      stop?: RouteMapStop;
-      station?: SubwayStationPoi;
-      poi?: SurroundingPoi;
-      rawX: number;
-      rawY: number;
-      x: number;
-      y: number;
-      isOffset: boolean;
-      inViewport: boolean;
-      isSelected: boolean;
-      isDraft: boolean;
-      baseShowFullLabel: boolean;
-      preferredDir: "right" | "left";
-    };
 
     const isPointInViewport = (px: number, py: number) =>
       px >= -80 &&
@@ -1289,6 +1377,8 @@ export function CourseRouteMap({
           iconColor: st.lines[0]?.color ?? "#0284C7",
           iconType: "STATION",
           station: st,
+          latitude: st.latitude,
+          longitude: st.longitude,
           rawX: px.x,
           rawY: px.y,
           x: px.x,
@@ -1323,6 +1413,8 @@ export function CourseRouteMap({
           iconColor: lm.kind === "PARK" ? "#059669" : "#0D9488",
           iconType: lm.kind === "PARK" ? "PARK" : "LANDMARK",
           poi: lm,
+          latitude: lm.latitude,
+          longitude: lm.longitude,
           rawX: px.x,
           rawY: px.y,
           x: px.x,
@@ -1357,6 +1449,8 @@ export function CourseRouteMap({
           iconColor: "#2563EB",
           iconType: "PARKING",
           poi: pk,
+          latitude: pk.latitude,
+          longitude: pk.longitude,
           rawX: px.x,
           rawY: px.y,
           x: px.x,
@@ -1394,6 +1488,8 @@ export function CourseRouteMap({
           iconColor: "#DB2777",
           iconType: "STOP",
           stop: fest,
+          latitude: fest.latitude,
+          longitude: fest.longitude,
           rawX: px.x,
           rawY: px.y,
           x: px.x,
@@ -1439,6 +1535,8 @@ export function CourseRouteMap({
         iconColor: visual.color,
         iconType: "STOP",
         stop,
+        latitude: stop.latitude,
+        longitude: stop.longitude,
         rawX: px.x,
         rawY: px.y,
         x: px.x,
@@ -1452,81 +1550,147 @@ export function CourseRouteMap({
       });
     }
 
-    const visibleIndices: number[] = [];
-    for (let idx = 0; idx < allPins.length; idx++) {
-      if (allPins[idx].inViewport) {
-        visibleIndices.push(idx);
+    // Step 1: Distance-based Marker Clustering for Zoom <= 14 (Prevents visual clutter when zoomed out)
+    const shouldCluster = viewport.zoom <= 14;
+    const finalClusters: ProjectedCluster[] = [];
+    let unclusteredPins: ProjectedPin[] = [];
+
+    if (shouldCluster) {
+      const CLUSTER_PX_DIST = viewport.zoom <= 12 ? 65 : 50;
+      const visited = new Set<string>();
+      const candidatePins = allPins.filter((p) => p.inViewport);
+
+      // Separate draft route pins and actively selected pins so user can always see active spots clearly
+      for (const p of candidatePins) {
+        if (p.isDraft || p.isSelected) {
+          unclusteredPins.push(p);
+          visited.add(p.markerKey);
+        }
       }
-    }
 
-    // Step 1: De-stack overlapping / near-coincident visible icons
-    const MIN_ICON_DIST = 30;
-    const MAX_OFFSET = 36;
-    for (let iter = 0; iter < 4; iter++) {
-      for (let aPos = 0; aPos < visibleIndices.length; aPos++) {
-        const i = visibleIndices[aPos];
-        for (let bPos = aPos + 1; bPos < visibleIndices.length; bPos++) {
-          const j = visibleIndices[bPos];
-          const pinA = allPins[i];
-          const pinB = allPins[j];
-          let dx = pinB.x - pinA.x;
-          let dy = pinB.y - pinA.y;
-          let dist = Math.hypot(dx, dy);
-          if (dist < MIN_ICON_DIST) {
-            if (dist < 0.5) {
-              const angle =
-                (aPos * 2.39996 + bPos * 1.0472) % (Math.PI * 2);
-              dx = Math.cos(angle);
-              dy = Math.sin(angle);
-              dist = 1;
-            } else {
-              dx /= dist;
-              dy /= dist;
-            }
-            const push = (MIN_ICON_DIST - dist) * 0.5;
-            pinA.x -= dx * push;
-            pinA.y -= dy * push;
-            pinB.x += dx * push;
-            pinB.y += dy * push;
+      for (let i = 0; i < candidatePins.length; i++) {
+        const pinA = candidatePins[i];
+        if (visited.has(pinA.markerKey)) continue;
 
-            for (const p of [pinA, pinB]) {
-              const ox = p.x - p.rawX;
-              const oy = p.y - p.rawY;
-              const oDist = Math.hypot(ox, oy);
-              if (oDist > MAX_OFFSET) {
-                p.x = p.rawX + (ox / oDist) * MAX_OFFSET;
-                p.y = p.rawY + (oy / oDist) * MAX_OFFSET;
+        const clusterGroup: ProjectedPin[] = [pinA];
+        visited.add(pinA.markerKey);
+
+        for (let j = i + 1; j < candidatePins.length; j++) {
+          const pinB = candidatePins[j];
+          if (visited.has(pinB.markerKey)) continue;
+
+          const dist = Math.hypot(pinB.x - pinA.x, pinB.y - pinA.y);
+          if (dist <= CLUSTER_PX_DIST) {
+            clusterGroup.push(pinB);
+            visited.add(pinB.markerKey);
+          }
+        }
+
+        if (clusterGroup.length >= 2) {
+          const avgLat =
+            clusterGroup.reduce((sum, p) => sum + p.latitude, 0) /
+            clusterGroup.length;
+          const avgLng =
+            clusterGroup.reduce((sum, p) => sum + p.longitude, 0) /
+            clusterGroup.length;
+          const clusterPx = latLngToContainerPx(
+            avgLat,
+            avgLng,
+            viewport,
+            containerSize.width,
+            containerSize.height,
+          );
+
+          // Anti-Occlusion: If cluster badge overlaps with an active selected pin's label, offset it above the pin
+          let clusterX = clusterPx.x;
+          let clusterY = clusterPx.y;
+          const selectedPin = unclusteredPins.find((p) => p.isSelected);
+          if (selectedPin) {
+            const dx = Math.abs(clusterX - selectedPin.x);
+            const dy = Math.abs(clusterY - selectedPin.y);
+            // Selected pin has an icon + horizontal label (~130px width, ~30px height)
+            if (dx < 70 && dy < 32) {
+              if (selectedPin.y - 36 > 30) {
+                clusterY = selectedPin.y - 36;
+              } else {
+                clusterY = selectedPin.y + 36;
               }
             }
           }
+
+          const festivalCount = clusterGroup.filter(
+            (p) => p.kind === "FESTIVAL" || p.stop?.categoryLabel.includes("축제"),
+          ).length;
+          const stopCount = clusterGroup.length - festivalCount;
+          const isMainlyFestival = festivalCount > stopCount;
+
+          finalClusters.push({
+            clusterKey: `cluster:${Math.round(avgLat * 1000)}:${Math.round(avgLng * 1000)}:${clusterGroup.length}`,
+            latitude: avgLat,
+            longitude: avgLng,
+            x: clusterX,
+            y: clusterY,
+            totalCount: clusterGroup.length,
+            festivalCount,
+            stopCount,
+            isMainlyFestival,
+            hasSelected: false,
+            title: isMainlyFestival
+              ? `행사·축제 ${festivalCount}곳`
+              : `주변 장소 ${clusterGroup.length}곳 (클릭하여 확대)`,
+          });
+        } else {
+          unclusteredPins.push(pinA);
+        }
+      }
+    } else {
+      unclusteredPins = allPins.filter((p) => p.inViewport);
+
+      // Micro de-collision for identically overlapping coordinates (only if distance < 3px)
+      // Uses deterministic index offset instead of volatile iterative relaxation to PREVENT JITTER
+      for (let i = 0; i < unclusteredPins.length; i++) {
+        const pA = unclusteredPins[i];
+        let overlapCount = 0;
+        for (let j = 0; j < i; j++) {
+          const pB = unclusteredPins[j];
+          if (Math.hypot(pA.rawX - pB.rawX, pA.rawY - pB.rawY) < 3) {
+            overlapCount++;
+          }
+        }
+        if (overlapCount > 0) {
+          const angle = (overlapCount * 2.39996) % (Math.PI * 2);
+          const offset = Math.min(18, overlapCount * 12);
+          pA.x = pA.rawX + Math.cos(angle) * offset;
+          pA.y = pA.rawY + Math.sin(angle) * offset;
+          pA.isOffset = true;
+        } else {
+          pA.x = pA.rawX;
+          pA.y = pA.rawY;
+          pA.isOffset = false;
         }
       }
     }
 
-    for (const idx of visibleIndices) {
-      const p = allPins[idx];
-      p.isOffset = Math.hypot(p.x - p.rawX, p.y - p.rawY) >= 10;
-    }
+    // Step 2: Icon-anchored directional label collision detection (Only enabled at zoom >= 14)
+    // Add safety margins so labels don't suffocate each other with tight overlaps
+    const SAFETY_MARGIN_X = 14;
+    const SAFETY_MARGIN_Y = 6;
 
-    // Step 2: Icon-anchored directional label collision detection
     const boxesOverlap = (a: Box2D, b: Box2D) =>
-      a.left < b.right &&
-      a.right > b.left &&
-      a.top < b.bottom &&
-      a.bottom > b.top;
+      a.left - SAFETY_MARGIN_X < b.right &&
+      a.right + SAFETY_MARGIN_X > b.left &&
+      a.top - SAFETY_MARGIN_Y < b.bottom &&
+      a.bottom + SAFETY_MARGIN_Y > b.top;
 
-    const iconBoxes = visibleIndices.map((idx) => {
-      const p = allPins[idx];
-      return {
-        pinIdx: idx,
-        box: {
-          left: p.x - 15,
-          right: p.x + 15,
-          top: p.y - 15,
-          bottom: p.y + 15,
-        } satisfies Box2D,
-      };
-    });
+    const iconBoxes = unclusteredPins.map((p, idx) => ({
+      pinIdx: idx,
+      box: {
+        left: p.x - 15,
+        right: p.x + 15,
+        top: p.y - 15,
+        bottom: p.y + 15,
+      } satisfies Box2D,
+    }));
 
     const estimatePillWidth = (pin: ProjectedPin) => {
       let textPx = 0;
@@ -1541,9 +1705,9 @@ export function CourseRouteMap({
       return Math.round(42 + textPx + draftPx);
     };
 
-    const prioritizedIndices = [...visibleIndices].sort((ia, ib) => {
-      const a = allPins[ia];
-      const b = allPins[ib];
+    const prioritizedIndices = unclusteredPins.map((_, i) => i).sort((ia, ib) => {
+      const a = unclusteredPins[ia];
+      const b = unclusteredPins[ib];
       if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
       if (a.isDraft !== b.isDraft) return a.isDraft ? -1 : 1;
       if (a.priorityGroup !== b.priorityGroup) {
@@ -1554,8 +1718,14 @@ export function CourseRouteMap({
 
     const occupiedPillBoxes: Box2D[] = [];
 
+    // Cap maximum expanded candidate labels per screen to keep map spacious and airy
+    // Selected spots and user draft spots are ALWAYS prioritized!
+    const MAX_GENERAL_LABELS =
+      viewport.zoom >= 17 ? 8 : viewport.zoom >= 15 ? 6 : 4;
+    let generalLabelCount = 0;
+
     for (const idx of prioritizedIndices) {
-      const pin = allPins[idx];
+      const pin = unclusteredPins[idx];
       const pillWidth = estimatePillWidth(pin);
       const rightBox: Box2D = {
         left: pin.x - 14,
@@ -1600,14 +1770,43 @@ export function CourseRouteMap({
         continue;
       }
 
+      // In overview zoom (zoom <= 13), keep pins compact without sprawling labels
+      if (viewport.zoom <= 13) {
+        pin.baseShowFullLabel = false;
+        continue;
+      }
+
+      // Draft route pins get high priority to show their name
+      if (pin.isDraft) {
+        if (rightIconHits === 0 && rightPillHits === 0 && rightClip === 0) {
+          pin.baseShowFullLabel = true;
+          pin.preferredDir = "right";
+          occupiedPillBoxes.push(rightBox);
+          continue;
+        } else if (leftIconHits === 0 && leftPillHits === 0 && leftClip === 0) {
+          pin.baseShowFullLabel = true;
+          pin.preferredDir = "left";
+          occupiedPillBoxes.push(leftBox);
+          continue;
+        }
+      }
+
+      // For general candidate spots, enforce quota so labels remain spacious and readable
+      if (generalLabelCount >= MAX_GENERAL_LABELS) {
+        pin.baseShowFullLabel = false;
+        continue;
+      }
+
       if (rightIconHits === 0 && rightPillHits === 0 && rightClip === 0) {
         pin.baseShowFullLabel = true;
         pin.preferredDir = "right";
         occupiedPillBoxes.push(rightBox);
+        generalLabelCount++;
       } else if (leftIconHits === 0 && leftPillHits === 0 && leftClip === 0) {
         pin.baseShowFullLabel = true;
         pin.preferredDir = "left";
         occupiedPillBoxes.push(leftBox);
+        generalLabelCount++;
       } else {
         pin.baseShowFullLabel = false;
         const rightScore = rightIconHits + rightClip * 0.5;
@@ -1616,7 +1815,7 @@ export function CourseRouteMap({
       }
     }
 
-    return allPins;
+    return { visiblePins: unclusteredPins, clusters: finalClusters };
   }, [
     stops,
     festivalStops,
@@ -1637,28 +1836,27 @@ export function CourseRouteMap({
     selectedFestivalId,
   ]);
 
-  const projectedStops = useMemo(
-    () =>
-      projectedPins.filter(
-        (pin): pin is (typeof projectedPins)[number] & { stop: RouteMapStop } =>
-          pin.kind === "STOP" && Boolean(pin.stop),
-      ),
-    [projectedPins],
-  );
-
   const projectedPolylines = useMemo(() => {
     if (!connectRoute) return [];
-    // Only connect stops that the user has explicitly drafted into the course,
-    // or fall back to connecting all stops in sequence if no draft flags exist (e.g. course maker/viewer)
-    const draftedStops = projectedStops.filter((p) => p.stop.isDraft);
-    const candidateToConnect =
-      draftedStops.length >= 2
-        ? draftedStops
-        : projectedStops.length >= 2
-          ? projectedStops
-          : [];
 
-    if (candidateToConnect.length < 2) return [];
+    // CRITICAL FIX: If there are draft stops (e.g. user selected spots in Explore view),
+    // ONLY connect stops that are explicitly drafted (isDraft === true).
+    // NEVER fall back to connecting all candidate preview spots into a web!
+    const hasAnyDraft = stops.some((s) => s.isDraft);
+
+    let stopsToConnect: RouteMapStop[] = [];
+
+    if (hasAnyDraft) {
+      stopsToConnect = stops
+        .filter((s) => s.isDraft)
+        .sort((a, b) => a.order - b.order);
+      // Require at least 2 drafted spots to draw any walking line
+      if (stopsToConnect.length < 2) return [];
+    } else {
+      // In dedicated course views (maker / viewer) where all stops are parts of the course
+      stopsToConnect = [...stops].sort((a, b) => a.order - b.order);
+      if (stopsToConnect.length < 2) return [];
+    }
 
     const segs: {
       key: string;
@@ -1673,31 +1871,52 @@ export function CourseRouteMap({
       distanceLabel: string;
     }[] = [];
 
-    for (let i = 0; i < candidateToConnect.length - 1; i++) {
-      const a = candidateToConnect[i];
-      const b = candidateToConnect[i + 1];
-      const walk = estimateWalkingRoute(
-        a.stop.latitude,
-        a.stop.longitude,
-        b.stop.latitude,
-        b.stop.longitude,
+    for (let i = 0; i < stopsToConnect.length - 1; i++) {
+      const a = stopsToConnect[i];
+      const b = stopsToConnect[i + 1];
+      const aPx = latLngToContainerPx(
+        a.latitude,
+        a.longitude,
+        viewport,
+        containerSize.width,
+        containerSize.height,
       );
-      const pixelLen = Math.hypot(b.x - a.x, b.y - a.y);
+      const bPx = latLngToContainerPx(
+        b.latitude,
+        b.longitude,
+        viewport,
+        containerSize.width,
+        containerSize.height,
+      );
+
+      const walk = estimateWalkingRoute(
+        a.latitude,
+        a.longitude,
+        b.latitude,
+        b.longitude,
+      );
+      const pixelLen = Math.hypot(bPx.x - aPx.x, bPx.y - aPx.y);
       segs.push({
-        key: `${a.stop.id}-${b.stop.id}-${i}`,
-        x1: a.x,
-        y1: a.y,
-        x2: b.x,
-        y2: b.y,
-        midX: (a.x + b.x) / 2,
-        midY: (a.y + b.y) / 2,
+        key: `${a.id}-${b.id}-${i}`,
+        x1: aPx.x,
+        y1: aPx.y,
+        x2: bPx.x,
+        y2: bPx.y,
+        midX: (aPx.x + bPx.x) / 2,
+        midY: (aPx.y + bPx.y) / 2,
         pixelLen,
         minutes: walk.walkingMinutes,
         distanceLabel: formatDistanceKo(walk.walkingMeters),
       });
     }
     return segs;
-  }, [connectRoute, projectedStops]);
+  }, [
+    connectRoute,
+    stops,
+    viewport,
+    containerSize.width,
+    containerSize.height,
+  ]);
 
   const stationToFirstStopGuide = useMemo(() => {
     if (selectedContext?.type !== "STATION" || stops.length === 0) return null;
@@ -1746,21 +1965,6 @@ export function CourseRouteMap({
     () => computeMetricScaleBar(activeCenter.lat, currentZoom),
     [activeCenter.lat, currentZoom],
   );
-
-  function handleZoomDelta(delta: 1 | -1) {
-    if (mapMode === "google" && mapInstanceRef.current) {
-      const cur = mapInstanceRef.current.getZoom() ?? 15;
-      const next = clampZoom(cur + delta);
-      mapInstanceRef.current.setZoom(next);
-      setGoogleView((prev) => ({ ...prev, zoom: next }));
-      return;
-    }
-    commitViewport({
-      centerLat: viewport.centerLat,
-      centerLng: viewport.centerLng,
-      zoom: clampZoom(viewport.zoom + delta),
-    }, true);
-  }
 
   function handleResetFit() {
     setSelectedContext(null);
@@ -1867,11 +2071,11 @@ export function CourseRouteMap({
     const walkBaseMinutes =
       stops.length > 0 && !hasMovedFromSearchOrigin
         ? estimateWalkingRoute(
-            st.latitude,
-            st.longitude,
-            stops[0].latitude,
-            stops[0].longitude,
-          ).walkingMinutes
+          st.latitude,
+          st.longitude,
+          stops[0].latitude,
+          stops[0].longitude,
+        ).walkingMinutes
         : Math.max(1, Math.round((st.distanceFromCenter * 1.25) / 67));
 
     const isSelected =
@@ -1938,11 +2142,10 @@ export function CourseRouteMap({
           <button
             type="button"
             onClick={() => setShowSubwayLayer((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${
-              showSubwayLayer
+            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${showSubwayLayer
                 ? "border-foreground/45 bg-surface text-foreground shadow-2xs"
                 : "border-line bg-surface/70 text-muted opacity-70 hover:text-foreground hover:opacity-100"
-            }`}
+              }`}
           >
             <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sky-600 text-white">
               <TrainFront className="h-2.5 w-2.5" />
@@ -1953,11 +2156,10 @@ export function CourseRouteMap({
           <button
             type="button"
             onClick={() => setShowLandmarkLayer((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${
-              showLandmarkLayer
+            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${showLandmarkLayer
                 ? "border-foreground/45 bg-surface text-foreground shadow-2xs"
                 : "border-line bg-surface/70 text-muted opacity-70 hover:text-foreground hover:opacity-100"
-            }`}
+              }`}
           >
             <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
               <Trees className="h-2.5 w-2.5" />
@@ -1968,11 +2170,10 @@ export function CourseRouteMap({
           <button
             type="button"
             onClick={() => setShowParkingLayer((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${
-              showParkingLayer
+            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${showParkingLayer
                 ? "border-foreground/45 bg-surface text-foreground shadow-2xs"
                 : "border-line bg-surface/70 text-muted opacity-70 hover:text-foreground hover:opacity-100"
-            }`}
+              }`}
           >
             <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
               <SquareParking className="h-2.5 w-2.5" />
@@ -1983,11 +2184,10 @@ export function CourseRouteMap({
           <button
             type="button"
             onClick={() => setShowFestivalLayer((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${
-              showFestivalLayer
+            className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-[11px] font-bold transition-all sm:text-xs ${showFestivalLayer
                 ? "border-foreground/45 bg-surface text-foreground shadow-2xs"
                 : "border-line bg-surface/70 text-muted opacity-70 hover:text-foreground hover:opacity-100"
-            }`}
+              }`}
           >
             <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-pink-600 text-white">
               <PartyPopper className="h-2.5 w-2.5" />
@@ -2002,11 +2202,10 @@ export function CourseRouteMap({
             type="button"
             onClick={() => handleFocusStation(closestStationBadge.station)}
             title={`${closestStationBadge.station.name} 기준 동선 확인 (클릭)`}
-            className={`inline-flex min-w-0 max-w-[210px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors truncate sm:text-xs ${
-              closestStationBadge.isSelected
+            className={`inline-flex min-w-0 max-w-[210px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors truncate sm:text-xs ${closestStationBadge.isSelected
                 ? "border-primary bg-surface text-foreground ring-1 ring-primary/25"
                 : "border-line bg-surface text-foreground hover:border-primary/50"
-            }`}
+              }`}
           >
             <span className="flex shrink-0 items-center gap-0.5">
               {closestStationBadge.station.lines.slice(0, 2).map((line) => (
@@ -2020,9 +2219,8 @@ export function CourseRouteMap({
             </span>
             <span className="truncate">{closestStationBadge.station.name}</span>
             <span
-              className={`shrink-0 text-[10px] font-semibold sm:text-[11px] ${
-                closestStationBadge.isSelected ? "text-primary" : "text-muted"
-              }`}
+              className={`shrink-0 text-[10px] font-semibold sm:text-[11px] ${closestStationBadge.isSelected ? "text-primary" : "text-muted"
+                }`}
             >
               도보 {closestStationBadge.walkBaseMinutes}분
             </span>
@@ -2049,10 +2247,27 @@ export function CourseRouteMap({
               if ((e.target as HTMLElement).closest("button, a")) return;
               handleZoomDelta(1);
             }}
-            className={`relative h-full w-full touch-none overflow-hidden ${isDragging ? "cursor-grabbing" : "cursor-grab"
-              }`}
+            className={`relative h-full w-full touch-none overflow-hidden ${
+              isDragging ? "cursor-grabbing" : "cursor-grab"
+            }`}
           >
-            {/* Real Korean Street & Transit Raster Tiles */}
+            {/* Smooth Zoom & GPU Pan Camera Viewport Layer */}
+            <div
+              style={{
+                transform: `translate3d(${dragPanOffset.x}px, ${dragPanOffset.y}px, 0)${
+                  zoomAnimScale !== 1 ? ` scale(${zoomAnimScale})` : ""
+                }`,
+                transformOrigin: "center center",
+                transition: isDragging
+                  ? "none"
+                  : zoomAnimScale !== 1
+                    ? "transform 150ms cubic-bezier(0.16, 1, 0.3, 1)"
+                    : "none",
+                willChange: "transform",
+              }}
+              className="absolute inset-0 h-full w-full"
+            >
+              {/* Real Korean Street & Transit Raster Tiles */}
             <div
               style={{ filter: activeTheme.tileCssFilter }}
               className="pointer-events-none absolute inset-0"
@@ -2233,11 +2448,19 @@ export function CourseRouteMap({
                             ? "z-[21]"
                             : "z-20";
 
-              const surfaceClass = isFocusedOrSelected
-                ? "bg-surface text-foreground ring-2 ring-primary shadow-md"
-                : pin.isDraft
-                  ? "bg-surface text-foreground ring-1.5 ring-primary/60 shadow-sm"
-                  : "bg-surface text-foreground ring-1 ring-line shadow-sm";
+              const isDarkMap = activeTheme.isDark || resolvedTheme === "dark";
+
+              const surfaceClass = isDarkMap
+                ? isFocusedOrSelected
+                  ? "bg-zinc-900/95 text-zinc-100 ring-2 ring-primary shadow-lg backdrop-blur-xs"
+                  : pin.isDraft
+                    ? "bg-zinc-900/90 text-zinc-100 ring-1.5 ring-primary/70 shadow-md backdrop-blur-xs"
+                    : "bg-zinc-900/90 text-zinc-200 ring-1 ring-zinc-700/80 shadow-md backdrop-blur-xs hover:text-white"
+                : isFocusedOrSelected
+                  ? "bg-surface text-foreground ring-2 ring-primary shadow-md"
+                  : pin.isDraft
+                    ? "bg-surface text-foreground ring-1.5 ring-primary/60 shadow-sm"
+                    : "bg-surface text-foreground ring-1 ring-line shadow-sm";
 
               const iconCls = showFullLabel ? "h-3 w-3" : "h-3.5 w-3.5";
               const renderPinIcon = () => {
@@ -2305,9 +2528,8 @@ export function CourseRouteMap({
                 >
                   <span
                     style={{ backgroundColor: pin.iconColor }}
-                    className={`flex shrink-0 items-center justify-center rounded-full text-white shadow-2xs ${
-                      showFullLabel ? "h-5 w-5" : "h-6 w-6"
-                    }`}
+                    className={`flex shrink-0 items-center justify-center rounded-full text-white shadow-2xs ${showFullLabel ? "h-5 w-5" : "h-6 w-6"
+                      }`}
                   >
                     {renderPinIcon()}
                   </span>
@@ -2330,6 +2552,59 @@ export function CourseRouteMap({
                 </button>
               );
             })}
+
+            {/* Clustered Pin Badges (Rendered strictly on top of all pins with z-[50] so they never get obscured) */}
+            {projectedClusters.map((cluster) => {
+              if (
+                cluster.x < -60 ||
+                cluster.x > containerSize.width + 60 ||
+                cluster.y < -40 ||
+                cluster.y > containerSize.height + 40
+              ) {
+                return null;
+              }
+
+              const isFestivalTheme = cluster.isMainlyFestival;
+              const clusterBgClass = isFestivalTheme
+                ? "bg-white text-zinc-900 border border-pink-200/90 ring-2 ring-pink-500/20 shadow-md"
+                : "bg-white text-zinc-900 border border-zinc-200/90 ring-2 ring-black/5 shadow-md";
+
+              return (
+                <button
+                  key={cluster.clusterKey}
+                  type="button"
+                  suppressHydrationWarning
+                  onClick={() => {
+                    commitViewport(
+                      {
+                        centerLat: cluster.latitude,
+                        centerLng: cluster.longitude,
+                        zoom: clampZoom(viewport.zoom + 2),
+                      },
+                      true,
+                    );
+                  }}
+                  title={`${cluster.title} - 클릭하여 확대`}
+                  aria-label={`${cluster.title} - 클릭하여 확대`}
+                  style={{
+                    left: `${Math.round(cluster.x)}px`,
+                    top: `${Math.round(cluster.y)}px`,
+                  }}
+                  className={`absolute z-[50] -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black whitespace-nowrap shadow-md transition-transform duration-100 hover:scale-105 active:scale-95 ${clusterBgClass} ${cluster.hasSelected
+                      ? "outline outline-2 outline-primary outline-offset-2 animate-pulse"
+                      : ""
+                    }`}
+                >
+                  {isFestivalTheme ? (
+                    <PartyPopper className="h-3.5 w-3.5 shrink-0 text-pink-600 fill-pink-500" />
+                  ) : (
+                    <MapPin className="h-3.5 w-3.5 shrink-0 text-primary fill-primary/20" />
+                  )}
+                  <span className="text-zinc-900">{cluster.totalCount}</span>
+                </button>
+              );
+            })}
+            </div>
 
             {/* Empty State Banner */}
             {stops.length === 0 && !onSearchInArea && (
@@ -2442,33 +2717,30 @@ export function CourseRouteMap({
         {/* 6. Selected Subway Station / Landmark / Parking / Festival Context Info Card */}
         {selectedContext && (
           <div
-            className={`absolute inset-x-4 z-30 flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface/95 px-4 py-2.5 text-foreground shadow-lg backdrop-blur-md ${footerNode ? "bottom-18" : "bottom-4"
+            className={`absolute inset-x-3 sm:inset-x-4 z-30 flex items-center justify-between gap-3 rounded-lg border border-line bg-surface/95 px-3.5 py-2.5 text-foreground shadow-lg backdrop-blur-md ${footerNode ? "bottom-18" : "bottom-3 sm:bottom-4"
               }`}
           >
             {selectedContext.type === "STATION" ? (
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-foreground">
-                    <span
-                      style={{
-                        backgroundColor:
-                          selectedContext.station.lines[0]?.color ?? "#0284C7",
-                      }}
-                      className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full text-white"
-                    >
-                      <TrainFront className="h-2.5 w-2.5" />
-                    </span>
-                    <span>{selectedContext.station.name}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-black text-sky-600 dark:text-sky-400 shrink-0">
+                    <TrainFront className="h-3 w-3" />
+                    <span>지하철역</span>
                   </span>
-                  {selectedContext.station.lines.map((line) => (
-                    <span
-                      key={line.label}
-                      style={{ backgroundColor: line.color }}
-                      className="rounded-full px-2 py-0.5 text-[10px] font-extrabold text-white"
-                    >
-                      {line.label}
-                    </span>
-                  ))}
+                  <span className="text-xs font-black text-foreground truncate">
+                    {selectedContext.station.name}
+                  </span>
+                  <div className="flex items-center gap-1 overflow-hidden">
+                    {selectedContext.station.lines.map((line) => (
+                      <span
+                        key={line.label}
+                        style={{ backgroundColor: line.color }}
+                        className="rounded px-1.5 py-0.5 text-[9px] font-extrabold text-white shrink-0"
+                      >
+                        {line.label}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <p className="mt-0.5 truncate text-[11px] text-muted">
                   {stationToFirstStopGuide
@@ -2477,21 +2749,21 @@ export function CourseRouteMap({
                 </p>
               </div>
             ) : selectedContext.type === "FESTIVAL" ? (
-              <div className="min-w-0">
-                <p className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-foreground">
-                  <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pink-600 text-white">
-                    <PartyPopper className="h-2.5 w-2.5" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1 rounded bg-pink-500/15 px-1.5 py-0.5 text-[10px] font-black text-pink-600 dark:text-pink-400 shrink-0">
+                    <PartyPopper className="h-3 w-3" />
+                    <span>행사·축제</span>
                   </span>
-                  <span>행사·축제 안내</span>
                   {selectedContext.stop.eventStartDate &&
                     selectedContext.stop.eventEndDate && (
-                      <span className="text-[10px] font-semibold text-muted">
-                        ({selectedContext.stop.eventStartDate} ~{" "}
-                        {selectedContext.stop.eventEndDate})
+                      <span className="truncate text-[10px] font-medium text-muted">
+                        ({selectedContext.stop.eventStartDate.replace(/^\d{4}-/, "")} ~{" "}
+                        {selectedContext.stop.eventEndDate.replace(/^\d{4}-/, "")})
                       </span>
                     )}
-                </p>
-                <p className="mt-0.5 truncate text-xs font-extrabold text-foreground">
+                </div>
+                <p className="mt-0.5 truncate text-xs font-black text-foreground">
                   {selectedContext.stop.name}
                 </p>
                 <p className="truncate text-[11px] text-muted">
@@ -2499,16 +2771,15 @@ export function CourseRouteMap({
                 </p>
               </div>
             ) : (
-              <div className="min-w-0">
-                <p className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-foreground">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
                   <span
-                    className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full text-white ${
-                      selectedContext.poi.kind === "PARKING"
+                    className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-black text-white shrink-0 ${selectedContext.poi.kind === "PARKING"
                         ? "bg-blue-600"
                         : selectedContext.poi.kind === "PARK"
                           ? "bg-emerald-600"
                           : "bg-teal-600"
-                    }`}
+                      }`}
                   >
                     {selectedContext.poi.kind === "PARKING" ? (
                       <SquareParking className="h-2.5 w-2.5" />
@@ -2517,20 +2788,23 @@ export function CourseRouteMap({
                     ) : (
                       <Landmark className="h-2.5 w-2.5" />
                     )}
+                    <span>
+                      {selectedContext.poi.kind === "PARKING"
+                        ? "주변 주차장"
+                        : `주변 ${selectedContext.poi.categoryLabel}`}
+                    </span>
                   </span>
-                  <span>
-                    {selectedContext.poi.kind === "PARKING"
-                      ? "주변 주차장"
-                      : `주변 ${selectedContext.poi.categoryLabel}`}
-                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-xs font-black text-foreground">
+                  {selectedContext.poi.name}
                 </p>
-                <p className="mt-0.5 truncate text-xs font-extrabold text-foreground">
+                <p className="truncate text-[11px] text-muted">
                   {selectedContext.poi.name}
                 </p>
               </div>
             )}
 
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
               {selectedContext.type === "FESTIVAL" && onSelectStop && (
                 <button
                   type="button"
@@ -2538,19 +2812,64 @@ export function CourseRouteMap({
                     onSelectStop(selectedContext.stop);
                     setSelectedContext(null);
                   }}
-                  className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-subtle px-2.5 py-1.5 text-[11px] font-bold text-foreground hover:bg-line/60"
+                  className="inline-flex items-center gap-1 rounded-lg border border-line bg-surface-subtle px-2 py-1 text-[11px] font-bold text-foreground hover:bg-line/60"
                 >
                   <span>상세 보기</span>
                 </button>
               )}
-              {selectedContext.type === "FESTIVAL" && onAddPlaceToCourse && (
+              {onAddPlaceToCourse && (
                 <button
                   type="button"
                   onClick={() => {
-                    onAddPlaceToCourse(selectedContext.stop);
+                    if (selectedContext.type === "FESTIVAL") {
+                      onAddPlaceToCourse(selectedContext.stop);
+                    } else if (selectedContext.type === "POI") {
+                      const poi = selectedContext.poi;
+                      const numericId =
+                        Number(poi.id.replace(/\D/g, "")) ||
+                        Math.floor(Date.now() % 1000000);
+                      onAddPlaceToCourse({
+                        id: numericId,
+                        order: stops.length + 1,
+                        name: poi.name,
+                        categoryGroup: poi.kind === "PARK" ? "PARK" : "EXHIBITION",
+                        categoryLabel:
+                          poi.categoryLabel ||
+                          (poi.kind === "PARK"
+                            ? "공원"
+                            : poi.kind === "PARKING"
+                              ? "주차장"
+                              : "명소"),
+                        latitude: poi.latitude,
+                        longitude: poi.longitude,
+                        address: poi.name,
+                        placeUrl: poi.placeUrl,
+                        stayMinutes:
+                          poi.kind === "PARK" ? 60 : poi.kind === "PARKING" ? 15 : 45,
+                        estimatedCost: 0,
+                      });
+                    } else if (selectedContext.type === "STATION") {
+                      const station = selectedContext.station;
+                      const numericId =
+                        Number(station.id.replace(/\D/g, "")) ||
+                        Math.floor(Date.now() % 1000000);
+                      onAddPlaceToCourse({
+                        id: numericId,
+                        order: stops.length + 1,
+                        name: station.name,
+                        categoryGroup: "ETC",
+                        categoryLabel: "지하철역",
+                        latitude: station.latitude,
+                        longitude: station.longitude,
+                        address: station.name,
+                        placeUrl: station.placeUrl,
+                        stayMinutes: 10,
+                        estimatedCost: 0,
+                      });
+                    }
                     setSelectedContext(null);
                   }}
-                  className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-[11px] font-black text-white shadow-sm hover:bg-primary-hover"
+                  className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-black text-white shadow-xs hover:bg-primary-hover"
                 >
                   <Plus className="h-3 w-3" />
                   <span>코스로 지정</span>
@@ -2571,7 +2890,7 @@ export function CourseRouteMap({
                     }
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-subtle px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-line/60"
+                    className="inline-flex items-center gap-1 rounded-lg border border-line bg-surface-subtle px-2 py-1 text-[11px] font-bold text-foreground hover:bg-line/60"
                   >
                     <span>지도</span>
                     <ExternalLink className="h-3 w-3" />
@@ -2581,7 +2900,7 @@ export function CourseRouteMap({
                 type="button"
                 onClick={() => setSelectedContext(null)}
                 aria-label="주변 정보 닫기"
-                className="rounded-full p-1 text-muted hover:bg-surface-subtle hover:text-foreground"
+                className="rounded-lg p-1 text-muted hover:bg-surface-subtle hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -2591,7 +2910,7 @@ export function CourseRouteMap({
 
         {/* 7. Selected Spot Floating Info Pill */}
         {activeStop && !footerNode && !selectedContext && (
-          <div className="absolute inset-x-4 bottom-4 z-30 flex items-center justify-between gap-3 rounded-2xl border border-white/70 bg-surface/95 px-4 py-3 shadow-sm backdrop-blur-md">
+          <div className="absolute inset-x-4 bottom-4 z-30 flex items-center justify-between gap-3 rounded-lg border border-white/70 bg-surface/95 px-4 py-3 shadow-sm backdrop-blur-md">
             <div className="min-w-0">
               <p className="text-[11px] font-extrabold text-primary">
                 #{activeStop.order} {activeStop.categoryLabel}

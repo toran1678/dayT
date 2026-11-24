@@ -29,6 +29,7 @@ function loadRootPublicEnv(): Record<string, string> {
 }
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   cacheComponents: true,
   partialPrefetching: true,
   env: loadRootPublicEnv(),

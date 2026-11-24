@@ -30,6 +30,7 @@ import {
   fetchTodayMissionsApi,
 } from "./together-api";
 import { PetStageIcon } from "./PetStageIcon";
+import { DatePickerField } from "@/components/ui/DatePickerField";
 
 function getPetStageMeta(characterType?: string) {
   switch (characterType) {
@@ -560,12 +561,11 @@ export function TogetherClientView() {
                       placeholder="상대방 6자리 코드 입력"
                       className="rounded-xl border border-line bg-surface px-3.5 py-2 font-mono text-xs font-bold tracking-widest uppercase outline-none focus:border-primary"
                     />
-                    <input
-                      type="date"
+                    <DatePickerField
                       value={startedDateInput}
-                      onChange={(e) => setStartedDateInput(e.target.value)}
-                      aria-label="사귀기 시작한 날"
-                      className="rounded-xl border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-foreground outline-none focus:border-primary"
+                      onChange={setStartedDateInput}
+                      placeholder="사귀기 시작한 날"
+                      className="w-full text-xs"
                     />
                   </div>
                   <button

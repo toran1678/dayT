@@ -892,9 +892,9 @@ export function CourseBuilderClientView({
                     key={theme}
                     type="button"
                     onClick={() => handleToggleTheme(theme)}
-                    className={`inline-flex items-center rounded-full border border-solid px-3 py-1 text-xs font-bold transition-colors ${
+                    className={`inline-flex items-center rounded-full border border-solid px-3 py-1 text-xs font-bold transition-all ${
                       active
-                        ? "border-surface-dark bg-surface-dark text-white"
+                        ? "border-primary bg-primary text-white shadow-2xs"
                         : "border-line bg-surface-subtle text-muted hover:border-primary/40 hover:text-foreground"
                     }`}
                   >
@@ -1086,10 +1086,10 @@ export function CourseBuilderClientView({
                           <button
                             type="button"
                             onClick={() => setFocusedOrder(step.order)}
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black shadow-xs transition-transform hover:scale-105 ${
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                               isFocused
-                                ? "bg-surface-dark text-amber-300 ring-2 ring-amber-300"
-                                : "bg-primary text-white"
+                                ? "bg-primary text-white"
+                                : "border border-line bg-surface text-muted hover:border-primary/50 hover:text-foreground"
                             }`}
                           >
                             {step.order}
@@ -1102,10 +1102,10 @@ export function CourseBuilderClientView({
                         {/* Editable Stop Card */}
                         <div
                           onClick={() => setFocusedOrder(step.order)}
-                          className={`mb-3 flex-1 rounded-2xl border bg-background p-4 transition-colors sm:p-5 ${
+                          className={`mb-3 flex-1 rounded-xl border p-4 transition-all sm:p-5 ${
                             isFocused
-                              ? "border-primary shadow-[0_6px_20px_rgba(232,93,63,0.08)]"
-                              : "border-line hover:border-primary/35"
+                              ? "border-primary/80 bg-surface shadow-xs"
+                              : "border-line bg-background hover:border-primary/35"
                           }`}
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">

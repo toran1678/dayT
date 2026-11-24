@@ -196,7 +196,7 @@ export function DatePickerField({
         <div
           role="dialog"
           aria-label="달력 날짜 선택"
-          className="absolute top-full left-0 z-50 mt-2 w-72 max-w-[calc(100vw-2.5rem)] rounded-2xl border border-line bg-surface p-3.5 shadow-xl sm:w-80"
+          className="absolute top-full left-0 z-50 mt-2 w-72 max-w-[calc(100vw-2.5rem)] rounded-lg border border-line bg-surface p-3.5 shadow-xl sm:w-80"
         >
           {/* Calendar Header */}
           <div className="mb-3 flex items-center justify-between">

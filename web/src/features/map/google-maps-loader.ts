@@ -358,7 +358,7 @@ export const DAYT_MAP_THEMES: Record<DaytMapThemeId, DaytMapThemeSpec> = {
     canvasBg: "#18181B",
     roadPrimary: "#292524",
     roadSecondary: "#44403C",
-    routeStroke: "#FBBF24",
+    routeStroke: "#FF6B4A",
     isDark: true,
     tileCssFilter:
       "invert(0.91) hue-rotate(180deg) saturate(0.82) brightness(0.95) contrast(1.08)",

@@ -207,10 +207,10 @@ export function getVisibleOsmTiles(
   const topLeftX = centerWorld.x - safeW / 2;
   const topLeftY = centerWorld.y - safeH / 2;
 
-  const startTileX = Math.floor(topLeftX / TILE_SIZE) - 1;
-  const endTileX = Math.floor((topLeftX + safeW) / TILE_SIZE) + 1;
-  const startTileY = Math.floor(topLeftY / TILE_SIZE) - 1;
-  const endTileY = Math.floor((topLeftY + safeH) / TILE_SIZE) + 1;
+  const startTileX = Math.floor(topLeftX / TILE_SIZE) - 2;
+  const endTileX = Math.floor((topLeftX + safeW) / TILE_SIZE) + 2;
+  const startTileY = Math.floor(topLeftY / TILE_SIZE) - 2;
+  const endTileY = Math.floor((topLeftY + safeH) / TILE_SIZE) + 2;
 
   const maxTileIndex = Math.pow(2, z);
   const tiles: TileDescriptor[] = [];

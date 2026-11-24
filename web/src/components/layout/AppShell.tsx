@@ -229,7 +229,6 @@ function DesktopPillNav() {
 
 function MobileFloatingDockView({ pathname }: { pathname: string | null }) {
   const [clickedHref, setClickedHref] = useState<string | null>(null);
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [prevPathname, setPrevPathname] = useState(pathname);
 
   if (pathname !== prevPathname) {
@@ -243,38 +242,24 @@ function MobileFloatingDockView({ pathname }: { pathname: string | null }) {
   );
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(24,24,27,0.06)] backdrop-blur-md lg:hidden">
+    <div className="fixed inset-x-3 bottom-3 z-40 sm:inset-x-6 sm:bottom-4 lg:hidden">
       <nav
         aria-label="모바일 하단 메뉴"
-        onMouseLeave={() => setHoveredIndex(null)}
-        className="relative mx-auto h-16 w-full px-2"
+        className="relative mx-auto flex h-[66px] w-full max-w-md items-center justify-between rounded-[24px] border border-line/80 bg-surface/95 px-2 py-1.5 shadow-[0_10px_30px_rgba(24,24,27,0.08)] backdrop-blur-xl"
       >
-        <div className="relative grid h-full w-full grid-cols-5 items-center">
-          {/* 1. Hover Sliding Capsule (Mobile / Pointer) */}
-          {hoveredIndex !== null && (
-            <div
-              aria-hidden="true"
-              style={{ transform: `translateX(${hoveredIndex * 100}%)` }}
-              className="pointer-events-none absolute inset-y-1.5 left-0 w-1/5 px-1 transition-transform duration-200 ease-out"
-            >
-              <div className="h-full w-full rounded-xl bg-foreground/[0.04] dark:bg-white/[0.06]" />
-            </div>
-          )}
-
-          {/* 2. Active Tab Sliding Capsule */}
+        <div className="relative grid h-full w-full grid-cols-5 items-center gap-1">
+          {/* Active Tab Sliding Squircle Background (Smooth Gliding Indicator) */}
           {activeIndex >= 0 && (
             <div
               aria-hidden="true"
               style={{ transform: `translateX(${activeIndex * 100}%)` }}
-              className="pointer-events-none absolute inset-y-1.5 left-0 w-1/5 px-1 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+              className="pointer-events-none absolute inset-y-0.5 left-0 w-1/5 p-0.5 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
             >
-              <div className="flex h-full w-full flex-col items-center rounded-xl border border-primary/20 bg-primary-soft/85 shadow-2xs">
-                <span className="h-0.5 w-6 rounded-full bg-primary" />
-              </div>
+              <div className="h-full w-full rounded-2xl bg-primary/10 border border-primary/20 dark:bg-primary/20 shadow-2xs" />
             </div>
           )}
 
-          {/* 3. Navigation Links */}
+          {/* Navigation Links */}
           {NAV_ITEMS.map((item, index) => {
             const Icon = item.icon;
             const active = activeIndex === index;
@@ -283,19 +268,23 @@ function MobileFloatingDockView({ pathname }: { pathname: string | null }) {
                 key={item.href}
                 href={item.href}
                 prefetch={true}
-                onMouseEnter={() => setHoveredIndex(index)}
                 onClick={() => {
                   setClickedHref(item.href);
-                  setHoveredIndex(null);
                 }}
-                className={`relative z-10 flex h-full flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-semibold transition-colors duration-150 select-none ${
+                className={`relative z-10 flex h-full flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] transition-colors duration-200 select-none ${
                   active
-                    ? "text-primary"
-                    : "text-muted hover:text-foreground"
+                    ? "font-bold text-primary"
+                    : "font-medium text-muted hover:text-foreground"
                 }`}
               >
-                <Icon className="h-4 w-4" />
-                <span className="truncate">{item.mobileLabel}</span>
+                <Icon
+                  className={`h-[18px] w-[18px] transition-transform duration-200 ${
+                    active
+                      ? "stroke-[2.5] scale-105 text-primary"
+                      : "stroke-[1.8] text-muted"
+                  }`}
+                />
+                <span className="truncate leading-none">{item.mobileLabel}</span>
               </Link>
             );
           })}

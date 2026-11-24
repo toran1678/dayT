@@ -1261,16 +1261,18 @@ export function ExploreClientView() {
           onClick={() => setIsSpotlightModalOpen(false)}
         >
           <div
-            className="relative max-h-[88vh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl border border-line bg-surface shadow-2xl [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.2)_transparent] dark:[scrollbar-color:rgba(255,255,255,0.2)_transparent]"
+            className="relative max-h-[92vh] w-full max-w-lg overflow-hidden rounded-lg border border-line bg-surface shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <PlaceSpotlightCard
-              place={activeSpotlightPlace}
-              orderNumber={activeSpotlightOrder}
-              isSelectedInDraft={draftIdSet.has(activeSpotlightPlace.id)}
-              onToggleDraft={handleToggleDraft}
-              onClose={() => setIsSpotlightModalOpen(false)}
-            />
+            <div className="max-h-[92vh] overflow-y-auto overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <PlaceSpotlightCard
+                place={activeSpotlightPlace}
+                orderNumber={activeSpotlightOrder}
+                isSelectedInDraft={draftIdSet.has(activeSpotlightPlace.id)}
+                onToggleDraft={handleToggleDraft}
+                onClose={() => setIsSpotlightModalOpen(false)}
+              />
+            </div>
           </div>
         </div>
       )}

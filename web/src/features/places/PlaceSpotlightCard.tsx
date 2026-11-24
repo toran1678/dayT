@@ -15,7 +15,6 @@ import {
   Phone,
   Plus,
   UtensilsCrossed,
-  X,
 } from "lucide-react";
 import type { PlaceCategoryGroup, PlaceDetail } from "@/shared/api/types";
 import type { PlacePhotoItem } from "@/app/api/place-photos/route";
@@ -208,7 +207,7 @@ export function PlaceSpotlightCard({
   return (
     <article className="bg-surface text-foreground">
       {/* 1. Food & Store Photo Gallery Carousel */}
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-surface-subtle">
+      <div className="relative aspect-[16/9] max-h-[220px] sm:max-h-[250px] w-full overflow-hidden bg-surface-subtle">
         {isLoadingPhotos ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -294,23 +293,12 @@ export function PlaceSpotlightCard({
               </span>
             )}
           </div>
-
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="창 닫기"
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/90 backdrop-blur-xs"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
         </div>
       </div>
 
       {/* 1.1 Photo Thumbnail Strip (if multiple photos available) */}
       {photos.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto border-b border-line bg-surface-subtle/40 px-5 py-2.5">
+        <div className="flex gap-1.5 overflow-x-auto border-b border-line bg-surface-subtle/40 px-4 py-2">
           {photos.map((photo, idx) => {
             const thumbSrc =
               photo.thumbnailUrl && !failedUrls[photo.thumbnailUrl]
@@ -321,11 +309,10 @@ export function PlaceSpotlightCard({
                 key={`${photo.url}-${idx}`}
                 type="button"
                 onClick={() => setSelectedPhotoIdx(idx)}
-                className={`relative h-12 w-16 shrink-0 overflow-hidden rounded-lg transition-opacity ${
-                  selectedPhotoIdx === idx
+                className={`relative h-10 w-14 shrink-0 overflow-hidden rounded-md transition-opacity ${selectedPhotoIdx === idx
                     ? "ring-2 ring-foreground opacity-100"
                     : "opacity-60 hover:opacity-100"
-                }`}
+                  }`}
               >
                 <Image
                   src={thumbSrc}
@@ -333,7 +320,7 @@ export function PlaceSpotlightCard({
                   fill
                   unoptimized
                   referrerPolicy="no-referrer"
-                  sizes="64px"
+                  sizes="56px"
                   className="object-cover"
                 />
               </button>
@@ -343,7 +330,7 @@ export function PlaceSpotlightCard({
       )}
 
       {/* 2. Place Main Details */}
-      <div className="p-5 sm:p-6 space-y-4">
+      <div className="p-4 sm:p-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-xl font-black tracking-tight text-foreground">
@@ -359,11 +346,10 @@ export function PlaceSpotlightCard({
           <button
             type="button"
             onClick={() => onToggleDraft(place)}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-extrabold transition-colors ${
-              isSelectedInDraft
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-extrabold transition-colors ${isSelectedInDraft
                 ? "bg-surface-dark text-white"
                 : "bg-primary text-white hover:bg-primary-hover"
-            }`}
+              }`}
           >
             {isSelectedInDraft ? (
               <>

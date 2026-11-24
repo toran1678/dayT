@@ -55,7 +55,11 @@ export function DiariesClientView() {
   const [filterMode, setFilterMode] = useState<DiaryFilterMode>("ALL");
 
   const [editingDiary, setEditingDiary] = useState<DiaryDetail | null>(null);
-  const [dateAt, setDateAt] = useState<string>(() => getTodayIso());
+  const [dateAt, setDateAt] = useState<string>("");
+
+  useEffect(() => {
+    setDateAt(getTodayIso());
+  }, []);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
